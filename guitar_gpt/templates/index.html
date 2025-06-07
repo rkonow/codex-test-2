@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Guitar GPT Tutor</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.39/Tone.js"></script>
+    <style>
+        /* Ensure ASCII guitar tabs maintain formatting */
+        #response {
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <h1>Ask the Guitar GPT Tutor</h1>
+    <form id="chat-form">
+        <textarea name="prompt" id="prompt" rows="4" cols="50" placeholder="Ask how to improve your solos, melody, and more..."></textarea><br>
+        <button type="submit">Send</button>
+        <button type="button" id="play-tab">Play Tab</button>
+    </form>
+    <pre id="response"></pre>
+    <script>
+        $(function() {
+            $('#chat-form').on('submit', function(e) {
+                e.preventDefault();
+                $.post('/chat', {prompt: $('#prompt').val()}, function(data) {
+                    $('#response').text(data.answer);
+                });
+            });
+
+            function parseTab(text) {
+                const lines = text.trim().split(/\r?\n/).slice(0, 6);
+                const stringMidi = [64, 59, 55, 50, 45, 40]; // high E to low E
+                const maxLen = Math.max.apply(null, lines.map(l => l.length));
+                const notes = [];
+                let idx = 0;
+                while (idx < maxLen) {
+                    for (let s = 0; s < 6; s++) {
+                        const line = lines[s] || "";
+                        if (idx >= line.length) continue;
+                        if (/\d/.test(line[idx])) {
+                            let num = "";
+                            let j = idx;
+                            while (j < line.length && /\d/.test(line[j])) {
+                                num += line[j];
+                                j++;
+                            }
+                            const fret = parseInt(num, 10);
+                            notes.push(stringMidi[s] + fret);
+                            if (j > idx) idx = j - 1;
+                        }
+                    }
+                    idx++;
+                }
+                return notes;
+            }
+
+            $('#play-tab').on('click', async function() {
+                const tab = $('#response').text();
+                if (!tab.trim()) return;
+                const notes = parseTab(tab);
+                const synth = new Tone.Synth().toDestination();
+                let time = Tone.now();
+                notes.forEach(n => {
+                    synth.triggerAttackRelease(Tone.Frequency(n, 'midi'), '8n', time);
+                    time += 0.5;
+                });
+            });
+        });
+    </script>
+</body>
+</html>
