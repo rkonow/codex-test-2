@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Login - Guitar GPT Tutor</title>
+    <style>
+        body { font-family: sans-serif; max-width: 320px; margin: 80px auto; }
+        h1 { font-size: 1.4em; }
+        label { display: block; margin-top: 12px; }
+        input[type="text"], input[type="password"] {
+            width: 100%; padding: 6px; box-sizing: border-box;
+        }
+        button { margin-top: 16px; padding: 8px 16px; }
+        .error { color: #b00020; margin-top: 12px; }
+    </style>
+</head>
+<body>
+    <h1>Sign in</h1>
+    <form method="post" action="/login">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username" required autofocus>
+
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" required>
+
+        <button type="submit">Log in</button>
+    </form>
+    {% if error %}
+    <p class="error">{{ error }}</p>
+    {% endif %}
+</body>
+</html>
