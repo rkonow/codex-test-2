@@ -122,7 +122,14 @@ def list_issues(cutoff: str) -> list[dict]:
 def deslug(slug: str) -> str:
     """`8-the-matryoshka-hypencoder` -> `the matryoshka hypencoder`."""
     slug = urllib.parse.unquote(slug)
-    return re.sub(r"^\d+-", "", slug).replace("-", " ").strip()
+    slug = re.sub(r"^\d+-", "", slug)
+    # Substack occasionally emits the heading text twice in one anchor, joined with
+    # no separator (`...via-distillationaligning-dense-retrievers-with...`), which
+    # makes the title unsearchable. Halve it when the two halves match exactly.
+    half = len(slug) // 2
+    if len(slug) % 2 == 0 and slug[:half] == slug[half:]:
+        slug = slug[:half]
+    return slug.replace("-", " ").strip()
 
 
 def compact(text: str) -> str:
@@ -273,12 +280,50 @@ OVERRIDES = {
         "2607.02818",
         "Session-Level Optimization for Large-Scale Retrieval using REINFORCE with Multi-Step Off-Policy Correction",
     ),
+    # v1 "Isotonic Layer: A Universal Framework for Generic Recommendation Debiasing"
+    "6-isotonic-layer-a-universal-framework-for-generic-recommendation-debiasing": (
+        "2603.06589",
+        "Isotonic Layer: A Unified Framework for Recommendation Calibration and Debiasing",
+    ),
+    # v1 "Bringing Model Editing to Generative Recommendation in Cold-Start Scenarios"
+    "7-bringing-model-editing-to-generative-recommendation-in-cold-start-scenarios": (
+        "2603.14259",
+        "GenRecEdit: Adapting Model Editing for Generative Recommendation with Cold-Start Items",
+    ),
+    # v1 "Semantic Shift: The Fundamental Challenge in Text Embedding and Retrieval"
+    "3-semantic-shift-the-fundamental-challenge-in-text-embedding-and-retrieval": (
+        "2603.21437",
+        "Pooling and Semantic Shift: The Fundamental Challenges in Long Text Embedding and Retrieval",
+    ),
+    # v1 "SkillRouter: Retrieve-and-Rerank Skill Selection for LLM Agents at Scale"
+    "7-skillrouter-retrieve-and-rerank-skill-selection-for-llm-agents-at-scale": (
+        "2603.22455",
+        "SkillRouter: Skill Routing for LLM Agents at Scale",
+    ),
+    # v1 "M-RAG: Making RAG Faster, Stronger, and More Efficient"; the v2 title matches
+    # the newsletter's "Chunk-Free RAG via Key-Value Meta-Markers" framing
+    "6-m-rag-making-rag-faster-stronger-and-more-efficient": (
+        "2603.26667",
+        "M-RAG: Semantic Key-Value Indexing for Retrieval-Augmented Generation",
+    ),
+    # Substack collided this section's anchor with the issue's intro heading, so the
+    # slug carries no title at all. Identified from the newsletter's own description
+    # ("cold-start generalization in generative recommendation", from Zhang et al) and
+    # confirmed against the abstract and author list.
+    "this-weeks-newsletter-highlights-the-following-research": (
+        "2603.29845",
+        "Cold-Starts in Generative Recommendation: A Reproducibility Study",
+    ),
 }
 
 # Papers confirmed to have no openly downloadable PDF, keyed by section slug.
 NOT_AVAILABLE = {
     "8-tmmsrec-time-interval-aware-multi-modal-sequential-recommender": (
         "not on arXiv; no open PDF found via arXiv or web search (venue-only paper)"
+    ),
+    # Published in ACM TOIS, May 2026 (doi 10.1145/3805800); no arXiv preprint.
+    "9-eenet-an-efficient-and-effective-network-for-large-scale-ctr-prediction": (
+        "journal-only (ACM TOIS, doi 10.1145/3805800); no arXiv preprint or open PDF"
     ),
 }
 
