@@ -1,8 +1,144 @@
 # Papers from recsys.substack.com
 
 Newsletter: <https://recsys.substack.com>  
-Issues covered: 14 (2026-05-08 to 2026-08-07)  
-Papers listed: 140 — PDFs downloaded: 139
+Issues covered: 23 (2026-03-06 to 2026-08-07)  
+Papers listed: 230 — PDFs downloaded: 228
+
+## 2026-03-06 — [Bringing the Muon Optimizer to Large-Scale Recommender Systems, Decoupling Memory Reasoning from LLM Inference, and More!](https://recsys.substack.com/p/bringing-the-muon-optimizer-to-large)
+
+_only paid_
+
+1. **AgentIR: Reasoning-Aware Retrieval for Deep Research Agents** — [2603.04384v3](https://arxiv.org/abs/2603.04384v3) — `01_AgentIR_Reasoning-Aware_Retrieval_for_Deep_Research_Agents.pdf`
+2. **KARL: Knowledge Agents via Reinforcement Learning** — [2603.05218v1](https://arxiv.org/abs/2603.05218v1) — `02_KARL_Knowledge_Agents_via_Reinforcement_Learning.pdf`
+3. **Beyond the Flat Sequence: Hierarchical and Preference-Aware Generative Recommendations** — [2603.00980v1](https://arxiv.org/abs/2603.00980v1) — `03_Beyond_the_Flat_Sequence_Hierarchical_and_Preference-Aware_Generative_Recommendations.pdf`
+4. **Stop Treating Collisions Equally: Qualification-Aware Semantic ID Learning for Recommendation at Industrial Scale** — [2603.00632v1](https://arxiv.org/abs/2603.00632v1) — `04_Stop_Treating_Collisions_Equally_Qualification-Aware_Semantic_ID_Learning_for_Recommendation_at_Industrial_Sca.pdf`
+5. **MemSifter: Offloading LLM Memory Retrieval via Outcome-Driven Proxy Reasoning** — [2603.03379v2](https://arxiv.org/abs/2603.03379v2) — `05_MemSifter_Offloading_LLM_Memory_Retrieval_via_Outcome-Driven_Proxy_Reasoning.pdf`
+6. **MuonRec: Shifting the Optimizer Paradigm Beyond Adam in Scalable Generative Recommendation** — [2603.00416v1](https://arxiv.org/abs/2603.00416v1) — `06_MuonRec_Shifting_the_Optimizer_Paradigm_Beyond_Adam_in_Scalable_Generative_Recommendation.pdf`
+7. **Beyond the Grid: Layout-Informed Multi-Vector Retrieval with Parsed Visual Document Representations** — [2603.01666v1](https://arxiv.org/abs/2603.01666v1) — `07_Beyond_the_Grid_Layout-Informed_Multi-Vector_Retrieval_with_Parsed_Visual_Document_Representations.pdf`
+8. **SORT: A Systematically Optimized Ranking Transformer for Industrial-scale Recommenders** — [2603.03988v1](https://arxiv.org/abs/2603.03988v1) — `08_SORT_A_Systematically_Optimized_Ranking_Transformer_for_Industrial-scale_Recommenders.pdf`
+9. **Not All Candidates are Created Equal: A Heterogeneity-Aware Approach to Pre-ranking in Recommender Systems** — [2603.03770v1](https://arxiv.org/abs/2603.03770v1) — `09_Not_All_Candidates_are_Created_Equal_A_Heterogeneity-Aware_Approach_to_Pre-ranking_in_Recommender_Systems.pdf`
+10. **SE-Search: Self-Evolving Search Agent via Memory and Dense Reward** — [2603.03293v1](https://arxiv.org/abs/2603.03293v1) — `10_SE-Search_Self-Evolving_Search_Agent_via_Memory_and_Dense_Reward.pdf`
+
+## 2026-03-13 — [Deep Research for Recommender Systems, Improving Search Agent with One Line of Code, and More!](https://recsys.substack.com/p/deep-research-for-recommender-systems)
+
+_only paid_
+
+1. **Strategic Navigation or Stochastic Search? How Agents and Humans Reason Over Document Collections** — [2603.12180v2](https://arxiv.org/abs/2603.12180v2) — `01_Strategic_Navigation_or_Stochastic_Search_How_Agents_and_Humans_Reason_Over_Document_Collections.pdf`
+2. **Improving Search Agent with One Line of Code** — [2603.10069v1](https://arxiv.org/abs/2603.10069v1) — `02_Improving_Search_Agent_with_One_Line_of_Code.pdf`
+3. **Visual Words Meet BM25: Sparse Auto-Encoder Visual Word Scoring for Image Retrieval** — [2603.05781v1](https://arxiv.org/abs/2603.05781v1) — `03_Visual_Words_Meet_BM25_Sparse_Auto-Encoder_Visual_Word_Scoring_for_Image_Retrieval.pdf`
+4. **Scaling Multilingual Semantic Search in Uber Eats Delivery** — [2603.06586v3](https://arxiv.org/abs/2603.06586v3) — `04_Scaling_Multilingual_Semantic_Search_in_Uber_Eats_Delivery.pdf`
+5. **LLM2Vec-Gen: Generative Embeddings from Large Language Models** — [2603.10913v3](https://arxiv.org/abs/2603.10913v3) — `05_LLM2Vec-Gen_Generative_Embeddings_from_Large_Language_Models.pdf`
+6. **Isotonic Layer: A Unified Framework for Recommendation Calibration and Debiasing** — [2603.06589](https://arxiv.org/abs/2603.06589) — `06_Isotonic_Layer_A_Unified_Framework_for_Recommendation_Calibration_and_Debiasing.pdf`
+7. **Beyond Relevance: On the Relationship Between Retrieval and RAG Information Coverage** — [2603.08819v4](https://arxiv.org/abs/2603.08819v4) — `07_Beyond_Relevance_On_the_Relationship_Between_Retrieval_and_RAG_Information_Coverage.pdf`
+8. **Deep Research for Recommender Systems** — [2603.07605v1](https://arxiv.org/abs/2603.07605v1) — `08_Deep_Research_for_Recommender_Systems.pdf`
+9. **SPD-RAG: Sub-Agent Per Document Retrieval-Augmented Generation** — [2603.08329v1](https://arxiv.org/abs/2603.08329v1) — `09_SPD-RAG_Sub-Agent_Per_Document_Retrieval-Augmented_Generation.pdf`
+10. **Scaling Agentic Capabilities, Not Context: Efficient Reinforcement Finetuning for Large Toolspaces** — [2603.06713v1](https://arxiv.org/abs/2603.06713v1) — `10_Scaling_Agentic_Capabilities_Not_Context_Efficient_Reinforcement_Finetuning_for_Large_Toolspaces.pdf`
+
+## 2026-03-20 — [A Production System for Podcast Discovery, A Fully Open-Source Frontier Search Agent, and More!](https://recsys.substack.com/p/a-production-system-for-podcast-discovery)
+
+_only paid_
+
+1. **Deploying Semantic ID-based Generative Retrieval for Large-Scale Podcast Discovery at Spotify** — [2603.17540v1](https://arxiv.org/abs/2603.17540v1) — `01_Deploying_Semantic_ID-based_Generative_Retrieval_for_Large-Scale_Podcast_Discovery_at_Spotify.pdf`
+2. **Learning Retrieval Models with Sparse Autoencoders** — [2603.13277v1](https://arxiv.org/abs/2603.13277v1) — `02_Learning_Retrieval_Models_with_Sparse_Autoencoders.pdf`
+3. **OpenSeeker: Democratizing Frontier Search Agents by Fully Open-Sourcing Training Data** — [2603.15594v1](https://arxiv.org/abs/2603.15594v1) — `03_OpenSeeker_Democratizing_Frontier_Search_Agents_by_Fully_Open-Sourcing_Training_Data.pdf`
+4. **A Unified Language Model for Large Scale Search, Recommendation, and Reasoning** — [2603.17533v1](https://arxiv.org/abs/2603.17533v1) — `04_A_Unified_Language_Model_for_Large_Scale_Search_Recommendation_and_Reasoning.pdf`
+5. **Negative Sampling Techniques in Information Retrieval: A Survey** — [2603.18005v1](https://arxiv.org/abs/2603.18005v1) — `05_Negative_Sampling_Techniques_in_Information_Retrieval_A_Survey.pdf`
+6. **F2LLM-v2: Inclusive, Performant, and Efficient Embeddings for a Multilingual World** — [2603.19223v1](https://arxiv.org/abs/2603.19223v1) — `06_F2LLM-v2_Inclusive_Performant_and_Efficient_Embeddings_for_a_Multilingual_World.pdf`
+7. **GenRecEdit: Adapting Model Editing for Generative Recommendation with Cold-Start Items** — [2603.14259](https://arxiv.org/abs/2603.14259) — `07_GenRecEdit_Adapting_Model_Editing_for_Generative_Recommendation_with_Cold-Start_Items.pdf`
+8. **AMES: Approximate Multi-modal Enterprise Search via Late Interaction Retrieval** — [2603.13537v1](https://arxiv.org/abs/2603.13537v1) — `08_AMES_Approximate_Multi-modal_Enterprise_Search_via_Late_Interaction_Retrieval.pdf`
+9. **VLM2Rec: Resolving Modality Collapse in Vision-Language Model Embedders for Multimodal Sequential Recommendation** — [2603.17450v1](https://arxiv.org/abs/2603.17450v1) — `09_VLM2Rec_Resolving_Modality_Collapse_in_Vision-Language_Model_Embedders_for_Multimodal_Sequential_Recommendatio.pdf`
+10. **IndexRAG: Bridging Facts for Cross-Document Reasoning at Index Time** — [2603.16415v1](https://arxiv.org/abs/2603.16415v1) — `10_IndexRAG_Bridging_Facts_for_Cross-Document_Reasoning_at_Index_Time.pdf`
+
+## 2026-03-27 — [Disentangling the Strengths of Semantic ID and Item ID Recommendation, Efficient Graph-Based Indexing for Multi-Vector Retrieval, and More!](https://recsys.substack.com/p/disentangling-the-strengths-of-semantic)
+
+_only paid_
+
+1. **How Well Does Generative Recommendation Generalize?** — [2603.19809v1](https://arxiv.org/abs/2603.19809v1) — `01_How_Well_Does_Generative_Recommendation_Generalize.pdf`
+2. **GEM: A Native Graph-based Index for Multi-Vector Retrieval** — [2603.20336v1](https://arxiv.org/abs/2603.20336v1) — `02_GEM_A_Native_Graph-based_Index_for_Multi-Vector_Retrieval.pdf`
+3. **Pooling and Semantic Shift: The Fundamental Challenges in Long Text Embedding and Retrieval** — [2603.21437](https://arxiv.org/abs/2603.21437) — `03_Pooling_and_Semantic_Shift_The_Fundamental_Challenges_in_Long_Text_Embedding_and_Retrieval.pdf`
+4. **Reasoning over Semantic IDs Enhances Generative Recommendation** — [2603.23183v2](https://arxiv.org/abs/2603.23183v2) — `04_Reasoning_over_Semantic_IDs_Enhances_Generative_Recommendation.pdf`
+5. **A Brief Comparison of Training-Free Multi-Vector Sequence Compression Methods** — [2603.22434v1](https://arxiv.org/abs/2603.22434v1) — `05_A_Brief_Comparison_of_Training-Free_Multi-Vector_Sequence_Compression_Methods.pdf`
+6. **On the Challenges and Opportunities of Learned Sparse Retrieval for Code** — [2603.22008v1](https://arxiv.org/abs/2603.22008v1) — `06_On_the_Challenges_and_Opportunities_of_Learned_Sparse_Retrieval_for_Code.pdf`
+7. **SkillRouter: Skill Routing for LLM Agents at Scale** — [2603.22455](https://arxiv.org/abs/2603.22455) — `07_SkillRouter_Skill_Routing_for_LLM_Agents_at_Scale.pdf`
+8. **Sparton: Fast and Memory-Efficient Triton Kernel for Learned Sparse Retrieval** — [2603.25011v1](https://arxiv.org/abs/2603.25011v1) — `08_Sparton_Fast_and_Memory-Efficient_Triton_Kernel_for_Learned_Sparse_Retrieval.pdf`
+9. **Fast and Faithful: Real-Time Verification for Long-Document Retrieval-Augmented Generation Systems** — [2603.23508v1](https://arxiv.org/abs/2603.23508v1) — `09_Fast_and_Faithful_Real-Time_Verification_for_Long-Document_Retrieval-Augmented_Generation_Systems.pdf`
+10. **Hyena Operator for Fast Sequential Recommendation** — [2603.25027v1](https://arxiv.org/abs/2603.25027v1) — `10_Hyena_Operator_for_Fast_Sequential_Recommendation.pdf`
+
+## 2026-04-03 — [On Strengths and Limitations of Single-Vector Embeddings, A Blueprint for Self-Evolving Multi-Agent Recommender Systems, and More!](https://recsys.substack.com/p/on-strengths-and-limitations-of-single)
+
+_only paid_
+
+1. **On Strengths and Limitations of Single-Vector Embeddings** — [2603.29519v1](https://arxiv.org/abs/2603.29519v1) — `01_On_Strengths_and_Limitations_of_Single-Vector_Embeddings.pdf`
+2. **Rethinking Recommendation Paradigms: From Pipelines to Agentic Recommender Systems** — [2603.26100v2](https://arxiv.org/abs/2603.26100v2) — `02_Rethinking_Recommendation_Paradigms_From_Pipelines_to_Agentic_Recommender_Systems.pdf`
+3. **Cold-Starts in Generative Recommendation: A Reproducibility Study** — [2603.29845](https://arxiv.org/abs/2603.29845) — `03_Cold-Starts_in_Generative_Recommendation_A_Reproducibility_Study.pdf`
+4. **Working Notes on Late Interaction Dynamics: Analyzing Targeted Behaviors of Late Interaction Models** — [2603.26259v2](https://arxiv.org/abs/2603.26259v2) — `04_Working_Notes_on_Late_Interaction_Dynamics_Analyzing_Targeted_Behaviors_of_Late_Interaction_Models.pdf`
+5. **UniMixer: A Unified Architecture for Scaling Laws in Recommendation Systems** — [2604.00590v2](https://arxiv.org/abs/2604.00590v2) — `05_UniMixer_A_Unified_Architecture_for_Scaling_Laws_in_Recommendation_Systems.pdf`
+6. **M-RAG: Semantic Key-Value Indexing for Retrieval-Augmented Generation** — [2603.26667](https://arxiv.org/abs/2603.26667) — `06_M-RAG_Semantic_Key-Value_Indexing_for_Retrieval-Augmented_Generation.pdf`
+7. **On the Accuracy Limits of Sequential Recommender Systems: An Entropy-Based Approach** — [2603.27952v2](https://arxiv.org/abs/2603.27952v2) — `07_On_the_Accuracy_Limits_of_Sequential_Recommender_Systems_An_Entropy-Based_Approach.pdf`
+8. **Marco DeepResearch: Unlocking Efficient Deep Research Agents via Verification-Centric Design** — [2603.28376v1](https://arxiv.org/abs/2603.28376v1) — `08_Marco_DeepResearch_Unlocking_Efficient_Deep_Research_Agents_via_Verification-Centric_Design.pdf`
+9. **eenet an efficient and effective network for large scale ctr prediction** — _unresolved_ — —
+   - journal-only (ACM TOIS, doi 10.1145/3805800); no arXiv preprint or open PDF
+10. **Multi-Agent Video Recommenders: Evolution, Patterns, and Open Challenges** — [2604.02211v1](https://arxiv.org/abs/2604.02211v1) — `10_Multi-Agent_Video_Recommenders_Evolution_Patterns_and_Open_Challenges.pdf`
+
+## 2026-04-10 — [Rethinking Negative Sampling for Knowledge Distillation in Retrieval, A Distillation Recipe for Small Language Model Search Agents, and More!](https://recsys.substack.com/p/rethinking-negative-sampling-for)
+
+_only paid_
+
+1. **Beyond Hard Negatives: The Importance of Score Distribution in Knowledge Distillation for Dense Retrieval** — [2604.04734v2](https://arxiv.org/abs/2604.04734v2) — `01_Beyond_Hard_Negatives_The_Importance_of_Score_Distribution_in_Knowledge_Distillation_for_Dense_Retrieval.pdf`
+2. **Search, Do not Guess: Teaching Small Language Models to Be Effective Search Agents** — [2604.04651v1](https://arxiv.org/abs/2604.04651v1) — `02_Search_Do_not_Guess_Teaching_Small_Language_Models_to_Be_Effective_Search_Agents.pdf`
+3. **Beyond Dense Connectivity: Explicit Sparsity for Scalable Recommendation** — [2604.08011v4](https://arxiv.org/abs/2604.08011v4) — `03_Beyond_Dense_Connectivity_Explicit_Sparsity_for_Scalable_Recommendation.pdf`
+4. **Pay Attention to Sequence Split: Uncovering the Impacts of Sub-Sequence Splitting on Sequential Recommendation Models** — [2604.05309v1](https://arxiv.org/abs/2604.05309v1) — `04_Pay_Attention_to_Sequence_Split_Uncovering_the_Impacts_of_Sub-Sequence_Splitting_on_Sequential_Recommendation.pdf`
+5. **Unified and Efficient Approach for Multi-Vector Similarity Search** — [2604.02815v1](https://arxiv.org/abs/2604.02815v1) — `05_Unified_and_Efficient_Approach_for_Multi-Vector_Similarity_Search.pdf`
+6. **BidirLM: From Text to Omnimodal Bidirectional Encoders by Adapting and Composing Causal LLMs** — [2604.02045v1](https://arxiv.org/abs/2604.02045v1) — `06_BidirLM_From_Text_to_Omnimodal_Bidirectional_Encoders_by_Adapting_and_Composing_Causal_LLMs.pdf`
+7. **The LLM Effect on IR Benchmarks: A Meta-Analysis of Effectiveness, Baselines, and Contamination** — [2604.05766v1](https://arxiv.org/abs/2604.05766v1) — `07_The_LLM_Effect_on_IR_Benchmarks_A_Meta-Analysis_of_Effectiveness_Baselines_and_Contamination.pdf`
+8. **Generative Retrieval Overcomes Limitations of Dense Retrieval but Struggles with Identifier Ambiguity** — [2604.05764v2](https://arxiv.org/abs/2604.05764v2) — `08_Generative_Retrieval_Overcomes_Limitations_of_Dense_Retrieval_but_Struggles_with_Identifier_Ambiguity.pdf`
+9. **Feedback Adaptation for Retrieval-Augmented Generation** — [2604.06647v2](https://arxiv.org/abs/2604.06647v2) — `09_Feedback_Adaptation_for_Retrieval-Augmented_Generation.pdf`
+10. **Self-Optimizing Multi-Agent Systems for Deep Research** — [2604.02988v1](https://arxiv.org/abs/2604.02988v1) — `10_Self-Optimizing_Multi-Agent_Systems_for_Deep_Research.pdf`
+
+## 2026-04-17 — [A Late Chunking Approach for Visual Documents, Does Agentic Search Make GraphRAG Obsolete? and More!](https://recsys.substack.com/p/a-late-chunking-approach-for-visual)
+
+_only paid_
+
+1. **RecaLLM: Addressing the Lost-in-Thought Phenomenon with Explicit In-Context Retrieval** — [2604.09494v1](https://arxiv.org/abs/2604.09494v1) — `01_RecaLLM_Addressing_the_Lost-in-Thought_Phenomenon_with_Explicit_In-Context_Retrieval.pdf`
+2. **R3-VAE: Reference Vector-Guided Rating Residual Quantization VAE for Generative Recommendation** — [2604.11440v3](https://arxiv.org/abs/2604.11440v3) — `02_R3-VAE_Reference_Vector-Guided_Rating_Residual_Quantization_VAE_for_Generative_Recommendation.pdf`
+3. **Visual Late Chunking: An Empirical Study of Contextual Chunking for Efficient Visual Document Retrieval** — [2604.10167v1](https://arxiv.org/abs/2604.10167v1) — `03_Visual_Late_Chunking_An_Empirical_Study_of_Contextual_Chunking_for_Efficient_Visual_Document_Retrieval.pdf`
+4. **Efficient Retrieval Scaling with Hierarchical Indexing for Large Scale Recommendation** — [2604.12965v1](https://arxiv.org/abs/2604.12965v1) — `04_Efficient_Retrieval_Scaling_with_Hierarchical_Indexing_for_Large_Scale_Recommendation.pdf`
+5. **RoTE: Coarse-to-Fine Multi-Level Rotary Time Embedding for Sequential Recommendation** — [2604.13389v1](https://arxiv.org/abs/2604.13389v1) — `05_RoTE_Coarse-to-Fine_Multi-Level_Rotary_Time_Embedding_for_Sequential_Recommendation.pdf`
+6. **Mitigating Collaborative Semantic ID Staleness in Generative Retrieval** — [2604.13273v1](https://arxiv.org/abs/2604.13273v1) — `06_Mitigating_Collaborative_Semantic_ID_Staleness_in_Generative_Retrieval.pdf`
+7. **Do We Still Need GraphRAG? Benchmarking RAG and GraphRAG for Agentic Search Systems** — [2604.09666v1](https://arxiv.org/abs/2604.09666v1) — `07_Do_We_Still_Need_GraphRAG_Benchmarking_RAG_and_GraphRAG_for_Agentic_Search_Systems.pdf`
+8. **Self-Correcting RAG: Enhancing Faithfulness via MMKP Context Selection and NLI-Guided MCTS** — [2604.10734v1](https://arxiv.org/abs/2604.10734v1) — `08_Self-Correcting_RAG_Enhancing_Faithfulness_via_MMKP_Context_Selection_and_NLI-Guided_MCTS.pdf`
+9. **NaviRAG: Towards Active Knowledge Navigation for Retrieval-Augmented Generation** — [2604.12766v2](https://arxiv.org/abs/2604.12766v2) — `09_NaviRAG_Towards_Active_Knowledge_Navigation_for_Retrieval-Augmented_Generation.pdf`
+10. **Thought-Retriever: Don't Just Retrieve Raw Data, Retrieve Thoughts for Memory-Augmented Agentic Systems** — [2604.12231v1](https://arxiv.org/abs/2604.12231v1) — `10_Thought-Retriever_Dont_Just_Retrieve_Raw_Data_Retrieve_Thoughts_for_Memory-Augmented_Agentic_Systems.pdf`
+
+## 2026-04-24 — [Rethinking Personalization for the Agent Era, Semantic Recall for Vector Search, and More!](https://recsys.substack.com/p/rethinking-personalization-for-the)
+
+_only paid_
+
+1. **From Hidden Profiles to Governable Personalization: Recommender Systems in the Age of LLM Agents** — [2604.20065v1](https://arxiv.org/abs/2604.20065v1) — `01_From_Hidden_Profiles_to_Governable_Personalization_Recommender_Systems_in_the_Age_of_LLM_Agents.pdf`
+2. **Modular Representation Compression: Adapting LLMs for Efficient and Effective Recommendations** — [2604.18146v2](https://arxiv.org/abs/2604.18146v2) — `02_Modular_Representation_Compression_Adapting_LLMs_for_Efficient_and_Effective_Recommendations.pdf`
+3. **Semantic Recall for Vector Search** — [2604.20417v1](https://arxiv.org/abs/2604.20417v1) — `03_Semantic_Recall_for_Vector_Search.pdf`
+4. **RankUp: Towards High-rank Representations for Large Scale Advertising Recommender Systems** — [2604.17878v3](https://arxiv.org/abs/2604.17878v3) — `04_RankUp_Towards_High-rank_Representations_for_Large_Scale_Advertising_Recommender_Systems.pdf`
+5. **Latent Abstraction for Retrieval-Augmented Generation** — [2604.17866v2](https://arxiv.org/abs/2604.17866v2) — `05_Latent_Abstraction_for_Retrieval-Augmented_Generation.pdf`
+6. **Balanced Co-Clustering of Users and Items for Embedding Table Compression in Recommender Systems** — [2604.18351v1](https://arxiv.org/abs/2604.18351v1) — `06_Balanced_Co-Clustering_of_Users_and_Items_for_Embedding_Table_Compression_in_Recommender_Systems.pdf`
+7. **On the Robustness of LLM-Based Dense Retrievers: A Systematic Analysis of Generalizability and Stability** — [2604.16576v1](https://arxiv.org/abs/2604.16576v1) — `07_On_the_Robustness_of_LLM-Based_Dense_Retrievers_A_Systematic_Analysis_of_Generalizability_and_Stability.pdf`
+8. **Linear-Time and Constant-Memory Text Embeddings Based on Recurrent Language Models** — [2604.18199v1](https://arxiv.org/abs/2604.18199v1) — `08_Linear-Time_and_Constant-Memory_Text_Embeddings_Based_on_Recurrent_Language_Models.pdf`
+9. **CS3: Efficient Online Capability Synergy for Two-Tower Recommendation** — [2604.19269v1](https://arxiv.org/abs/2604.19269v1) — `09_CS3_Efficient_Online_Capability_Synergy_for_Two-Tower_Recommendation.pdf`
+10. **Why Fine-Tuning Encourages Hallucinations and How to Fix It** — [2604.15574v1](https://arxiv.org/abs/2604.15574v1) — `10_Why_Fine-Tuning_Encourages_Hallucinations_and_How_to_Fix_It.pdf`
+
+## 2026-05-01 — [Rethinking Semantic–Collaborative Integration in Recommenders, Efficient Token-Aware Clustering for Multivector Retrieval, and More!](https://recsys.substack.com/p/rethinking-semanticcollaborative)
+
+_only paid_
+
+1. **Rethinking Semantic Collaborative Integration: Why Alignment Is Not Enough** — [2604.22195v1](https://arxiv.org/abs/2604.22195v1) — `01_Rethinking_Semantic_Collaborative_Integration_Why_Alignment_Is_Not_Enough.pdf`
+2. **Efficient Multivector Retrieval with Token-Aware Clustering and Hierarchical Indexing** — [2604.28142v1](https://arxiv.org/abs/2604.28142v1) — `02_Efficient_Multivector_Retrieval_with_Token-Aware_Clustering_and_Hierarchical_Indexing.pdf`
+3. **Aligning Dense Retrievers with LLM Utility via Distillation** — [2604.22722v2](https://arxiv.org/abs/2604.22722v2) — `03_Aligning_Dense_Retrievers_with_LLM_Utility_via_Distillation.pdf`
+4. **Beyond Static Collision Handling: Adaptive Semantic ID Learning for Multimodal Recommendation at Industrial Scale** — [2604.23522v1](https://arxiv.org/abs/2604.23522v1) — `04_Beyond_Static_Collision_Handling_Adaptive_Semantic_ID_Learning_for_Multimodal_Recommendation_at_Industrial_Sca.pdf`
+5. **Prism-Reranker: Beyond Relevance Scoring -- Jointly Producing Contributions and Evidence for Agentic Retrieval** — [2604.23734v1](https://arxiv.org/abs/2604.23734v1) — `05_Prism-Reranker_Beyond_Relevance_Scoring_--_Jointly_Producing_Contributions_and_Evidence_for_Agentic_Retrieval.pdf`
+6. **Efficient Listwise Reranking with Compressed Document Representations** — [2604.26483v1](https://arxiv.org/abs/2604.26483v1) — `06_Efficient_Listwise_Reranking_with_Compressed_Document_Representations.pdf`
+7. **AgenticRecTune: Multi-Agent with Self-Evolving Skillhub for Recommendation System Optimization** — [2604.26969v2](https://arxiv.org/abs/2604.26969v2) — `07_AgenticRecTune_Multi-Agent_with_Self-Evolving_Skillhub_for_Recommendation_System_Optimization.pdf`
+8. **Why Mean Pooling Works: Quantifying Second-Order Collapse in Text Embeddings** — [2604.27398v1](https://arxiv.org/abs/2604.27398v1) — `08_Why_Mean_Pooling_Works_Quantifying_Second-Order_Collapse_in_Text_Embeddings.pdf`
+9. **DRACULA: Hunting for the Actions Users Want Deep Research Agents to Execute** — [2604.23815v1](https://arxiv.org/abs/2604.23815v1) — `09_DRACULA_Hunting_for_the_Actions_Users_Want_Deep_Research_Agents_to_Execute.pdf`
+10. **ResRank: Unifying Retrieval and Listwise Reranking via End-to-End Joint Training with Residual Passage Compression** — [2604.22180v1](https://arxiv.org/abs/2604.22180v1) — `10_ResRank_Unifying_Retrieval_and_Listwise_Reranking_via_End-to-End_Joint_Training_with_Residual_Passage_Compress.pdf`
 
 ## 2026-05-08 — [Eliciting Retrieval from Frozen Encoder-Decoder Models, Frontier Search Agents on an Academic Budget, and More!](https://recsys.substack.com/p/eliciting-retrieval-from-frozen-encoder)
 
