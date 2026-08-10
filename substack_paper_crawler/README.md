@@ -9,9 +9,19 @@ arXiv entry, and downloads it as a PDF.
 ```bash
 python3 crawl.py --months 3 --out ../papers      # last 3 months (default)
 python3 crawl.py --since 2026-05-08 --out ../papers
+python3 crawl.py --free-only --out ../papers     # skip subscriber-only issues
 ```
 
 No third-party dependencies — standard library only.
+
+| flag | effect |
+| --- | --- |
+| `--months N` / `--since YYYY-MM-DD` | how far back to crawl (default: 3 months) |
+| `--free-only` | only issues published to everyone; most issues are subscriber-only, so this is a much smaller crawl |
+| `--refresh` | re-look-up every arXiv ID instead of reusing the ones cached in an existing `manifest.json` |
+
+Re-runs are cheap: arXiv IDs are cached in the manifest and existing PDFs are skipped,
+so crawling again costs one API request per *new* paper rather than one per paper.
 
 ## Output
 

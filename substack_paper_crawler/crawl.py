@@ -454,6 +454,11 @@ def main() -> int:
         action="store_true",
         help="ignore arXiv IDs cached in an existing manifest and look them all up again",
     )
+    ap.add_argument(
+        "--free-only",
+        action="store_true",
+        help="only crawl issues published to everyone, skipping subscriber-only ones",
+    )
     args = ap.parse_args()
 
     cutoff = args.since or (
@@ -465,6 +470,10 @@ def main() -> int:
     print(f"Crawling {PUBLICATION} issues since {cutoff}")
     entries = list_issues(cutoff)
     print(f"Found {len(entries)} issues")
+    if args.free_only:
+        kept = [e for e in entries if e.get("audience") == "everyone"]
+        print(f"  --free-only: keeping {len(kept)}, skipping {len(entries) - len(kept)}")
+        entries = kept
 
     issues: list[Issue] = []
     for entry in entries:
