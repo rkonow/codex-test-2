@@ -371,6 +371,19 @@ pub fn roaring_count_algos(
     }
 }
 
+/// Loom: cardinality-only AND / OR (no docID materialisation).
+pub fn loom_count_algos(lists: &[crate::codecs::loom::Loom], w: &Workload, cfg: &BenchConfig, m: &mut Vec<Measurement>) {
+    use crate::codecs::loom::Loom;
+    let name = Loom::NAME;
+    let refs = |q: &[u32]| q.iter().map(|&t| &lists[t as usize]).collect::<Vec<_>>();
+    if cfg.and {
+        m.push(time_queries_count(w, cfg, Op::And, name, "native, count only", |q| Loom::and_count(&refs(q))));
+    }
+    if cfg.or {
+        m.push(time_queries_count(w, cfg, Op::Or, name, "native, count only", |q| Loom::or_count(&refs(q))));
+    }
+}
+
 /// A codec in the benchmark registry.
 pub struct CodecEntry {
     pub name: &'static str,
@@ -402,6 +415,16 @@ pub fn registry() -> Vec<CodecEntry> {
             run: |w, c| report::<elias_fano::EliasFano>(w, c, cursor_algos),
         },
         CodecEntry { name: pef::PartitionedEF::NAME, run: |w, c| report::<pef::PartitionedEF>(w, c, cursor_algos) },
+        CodecEntry {
+            name: loom::Loom::NAME,
+            run: |w, c| {
+                report::<loom::Loom>(w, c, |l, w, c, m| {
+                    setops_algos(l, w, c, m);
+                    loom_count_algos(l, w, c, m);
+                    cursor_algos(l, w, c, m);
+                })
+            },
+        },
         CodecEntry {
             name: interpolative::Interpolative::NAME,
             run: |w, c| report::<interpolative::Interpolative>(w, c, cursor_algos),

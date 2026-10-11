@@ -13,6 +13,7 @@ pub mod entropic;
 pub mod external;
 pub mod hybrid;
 pub mod interpolative;
+pub mod loom;
 pub mod pef;
 pub mod pfor;
 pub mod roaring;
