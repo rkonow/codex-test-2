@@ -404,6 +404,15 @@ pub fn registry() -> Vec<CodecEntry> {
             run: |w, c| report::<interpolative::Interpolative>(w, c, cursor_algos),
         },
         CodecEntry {
+            name: entropic::Entropic::NAME,
+            run: |w, c| {
+                report::<entropic::Entropic>(w, c, |l, w, c, m| {
+                    setops_algos(l, w, c, m);
+                    cursor_algos(l, w, c, m);
+                })
+            },
+        },
+        CodecEntry {
             name: hybrid::Hybrid::NAME,
             run: |w, c| {
                 report::<hybrid::Hybrid>(w, c, |l, w, c, m| {

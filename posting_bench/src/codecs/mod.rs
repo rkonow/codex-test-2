@@ -9,6 +9,7 @@
 pub mod block;
 pub mod bp128;
 pub mod elias_fano;
+pub mod entropic;
 pub mod external;
 pub mod hybrid;
 pub mod interpolative;
