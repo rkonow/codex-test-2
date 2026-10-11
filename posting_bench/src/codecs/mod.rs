@@ -9,6 +9,11 @@
 pub mod block;
 pub mod uncompressed;
 pub mod vbyte;
+pub mod bp128;
+pub mod pfor;
+pub mod interpolative;
+pub mod external;
+pub mod hybrid;
 
 #[cfg(test)]
 pub(crate) mod conformance;
