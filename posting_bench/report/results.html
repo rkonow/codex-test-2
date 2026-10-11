@@ -95,7 +95,13 @@
 
 <div class="col">
   <h3 id="r-wikitext">Real text: WikiText-103</h3>
-  <p>DRAFT</p>
+  <p>WikiText-103 has 859,532 paragraphs, a 531,033-term vocabulary and 57 million postings. Its lists are far denser than the synthetic ones: function words occur in most paragraphs. The queries use terms with at least 100 postings and average 3.0 terms, with 64 documents per AND and 199,635 per OR.</p>
+  <ul>
+    <li><b>Dense real lists suit Roaring.</b> Its bitmap containers answer AND in 0.007 ms, 2.7× faster than the fastest list codec (Elias-Fano, 0.019 ms), and OR in 0.086 ms, 10× faster than any list codec with a cursor algorithm (0.86–1.6 ms) and 4.5× faster than the hybrid index. On the query lists it costs 8.47 bits per posting, 1.8× PEF.</li>
+    <li><b>The Elias-Fano family leads the list codecs</b>: PEF and interpolative coding are the smallest (4.75 and 4.77 bits per posting on query lists), and Elias-Fano and PEF answer conjunctions 1.4–4.3× faster than the block codecs.</li>
+    <li><b>Small lists dominate whole-index space.</b> Over all 531k lists the ranking changes: interpolative (8.46), Elias-Fano (8.51) and PEF (8.92) stay smallest, but the tries reach 23 bits per posting, because each of the many short lists pays for about 20 trie levels and their rank directories. Roaring pays a container header per list and lands at 15.4.</li>
+    <li><b>The OR algorithm matters as much as the codec.</b> For every cursor codec except the hybrid, the Lucene-style bitset window is the fastest union, 1.6–2.5× faster than the heap.</li>
+  </ul>
 </div>
 <div class="pair">
   <figure>
