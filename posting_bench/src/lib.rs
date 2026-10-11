@@ -14,6 +14,7 @@ pub mod bench;
 pub mod bits;
 pub mod codecs;
 pub mod data;
+pub mod stats;
 
 /// Sentinel docID returned by exhausted cursors. Valid docIDs are `< END`.
 pub const END: u32 = u32::MAX;

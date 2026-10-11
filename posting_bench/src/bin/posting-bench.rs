@@ -23,8 +23,18 @@ enum Cmd {
     Kernels(KernelArgs),
     /// Write a collection (and generated queries) in ds2i/PISA format.
     Export(ExportArgs),
+    /// Print structural statistics of a collection and its queries.
+    Stats(StatsArgs),
     /// List the available codecs.
     Codecs,
+}
+
+#[derive(Args)]
+struct StatsArgs {
+    #[command(flatten)]
+    source: SourceArgs,
+    #[command(flatten)]
+    query: QueryArgs,
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -434,6 +444,11 @@ fn main() {
         Cmd::Run(a) => cmd_run(a),
         Cmd::Kernels(a) => cmd_kernels(a),
         Cmd::Export(a) => cmd_export(a),
+        Cmd::Stats(a) => {
+            let coll = load_collection(&a.source);
+            let queries = load_queries(&a.query, &coll, a.source.seed);
+            println!("{}", posting_bench::stats::report(&coll, &queries));
+        }
         Cmd::Codecs => {
             for e in bench::registry() {
                 println!("{}", e.name);
