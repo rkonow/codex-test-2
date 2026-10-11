@@ -7,6 +7,7 @@
 //! harness runs every applicable algorithm on every representation.
 
 pub mod block;
+pub mod roaring;
 pub mod uncompressed;
 pub mod vbyte;
 pub mod bp128;

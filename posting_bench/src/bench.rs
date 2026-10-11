@@ -329,6 +329,28 @@ pub fn roaring_rs_count_algos(
     }
 }
 
+/// Our Roaring: cardinality-only operations returning Roaring results.
+pub fn roaring_count_algos(
+    lists: &[crate::codecs::roaring::Roaring],
+    w: &Workload,
+    cfg: &BenchConfig,
+    m: &mut Vec<Measurement>,
+) {
+    use crate::codecs::roaring::Roaring;
+    let name = Roaring::NAME;
+    let refs = |q: &[u32]| q.iter().map(|&t| &lists[t as usize]).collect::<Vec<_>>();
+    if cfg.and {
+        m.push(time_queries_count(w, cfg, Op::And, name, "native, count only", |q| {
+            Roaring::and_native(&refs(q)).cardinality()
+        }));
+    }
+    if cfg.or {
+        m.push(time_queries_count(w, cfg, Op::Or, name, "native, count only", |q| {
+            Roaring::or_native(&refs(q)).cardinality()
+        }));
+    }
+}
+
 /// A codec in the benchmark registry.
 pub struct CodecEntry {
     pub name: &'static str,
@@ -364,6 +386,16 @@ pub fn registry() -> Vec<CodecEntry> {
             run: |w, c| {
                 report::<hybrid::Hybrid>(w, c, |l, w, c, m| {
                     setops_algos(l, w, c, m);
+                    cursor_algos(l, w, c, m);
+                })
+            },
+        },
+        CodecEntry {
+            name: roaring::Roaring::NAME,
+            run: |w, c| {
+                report::<roaring::Roaring>(w, c, |l, w, c, m| {
+                    setops_algos(l, w, c, m);
+                    roaring_count_algos(l, w, c, m);
                     cursor_algos(l, w, c, m);
                 })
             },
