@@ -47,6 +47,19 @@ pub trait PostingList: Sized + Send + Sync {
 
     /// Decode the whole list, appending the docIDs to `out`.
     fn decode_into(&self, out: &mut Vec<u32>);
+
+    /// Bytes of memory derived at load time that are not part of
+    /// [`size_bits`](Self::size_bits), such as decode tables rebuilt from a
+    /// stored model. Zero for most codecs.
+    fn aux_memory_bytes(&self) -> u64 {
+        0
+    }
+
+    /// Bytes of process-wide memory shared by all lists of this codec (e.g.
+    /// decode tables of shared models), measured after building an index.
+    fn shared_aux_memory_bytes() -> u64 {
+        0
+    }
 }
 
 /// Forward-only iterator over a posting list with skipping.

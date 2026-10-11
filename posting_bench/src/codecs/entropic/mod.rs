@@ -539,6 +539,14 @@ impl PostingList for Entropic {
         out.resize(start + self.n, 0);
         self.decode_all(&mut out[start..]);
     }
+
+    fn aux_memory_bytes(&self) -> u64 {
+        self.own_table_bytes() as u64
+    }
+
+    fn shared_aux_memory_bytes() -> u64 {
+        shared_tables().1 as u64
+    }
 }
 
 /// Cursor over an [`Entropic`] list: decodes the current block lazily, as

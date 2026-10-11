@@ -46,6 +46,8 @@ pub struct CodecReport {
     pub decode_ns_per_posting: f64,
     /// Full decoding speed over the lists that appear in queries.
     pub query_decode_ns_per_posting: f64,
+    /// Memory derived at load time beyond the serialized size (bytes).
+    pub aux_memory_bytes: u64,
     pub measurements: Vec<Measurement>,
 }
 
@@ -237,6 +239,7 @@ pub fn report<C: PostingList>(w: &Workload, cfg: &BenchConfig, algos: AlgoSuite<
         build_secs,
         decode_ns_per_posting: best * 1e9 / postings,
         query_decode_ns_per_posting: qbest * 1e9 / qpostings.max(1) as f64,
+        aux_memory_bytes: lists.iter().map(|l| l.aux_memory_bytes()).sum::<u64>() + C::shared_aux_memory_bytes(),
         measurements,
     }
 }
