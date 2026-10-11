@@ -1,0 +1,1 @@
+//! Intersection and union algorithms.
