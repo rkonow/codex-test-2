@@ -33,7 +33,13 @@
 
 <div class="col">
   <h3 id="r-clustering">What docID clustering buys</h3>
-  <p>DRAFT</p>
+  <p>The uniform collection has exactly the same list lengths as the clustered one, but random docIDs. Comparing the two isolates the effect of docID order, which real systems control by reordering documents (by URL, or by recursive graph bisection).</p>
+  <ul>
+    <li><b>Codecs that model local density gain the most.</b> On the query lists, clustering cuts Run-Trie by 50%, Trie by 46%, interpolative by 42%, PEF by 39%, OptPFor by 33% and Roaring by 32%. BP128 gains 18% and VByte only 12%, because one wide gap still forces a wide block or extra bytes.</li>
+    <li><b>Plain Elias-Fano gains nothing</b> (8.08 → 8.13 bits): its size depends only on \(u\) and \(n\), exactly as the formula says. On uniform data it ties PEF as the smallest codec, which is the case partitioning cannot improve.</li>
+    <li><b>Roaring and the tries pay most for randomness.</b> At 13.2–13.7 bits per posting on uniform data they are 1.6–1.7× the size of PEF, because random docIDs leave few runs and many half-empty 16-bit arrays or trie paths.</li>
+    <li><b>Conjunctions get about 2× faster with clustering</b> for every list codec (PEF 0.083 → 0.043 ms, BP128 0.156 → 0.076 ms), while Roaring changes little. Part of this comes from the workloads: the uniform queries touch 19% more postings and have smaller results, because random lists share fewer documents. The rest comes from skipping, since clustered lists put matching docIDs in fewer blocks and partitions.</li>
+  </ul>
 </div>
 <div class="pair">
   <figure>
@@ -55,7 +61,12 @@
 
 <div class="col">
   <h3 id="r-kernels">Kernels: where merging stops paying</h3>
-  <p>DRAFT</p>
+  <p>The pairwise kernels were timed on uncompressed random lists with a fixed short list of 10,000 docIDs and a long list 1 to 4,096 times larger. The chart plots nanoseconds per element of the short list, so a flat line means the cost tracks the short list (the \(m \log(n/m)\) regime) and a rising line means the long list is scanned (the \(m + n\) regime).</p>
+  <ul>
+    <li><b>Similar sizes favour SIMD.</b> At 1:1 the AVX-512 kernel takes 22 µs against 98 µs for the branchy merge, 4.4× faster; SSE and AVX2 take 25–26 µs, so most of the gain comes from comparing blocks at all, not from vector width. The branch-free merge (66 µs) beats the branchy one only at 1:1 and becomes the slowest kernel by 1:8, because its loop-carried dependency serialises every step.</li>
+    <li><b>Skew favours galloping.</b> Galloping overtakes the SIMD kernel between 1:16 and 1:32 and is 5.8× faster at 1:4,096 (9.6 ms against 55 ms). At 1:4,096 Baeza-Yates is within 13% of galloping and plain binary search is 2.6× slower; both lose badly when the sizes are similar (binary search needs 389 µs at 1:1).</li>
+    <li><b>The switch point is hardware-specific.</b> The adaptive kernel uses CRoaring's 64× threshold. On this CPU that is too late: between 1:32 and 1:64 it pays up to 2.1× more than galloping. A threshold near 1:24 would track the lower envelope of both kernels, consistent with Baeza-Yates and Salinger's ~30:1 crossover for scalar code.</li>
+  </ul>
 </div>
 <figure>
   <div class="frame">
