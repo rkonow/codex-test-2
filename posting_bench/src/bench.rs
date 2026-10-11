@@ -406,6 +406,24 @@ pub fn registry() -> Vec<CodecEntry> {
             },
         },
         CodecEntry {
+            name: trie::Trie::NAME,
+            run: |w, c| {
+                report::<trie::Trie>(w, c, |l, w, c, m| {
+                    setops_algos(l, w, c, m);
+                    cursor_algos(l, w, c, m);
+                })
+            },
+        },
+        CodecEntry {
+            name: trie::RunTrie::NAME,
+            run: |w, c| {
+                report::<trie::RunTrie>(w, c, |l, w, c, m| {
+                    setops_algos(l, w, c, m);
+                    cursor_algos(l, w, c, m);
+                })
+            },
+        },
+        CodecEntry {
             name: external::RoaringRs::NAME,
             run: |w, c| {
                 report::<external::RoaringRs>(w, c, |l, w, c, m| {

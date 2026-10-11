@@ -15,6 +15,7 @@ pub mod interpolative;
 pub mod pef;
 pub mod pfor;
 pub mod roaring;
+pub mod trie;
 pub mod uncompressed;
 pub mod vbyte;
 
