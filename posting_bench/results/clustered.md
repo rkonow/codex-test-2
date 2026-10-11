@@ -14,127 +14,127 @@
 
 | codec | bits/posting | bits/posting (query lists) | build s | decode ns/posting | decode ns/posting (query lists) | best AND ms | best OR ms |
 |---|---:|---:|---:|---:|---:|---|---|
-| Uncompressed | 32.00 | 32.00 | 0.05 | 0.23 | 0.22 | 0.061 (SvS + galloping) | 1.988 (slices: bitmap) |
-| VByte | 10.33 | 9.61 | 0.07 | 1.98 | 1.84 | 0.132 (leapfrog (NextGEQ)) | 3.133 (bitset window (4096)) |
-| BP128 | 10.07 | 7.69 | 0.05 | 0.92 | 0.67 | 0.076 (leapfrog (NextGEQ)) | 2.868 (bitset window (4096)) |
-| BP128 (bitpacking crate) | 10.07 | 7.69 | 0.03 | 0.72 | 0.57 | 0.071 (leapfrog (NextGEQ)) | 2.677 (min-scan) |
-| OptPFor | 7.13 | 5.92 | 0.21 | 1.24 | 0.83 | 0.077 (leapfrog (NextGEQ)) | 2.790 (bitset window (4096)) |
-| Elias-Fano | 10.85 | 8.13 | 0.05 | 1.71 | 2.96 | 0.049 (leapfrog (NextGEQ)) | 2.530 (bitset window (4096)) |
-| PEF | 7.04 | 4.94 | 0.16 | 1.71 | 1.37 | 0.043 (leapfrog (NextGEQ)) | 3.098 (bitset window (4096)) |
-| Interpolative | 5.97 | 4.90 | 0.16 | 4.31 | 4.19 | 0.183 (leapfrog (NextGEQ)) | 4.658 (min-scan) |
-| Hybrid (bitmap + BP128) | 10.01 | 7.58 | 0.05 | 1.08 | 0.95 | 0.064 (native) | 1.730 (native) |
-| Roaring | 11.72 | 9.32 | 0.13 | 2.30 | 1.59 | 0.028 (native) | 0.486 (native) |
-| Trie | 9.61 | 7.18 | 0.58 | 7.39 | 4.62 | 0.126 (native) | 2.456 (native) |
-| Run-Trie | 9.13 | 6.67 | 0.70 | 9.14 | 6.17 | 0.134 (native) | 2.567 (native) |
-| Roaring (roaring crate) | 11.72 | 9.32 | 0.27 | 8.12 | 7.41 | 0.084 (native) | 4.275 (native) |
+| Uncompressed | 32.00 | 32.00 | 0.05 | 0.22 | 0.23 | 0.061 (SvS + galloping) | 1.861 (slices: bitmap) |
+| VByte | 10.33 | 9.61 | 0.06 | 2.00 | 1.93 | 0.133 (leapfrog (NextGEQ)) | 3.204 (bitset window (4096)) |
+| BP128 | 10.07 | 7.69 | 0.05 | 0.89 | 0.66 | 0.080 (leapfrog (NextGEQ)) | 2.889 (bitset window (4096)) |
+| BP128 (bitpacking crate) | 10.07 | 7.69 | 0.03 | 0.67 | 0.42 | 0.072 (leapfrog (NextGEQ)) | 2.539 (min-scan) |
+| OptPFor | 7.13 | 5.92 | 0.23 | 1.35 | 1.03 | 0.088 (leapfrog (NextGEQ)) | 2.998 (min-scan) |
+| Elias-Fano | 10.85 | 8.13 | 0.07 | 1.92 | 1.84 | 0.055 (leapfrog (NextGEQ)) | 2.873 (bitset window (4096)) |
+| PEF | 7.04 | 4.94 | 0.16 | 1.70 | 1.49 | 0.046 (leapfrog (NextGEQ)) | 2.841 (bitset window (4096)) |
+| Interpolative | 5.97 | 4.90 | 0.15 | 4.46 | 4.25 | 0.181 (leapfrog (NextGEQ)) | 5.002 (min-scan) |
+| Hybrid (bitmap + BP128) | 10.01 | 7.58 | 0.06 | 1.05 | 0.92 | 0.067 (native) | 1.905 (native) |
+| Roaring | 11.72 | 9.32 | 0.14 | 2.54 | 1.84 | 0.030 (native) | 0.570 (native) |
+| Trie | 9.61 | 7.18 | 0.65 | 8.15 | 5.28 | 0.147 (native) | 2.497 (native) |
+| Run-Trie | 9.13 | 6.67 | 0.75 | 8.97 | 6.17 | 0.132 (native) | 2.838 (native) |
+| Roaring (roaring crate) | 11.72 | 9.32 | 0.24 | 7.98 | 6.85 | 0.088 (native) | 4.300 (native) |
 
 ## All measurements (ms per query)
 
 | codec | op | algorithm | ms/query |
 |---|---|---|---:|
-| Uncompressed | AND | SvS + merge | 0.467 |
-| Uncompressed | AND | SvS + merge (branchless) | 1.462 |
+| Uncompressed | AND | SvS + merge | 0.461 |
+| Uncompressed | AND | SvS + merge (branchless) | 1.519 |
 | Uncompressed | AND | SvS + galloping | 0.061 |
-| Uncompressed | AND | SvS + binary search | 0.315 |
-| Uncompressed | AND | SvS + Baeza-Yates | 0.098 |
-| Uncompressed | AND | SvS + SIMD SSE 4x4 | 0.602 |
-| Uncompressed | AND | SvS + SIMD AVX2 8x8 | 0.607 |
-| Uncompressed | AND | SvS + SIMD AVX-512 16x16 | 0.497 |
-| Uncompressed | AND | SvS + adaptive (SIMD / gallop @64x) | 0.065 |
-| Uncompressed | AND | Small Adaptive | 0.075 |
-| Uncompressed | AND | Sequential (Barbay-Kenyon) | 0.107 |
-| Uncompressed | OR | slices: heap | 7.290 |
-| Uncompressed | OR | slices: fold (pairwise merge) | 2.398 |
-| Uncompressed | OR | slices: bitmap | 1.988 |
-| Uncompressed | AND | leapfrog (NextGEQ) | 0.066 |
-| Uncompressed | AND | round-robin (LFTJ) | 0.108 |
-| Uncompressed | AND | decode + SvS | 0.240 |
-| Uncompressed | OR | heap | 3.465 |
-| Uncompressed | OR | min-scan | 2.911 |
-| Uncompressed | OR | bitset window (4096) | 2.029 |
-| VByte | AND | leapfrog (NextGEQ) | 0.132 |
-| VByte | AND | round-robin (LFTJ) | 0.219 |
-| VByte | AND | decode + SvS | 0.845 |
-| VByte | OR | heap | 4.176 |
-| VByte | OR | min-scan | 3.884 |
-| VByte | OR | bitset window (4096) | 3.133 |
-| BP128 | AND | leapfrog (NextGEQ) | 0.076 |
-| BP128 | AND | round-robin (LFTJ) | 0.113 |
-| BP128 | AND | decode + SvS | 0.451 |
-| BP128 | OR | heap | 4.033 |
-| BP128 | OR | min-scan | 2.889 |
-| BP128 | OR | bitset window (4096) | 2.868 |
-| BP128 (bitpacking crate) | AND | leapfrog (NextGEQ) | 0.071 |
+| Uncompressed | AND | SvS + binary search | 0.330 |
+| Uncompressed | AND | SvS + Baeza-Yates | 0.111 |
+| Uncompressed | AND | SvS + SIMD SSE 4x4 | 0.631 |
+| Uncompressed | AND | SvS + SIMD AVX2 8x8 | 0.625 |
+| Uncompressed | AND | SvS + SIMD AVX-512 16x16 | 0.479 |
+| Uncompressed | AND | SvS + adaptive (SIMD / gallop @64x) | 0.064 |
+| Uncompressed | AND | Small Adaptive | 0.072 |
+| Uncompressed | AND | Sequential (Barbay-Kenyon) | 0.105 |
+| Uncompressed | OR | slices: heap | 7.027 |
+| Uncompressed | OR | slices: fold (pairwise merge) | 2.378 |
+| Uncompressed | OR | slices: bitmap | 1.861 |
+| Uncompressed | AND | leapfrog (NextGEQ) | 0.068 |
+| Uncompressed | AND | round-robin (LFTJ) | 0.109 |
+| Uncompressed | AND | decode + SvS | 0.227 |
+| Uncompressed | OR | heap | 3.492 |
+| Uncompressed | OR | min-scan | 2.979 |
+| Uncompressed | OR | bitset window (4096) | 2.027 |
+| VByte | AND | leapfrog (NextGEQ) | 0.133 |
+| VByte | AND | round-robin (LFTJ) | 0.216 |
+| VByte | AND | decode + SvS | 0.785 |
+| VByte | OR | heap | 4.526 |
+| VByte | OR | min-scan | 3.854 |
+| VByte | OR | bitset window (4096) | 3.204 |
+| BP128 | AND | leapfrog (NextGEQ) | 0.080 |
+| BP128 | AND | round-robin (LFTJ) | 0.117 |
+| BP128 | AND | decode + SvS | 0.474 |
+| BP128 | OR | heap | 4.250 |
+| BP128 | OR | min-scan | 2.973 |
+| BP128 | OR | bitset window (4096) | 2.889 |
+| BP128 (bitpacking crate) | AND | leapfrog (NextGEQ) | 0.072 |
 | BP128 (bitpacking crate) | AND | round-robin (LFTJ) | 0.101 |
-| BP128 (bitpacking crate) | AND | decode + SvS | 0.287 |
-| BP128 (bitpacking crate) | OR | heap | 4.018 |
-| BP128 (bitpacking crate) | OR | min-scan | 2.677 |
-| BP128 (bitpacking crate) | OR | bitset window (4096) | 2.684 |
-| OptPFor | AND | leapfrog (NextGEQ) | 0.077 |
-| OptPFor | AND | round-robin (LFTJ) | 0.117 |
-| OptPFor | AND | decode + SvS | 0.505 |
-| OptPFor | OR | heap | 4.418 |
-| OptPFor | OR | min-scan | 2.937 |
-| OptPFor | OR | bitset window (4096) | 2.790 |
-| Elias-Fano | AND | leapfrog (NextGEQ) | 0.049 |
-| Elias-Fano | AND | round-robin (LFTJ) | 0.076 |
-| Elias-Fano | AND | decode + SvS | 0.992 |
-| Elias-Fano | OR | heap | 4.347 |
-| Elias-Fano | OR | min-scan | 3.149 |
-| Elias-Fano | OR | bitset window (4096) | 2.530 |
-| PEF | AND | leapfrog (NextGEQ) | 0.043 |
-| PEF | AND | round-robin (LFTJ) | 0.063 |
-| PEF | AND | decode + SvS | 0.733 |
-| PEF | OR | heap | 4.409 |
-| PEF | OR | min-scan | 3.103 |
-| PEF | OR | bitset window (4096) | 3.098 |
-| Interpolative | AND | leapfrog (NextGEQ) | 0.183 |
-| Interpolative | AND | round-robin (LFTJ) | 0.312 |
-| Interpolative | AND | decode + SvS | 2.599 |
-| Interpolative | OR | heap | 6.116 |
-| Interpolative | OR | min-scan | 4.658 |
-| Interpolative | OR | bitset window (4096) | 4.938 |
-| Hybrid (bitmap + BP128) | AND | native | 0.064 |
-| Hybrid (bitmap + BP128) | OR | native | 1.730 |
-| Hybrid (bitmap + BP128) | AND | leapfrog (NextGEQ) | 0.069 |
-| Hybrid (bitmap + BP128) | AND | round-robin (LFTJ) | 0.092 |
-| Hybrid (bitmap + BP128) | AND | decode + SvS | 0.783 |
-| Hybrid (bitmap + BP128) | OR | heap | 5.363 |
-| Hybrid (bitmap + BP128) | OR | min-scan | 4.605 |
-| Hybrid (bitmap + BP128) | OR | bitset window (4096) | 4.861 |
-| Roaring | AND | native | 0.028 |
-| Roaring | OR | native | 0.486 |
+| BP128 (bitpacking crate) | AND | decode + SvS | 0.304 |
+| BP128 (bitpacking crate) | OR | heap | 4.095 |
+| BP128 (bitpacking crate) | OR | min-scan | 2.539 |
+| BP128 (bitpacking crate) | OR | bitset window (4096) | 2.638 |
+| OptPFor | AND | leapfrog (NextGEQ) | 0.088 |
+| OptPFor | AND | round-robin (LFTJ) | 0.128 |
+| OptPFor | AND | decode + SvS | 0.552 |
+| OptPFor | OR | heap | 4.371 |
+| OptPFor | OR | min-scan | 2.998 |
+| OptPFor | OR | bitset window (4096) | 3.032 |
+| Elias-Fano | AND | leapfrog (NextGEQ) | 0.055 |
+| Elias-Fano | AND | round-robin (LFTJ) | 0.079 |
+| Elias-Fano | AND | decode + SvS | 0.983 |
+| Elias-Fano | OR | heap | 4.428 |
+| Elias-Fano | OR | min-scan | 3.172 |
+| Elias-Fano | OR | bitset window (4096) | 2.873 |
+| PEF | AND | leapfrog (NextGEQ) | 0.046 |
+| PEF | AND | round-robin (LFTJ) | 0.069 |
+| PEF | AND | decode + SvS | 0.848 |
+| PEF | OR | heap | 4.687 |
+| PEF | OR | min-scan | 3.300 |
+| PEF | OR | bitset window (4096) | 2.841 |
+| Interpolative | AND | leapfrog (NextGEQ) | 0.181 |
+| Interpolative | AND | round-robin (LFTJ) | 0.314 |
+| Interpolative | AND | decode + SvS | 2.803 |
+| Interpolative | OR | heap | 6.718 |
+| Interpolative | OR | min-scan | 5.002 |
+| Interpolative | OR | bitset window (4096) | 5.071 |
+| Hybrid (bitmap + BP128) | AND | native | 0.067 |
+| Hybrid (bitmap + BP128) | OR | native | 1.905 |
+| Hybrid (bitmap + BP128) | AND | leapfrog (NextGEQ) | 0.077 |
+| Hybrid (bitmap + BP128) | AND | round-robin (LFTJ) | 0.090 |
+| Hybrid (bitmap + BP128) | AND | decode + SvS | 0.767 |
+| Hybrid (bitmap + BP128) | OR | heap | 5.578 |
+| Hybrid (bitmap + BP128) | OR | min-scan | 4.773 |
+| Hybrid (bitmap + BP128) | OR | bitset window (4096) | 5.151 |
+| Roaring | AND | native | 0.030 |
+| Roaring | OR | native | 0.570 |
 | Roaring | AND | native, count only | 0.029 |
-| Roaring | OR | native, count only | 0.384 |
-| Roaring | AND | leapfrog (NextGEQ) | 0.038 |
-| Roaring | AND | round-robin (LFTJ) | 0.054 |
-| Roaring | AND | decode + SvS | 0.397 |
-| Roaring | OR | heap | 4.461 |
-| Roaring | OR | min-scan | 3.588 |
-| Roaring | OR | bitset window (4096) | 2.710 |
-| Trie | AND | native | 0.126 |
-| Trie | OR | native | 2.456 |
-| Trie | AND | leapfrog (NextGEQ) | 0.179 |
-| Trie | AND | round-robin (LFTJ) | 0.239 |
-| Trie | AND | decode + SvS | 1.359 |
-| Trie | OR | heap | 6.837 |
-| Trie | OR | min-scan | 5.201 |
-| Trie | OR | bitset window (4096) | 5.530 |
-| Run-Trie | AND | native | 0.134 |
-| Run-Trie | OR | native | 2.567 |
-| Run-Trie | AND | leapfrog (NextGEQ) | 0.194 |
-| Run-Trie | AND | round-robin (LFTJ) | 0.267 |
-| Run-Trie | AND | decode + SvS | 1.673 |
-| Run-Trie | OR | heap | 7.176 |
-| Run-Trie | OR | min-scan | 5.926 |
-| Run-Trie | OR | bitset window (4096) | 5.608 |
-| Roaring (roaring crate) | AND | native | 0.084 |
-| Roaring (roaring crate) | OR | native | 4.275 |
-| Roaring (roaring crate) | AND | native, count only | 0.084 |
-| Roaring (roaring crate) | OR | native, count only | 0.690 |
-| Roaring (roaring crate) | AND | leapfrog (NextGEQ) | 0.089 |
-| Roaring (roaring crate) | AND | round-robin (LFTJ) | 0.109 |
-| Roaring (roaring crate) | AND | decode + SvS | 3.508 |
-| Roaring (roaring crate) | OR | heap | 6.054 |
-| Roaring (roaring crate) | OR | min-scan | 5.692 |
-| Roaring (roaring crate) | OR | bitset window (4096) | 4.839 |
+| Roaring | OR | native, count only | 0.383 |
+| Roaring | AND | leapfrog (NextGEQ) | 0.042 |
+| Roaring | AND | round-robin (LFTJ) | 0.073 |
+| Roaring | AND | decode + SvS | 0.394 |
+| Roaring | OR | heap | 4.607 |
+| Roaring | OR | min-scan | 3.761 |
+| Roaring | OR | bitset window (4096) | 2.959 |
+| Trie | AND | native | 0.147 |
+| Trie | OR | native | 2.497 |
+| Trie | AND | leapfrog (NextGEQ) | 0.196 |
+| Trie | AND | round-robin (LFTJ) | 0.267 |
+| Trie | AND | decode + SvS | 1.403 |
+| Trie | OR | heap | 7.089 |
+| Trie | OR | min-scan | 5.401 |
+| Trie | OR | bitset window (4096) | 5.525 |
+| Run-Trie | AND | native | 0.132 |
+| Run-Trie | OR | native | 2.838 |
+| Run-Trie | AND | leapfrog (NextGEQ) | 0.202 |
+| Run-Trie | AND | round-robin (LFTJ) | 0.279 |
+| Run-Trie | AND | decode + SvS | 1.677 |
+| Run-Trie | OR | heap | 7.015 |
+| Run-Trie | OR | min-scan | 6.073 |
+| Run-Trie | OR | bitset window (4096) | 5.858 |
+| Roaring (roaring crate) | AND | native | 0.088 |
+| Roaring (roaring crate) | OR | native | 4.300 |
+| Roaring (roaring crate) | AND | native, count only | 0.086 |
+| Roaring (roaring crate) | OR | native, count only | 0.746 |
+| Roaring (roaring crate) | AND | leapfrog (NextGEQ) | 0.092 |
+| Roaring (roaring crate) | AND | round-robin (LFTJ) | 0.125 |
+| Roaring (roaring crate) | AND | decode + SvS | 3.603 |
+| Roaring (roaring crate) | OR | heap | 5.962 |
+| Roaring (roaring crate) | OR | min-scan | 5.488 |
+| Roaring (roaring crate) | OR | bitset window (4096) | 4.751 |

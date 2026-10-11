@@ -83,4 +83,38 @@ scripts/run_experiments.sh data/wikitext103.txt
 python3 scripts/build_report.py            # report/report.html from results/*.json
 ```
 
-<!--RESULTS-SUMMARY-->
+## Results (single thread, Intel Xeon @ 2.1 GHz with AVX-512)
+
+Bits per posting are measured on the lists that appear in queries; times are
+the best algorithm per codec, in ms per query, with docIDs written out.
+Clustered and uniform: 8M documents, 21M postings, 500 queries of 2-4
+co-occurring terms. WikiText-103: 859,532 paragraphs, 57M postings, 500
+queries.
+
+| codec | clustered bits | clustered AND ms | clustered OR ms | uniform bits | WikiText bits | WikiText AND ms | WikiText OR ms |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Uncompressed | 32.00 | 0.061 | 1.86 | 32.00 | 32.00 | 0.022 | 0.561 |
+| VByte | 9.61 | 0.133 | 3.20 | 10.91 | 8.91 | 0.051 | 0.974 |
+| BP128 | 7.69 | 0.080 | 2.89 | 9.39 | 7.11 | 0.033 | 0.966 |
+| BP128 (bitpacking crate) | 7.69 | 0.072 | 2.54 | 9.39 | 7.11 | 0.030 | 0.855 |
+| OptPFor | 5.92 | 0.088 | 3.00 | 8.87 | 5.91 | 0.037 | 0.898 |
+| Elias-Fano | 8.13 | 0.055 | 2.87 | 8.08 | 5.16 | 0.019 | 0.976 |
+| PEF | 4.94 | 0.046 | 2.84 | 8.08 | 4.75 | 0.022 | 0.931 |
+| Interpolative | 4.90 | 0.181 | 5.00 | 8.52 | 4.77 | 0.081 | 1.623 |
+| Hybrid (bitmap + BP128) | 7.58 | 0.067 | 1.91 | 9.31 | 5.85 | 0.025 | 0.387 |
+| Roaring | 9.32 | 0.030 | 0.57 | 13.70 | 8.47 | 0.007 | 0.086 |
+| Trie | 7.18 | 0.147 | 2.50 | 13.24 | 6.50 | 0.062 | 0.485 |
+| Run-Trie | 6.67 | 0.132 | 2.84 | 13.24 | 6.23 | 0.061 | 0.530 |
+| Roaring (roaring crate) | 9.32 | 0.088 | 4.30 | 13.70 | 8.47 | 0.027 | 1.182 |
+
+* Roaring is the fastest for AND and OR on every collection (4.5-10x faster
+  OR than the best list codec) at 1.6-1.9x PEF's size.
+* PEF is the smallest codec, or within 1% of it, everywhere, and Elias-Fano or
+  PEF is the fastest list codec for AND.
+* Rarest-first leapfrog (`NextGEQ`) is 4-18x faster than decode-then-intersect.
+* SIMD block merge is 4.4x faster than scalar merge on equal-size lists;
+  galloping wins beyond a ~1:24 size ratio.
+* DocID clustering shrinks PEF, interpolative, Roaring and tries by 32-50%.
+
+Full analysis, formulas and diagrams: [`report/report.html`](report/report.html).
+

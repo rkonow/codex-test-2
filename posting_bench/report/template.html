@@ -170,7 +170,12 @@ footer { margin-top: 60px; color: var(--ink-3); font-size: 0.85rem; }
   <h1>Intersecting and merging compressed posting lists</h1>
   <p class="lede">I implemented 13 posting-list representations and 20 intersection and union algorithms in Rust, built a testbed that checks every query result before it is timed, and ran them on synthetic and real collections. This page explains each technique with its formulas and layout, then reports what was measured.</p>
   <p class="meta" id="meta-line"></p>
-  <div class="findings" id="findings"></div>
+  <div class="findings" id="findings">
+    <div class="finding"><div class="k">Fastest AND and OR</div><div class="v">Roaring</div><p>0.030 ms AND and 0.57 ms OR on the clustered collection, 1.5× and 5× faster than PEF, at 1.9× its size.</p></div>
+    <div class="finding"><div class="k">Best balance</div><div class="v">PEF · 4.9 bits</div><p>The smallest codec, or within 1% of it, on all three collections, and 1.5× Roaring's AND time on the clustered one.</p></div>
+    <div class="finding"><div class="k">Skip, don't decode</div><div class="v">4–18×</div><p>Rarest-first leapfrog with NextGEQ against decoding every list and intersecting arrays.</p></div>
+    <div class="finding"><div class="k">SIMD crossover</div><div class="v">≈ 1 : 24</div><p>SIMD block merge is 4.4× faster than a scalar merge on equal lists; galloping wins beyond this size ratio.</p></div>
+  </div>
   <ul class="toc">
     <li><a href="#problem">The problem</a></li>
     <li><a href="#testbed">Testbed</a></li>

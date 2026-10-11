@@ -1,6 +1,13 @@
 <div class="col">
   <h3 id="r-tradeoff">Space against speed on a reordered index</h3>
-  <p>DRAFT</p>
+  <p>On the clustered collection the 500 queries average 2.8 terms and touch 576,000 postings each; a conjunction returns 309 documents and a disjunction 563,000. The charts plot each codec's size on the query lists against its fastest algorithm; blue points are Pareto-optimal (nothing else is both smaller and faster).</p>
+  <ul>
+    <li><b>The AND frontier has three members.</b> It runs from interpolative coding (4.90 bits per posting, 0.18 ms) through PEF (4.94 bits, 0.046 ms) to Roaring (9.32 bits, 0.030 ms). PEF is within 1% of interpolative coding's size but 3.9× faster, because its <code>NextGEQ</code> is a select over the high bits instead of a block decode.</li>
+    <li><b>Roaring buys speed with space.</b> It is 1.5× faster than PEF for AND and 5× faster for OR (0.57 against 2.84 ms), at 1.9× the size. Pibiri &amp; Venturini report 4–8× (AND) and 14–18× (OR) for CRoaring over list codecs at about twice the space; the direction holds here, with smaller gaps on these skewed queries.</li>
+    <li><b>Block codecs sit in the middle.</b> BP128 and the bitpacking crate take 0.072–0.080 ms at 7.69 bits, and OptPFor is about as fast at 5.92 bits, 23% smaller. VByte is 1.7× slower than BP128 with no space advantage. Even uncompressed arrays (0.061 ms) lose to PEF: galloping over 32-bit integers touches more memory than PEF's select jumps.</li>
+    <li><b>Unions are bound by their output.</b> Every list codec needs 2.5–5 ms, that is 4.5–9 ns per output docID, whatever its decoding speed. Only representations that OR whole machine words escape this: Roaring (0.57 ms, about 1 ns per result, or 0.38 ms if it only counts), the hybrid index (1.9 ms) and uncompressed arrays merged through a bitmap (1.86 ms).</li>
+    <li><b>Implementation matters as much as format.</b> With identical containers and size, this crate's Roaring answers AND 2.9× faster than the <code>roaring</code> crate and OR 7.5× faster when docIDs are written out. When both only count, the OR gap shrinks to 1.9×, so most of the crate's union cost is its iterator. In the other direction, the bitpacking crate decodes BP128 blocks faster than my auto-vectorised unpacker (0.42 against 0.66 ns per posting).</li>
+  </ul>
 </div>
 <div class="pair">
   <figure>
@@ -22,7 +29,13 @@
 
 <div class="col">
   <h3 id="r-algos">Skipping beats decoding for conjunctions</h3>
-  <p>DRAFT</p>
+  <p>The tables below give every algorithm's time on every codec (clustered collection; blue marks the fastest per row, not counting the count-only variants).</p>
+  <ul>
+    <li><b>Rarest-first leapfrog is the best cursor conjunction for every codec.</b> Driving the shortest list and calling <code>NextGEQ</code> on the others is 4–18× faster than decoding all lists and intersecting the arrays (39× for the <code>roaring</code> crate, whose decoding goes through a slow iterator). The gap is largest for Elias-Fano and PEF (18×), whose decoding is slower but whose jumps are cheap.</li>
+    <li><b>Round-robin order costs 1.2–1.7×.</b> Leapfrog Triejoin's round-robin seeks waste work when one list is much shorter than the rest, as here; it only won for some two-term queries.</li>
+    <li><b>SIMD loses on real query shapes.</b> On uncompressed arrays, SvS with galloping (0.061 ms) beats SvS with every SIMD kernel by 7.8–10× (0.48–0.63 ms), although SIMD wins by 4.4× on equal-size lists. The size ratios of real queries are large, so the adaptive kernel (0.064 ms) is the safe default. Small Adaptive (0.072 ms) and Sequential (0.105 ms) come close but never beat SvS, which is Barbay et al.'s experimental finding.</li>
+    <li><b>Union algorithms:</b> Lucene's bitset window or PISA's min-scan is the fastest cursor union for every codec, 1.2–1.7× faster than a heap of cursors. Native operations beat any cursor union: 5.2× for Roaring and 2.5× for the hybrid index.</li>
+  </ul>
 </div>
 <div class="wide">
   <p class="chart-title">AND, ms per query, by algorithm (clustered)</p>
@@ -38,7 +51,7 @@
     <li><b>Codecs that model local density gain the most.</b> On the query lists, clustering cuts Run-Trie by 50%, Trie by 46%, interpolative by 42%, PEF by 39%, OptPFor by 33% and Roaring by 32%. BP128 gains 18% and VByte only 12%, because one wide gap still forces a wide block or extra bytes.</li>
     <li><b>Plain Elias-Fano gains nothing</b> (8.08 → 8.13 bits): its size depends only on \(u\) and \(n\), exactly as the formula says. On uniform data it ties PEF as the smallest codec, which is the case partitioning cannot improve.</li>
     <li><b>Roaring and the tries pay most for randomness.</b> At 13.2–13.7 bits per posting on uniform data they are 1.6–1.7× the size of PEF, because random docIDs leave few runs and many half-empty 16-bit arrays or trie paths.</li>
-    <li><b>Conjunctions get about 2× faster with clustering</b> for every list codec (PEF 0.083 → 0.043 ms, BP128 0.156 → 0.076 ms), while Roaring changes little. Part of this comes from the workloads: the uniform queries touch 19% more postings and have smaller results, because random lists share fewer documents. The rest comes from skipping, since clustered lists put matching docIDs in fewer blocks and partitions.</li>
+    <li><b>Conjunctions get about 2× faster with clustering</b> for every list codec (PEF 0.083 → 0.046 ms, BP128 0.156 → 0.080 ms), while Roaring changes little. Part of this comes from the workloads: the uniform queries touch 19% more postings and have smaller results, because random lists share fewer documents. The rest comes from skipping, since clustered lists put matching docIDs in fewer blocks and partitions.</li>
   </ul>
 </div>
 <div class="pair">

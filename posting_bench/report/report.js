@@ -428,6 +428,7 @@
   }
   const short = (name) => name.replace("Hybrid (bitmap + BP128)", "Hybrid").replace("BP128 (bitpacking crate)", "BP128 (crate)").replace("Roaring (roaring crate)", "Roaring (crate)");
 
+  const shortAlgo = (a) => a.replace(" (NextGEQ)", "").replace(" (4096)", "").replace("adaptive (SIMD / gallop @64x)", "adaptive").replace("slices: ", "");
   function summaryTable(container, run) {
     const wrap = h("div", { class: "table-wrap" }, container);
     const t = h("table", {}, wrap);
@@ -446,9 +447,9 @@
       h("td", { class: "n" + (c.query_bits_per_posting === bSpace ? " best" : "") }, tr, c.query_bits_per_posting.toFixed(2));
       h("td", { class: "n" }, tr, c.query_decode_ns_per_posting.toFixed(2));
       h("td", { class: "n" + (a.ms_per_query === bAnd ? " best" : "") }, tr, ms(a.ms_per_query));
-      h("td", { class: "algo" }, tr, a.algorithm);
+      h("td", { class: "algo" }, tr, shortAlgo(a.algorithm));
       h("td", { class: "n" + (o.ms_per_query === bOr ? " best" : "") }, tr, ms(o.ms_per_query));
-      h("td", { class: "algo" }, tr, o.algorithm);
+      h("td", { class: "algo" }, tr, shortAlgo(o.algorithm));
     });
   }
 
@@ -462,7 +463,7 @@
     run.codecs.forEach((c) => {
       const vals = algos.map((a) => m(c, op, a));
       if (vals.every((v) => v == null)) return;
-      const mn = Math.min(...vals.filter((v) => v != null));
+      const mn = Math.min(...vals.filter((v, i) => v != null && !algos[i].includes("count only")));
       const tr = h("tr", {}, tb);
       h("td", {}, tr, c.codec);
       vals.forEach((v) => h("td", { class: "n" + (v === mn ? " best" : "") }, tr, v == null ? "—" : ms(v)));
@@ -580,7 +581,7 @@
         const rows = DATA.kernels.rows;
         const ratios = [...new Set(rows.map((r) => r.ratio))];
         const pick = ["merge", "merge (branchless)", "galloping", "binary search", "Baeza-Yates", "SIMD AVX-512 16x16", "adaptive (SIMD / gallop @64x)"];
-        const cols = ["--s1", "--s2", "--s3", "--s4", "--s5", "--s7", "--s8"];
+        const cols = ["--s1", "--s2", "--s3", "--s4", "--s5", "--s6", "--s7"];
         const series = pick.filter((k) => rows.some((r) => r.kernel === k)).map((k, i) => ({
           name: k.replace(" (SIMD / gallop @64x)", " (SIMD ≤64×, else gallop)"), color: css(cols[i]),
           values: ratios.map((x) => { const r = rows.find((q) => q.kernel === k && q.ratio === x); return r ? r.ns_per_small_element : null; }),
@@ -594,7 +595,7 @@
       chart("terms", (el) => {
         const ks = Object.keys(DATA.terms).map(Number).sort((a, b) => a - b);
         const pick = ["Uncompressed", "BP128", "PEF", "Hybrid (bitmap + BP128)", "Roaring", "Trie"];
-        const cols = ["--s1", "--s2", "--s3", "--s4", "--s7", "--s8"];
+        const cols = ["--s1", "--s2", "--s3", "--s4", "--s5", "--s6"];
         const series = pick.map((n, i) => ({
           name: short(n), color: css(cols[i]),
           values: ks.map((k) => { const c = DATA.terms[k].codecs.find((q) => q.codec === n); return c ? best(c, "AND").ms_per_query : null; }),
