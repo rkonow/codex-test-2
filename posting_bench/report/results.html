@@ -1,0 +1,100 @@
+<div class="col">
+  <h3 id="r-tradeoff">Space against speed on a reordered index</h3>
+  <p>DRAFT</p>
+</div>
+<div class="pair">
+  <figure>
+    <div class="frame">
+      <p class="chart-title">AND: index size vs query time</p>
+      <p class="chart-sub">Clustered collection · best algorithm per codec · blue: Pareto frontier</p>
+      <div class="chart" id="clustered-and"></div>
+    </div>
+  </figure>
+  <figure>
+    <div class="frame">
+      <p class="chart-title">OR: index size vs query time</p>
+      <p class="chart-sub">Clustered collection · best algorithm that outputs docIDs</p>
+      <div class="chart" id="clustered-or"></div>
+    </div>
+  </figure>
+</div>
+<div class="wide" id="clustered-table"></div>
+
+<div class="col">
+  <h3 id="r-algos">Skipping beats decoding for conjunctions</h3>
+  <p>DRAFT</p>
+</div>
+<div class="wide">
+  <p class="chart-title">AND, ms per query, by algorithm (clustered)</p>
+  <div id="algo-and"></div>
+  <p class="chart-title">OR, ms per query, by algorithm (clustered)</p>
+  <div id="algo-or"></div>
+</div>
+
+<div class="col">
+  <h3 id="r-clustering">What docID clustering buys</h3>
+  <p>DRAFT</p>
+</div>
+<div class="pair">
+  <figure>
+    <div class="frame">
+      <p class="chart-title">Index size, clustered vs uniform docIDs</p>
+      <p class="chart-sub">Bits per posting over the query lists</p>
+      <div class="chart" id="space-compare"></div>
+    </div>
+  </figure>
+  <figure>
+    <div class="frame">
+      <p class="chart-title">AND time, clustered vs uniform docIDs</p>
+      <p class="chart-sub">Best algorithm per codec, ms per query</p>
+      <div class="chart" id="time-compare"></div>
+    </div>
+  </figure>
+</div>
+<div class="wide" id="uniform-table"></div>
+
+<div class="col">
+  <h3 id="r-kernels">Kernels: where merging stops paying</h3>
+  <p>DRAFT</p>
+</div>
+<figure>
+  <div class="frame">
+    <p class="chart-title">Pairwise intersection cost vs size ratio</p>
+    <p class="chart-sub">|small| = 10,000; the large list has density 0.1 in its universe; uncompressed arrays</p>
+    <div class="chart" id="kernels"></div>
+  </div>
+</figure>
+
+<div class="col">
+  <h3 id="r-terms">Longer queries</h3>
+  <p>DRAFT</p>
+</div>
+<figure class="narrow">
+  <div class="frame">
+    <p class="chart-title">AND time vs number of query terms</p>
+    <p class="chart-sub">Clustered collection · 300 queries per point · best algorithm per codec</p>
+    <div class="chart" id="terms"></div>
+  </div>
+</figure>
+
+<div class="col">
+  <h3 id="r-wikitext">Real text: WikiText-103</h3>
+  <p>DRAFT</p>
+</div>
+<div class="pair">
+  <figure>
+    <div class="frame">
+      <p class="chart-title">AND on WikiText-103</p>
+      <p class="chart-sub">859,532 paragraphs · best algorithm per codec</p>
+      <div class="chart" id="wikitext-and"></div>
+    </div>
+  </figure>
+  <figure>
+    <div class="frame">
+      <p class="chart-title">OR on WikiText-103</p>
+      <p class="chart-sub">Best algorithm that outputs docIDs</p>
+      <div class="chart" id="wikitext-or"></div>
+    </div>
+  </figure>
+</div>
+<div class="wide" id="wikitext-table"></div>

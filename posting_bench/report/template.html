@@ -75,6 +75,8 @@ strong { font-weight: 600; }
 .toc a:hover, .toc a:focus-visible { color: var(--accent); border-color: var(--accent); }
 
 figure { margin: 28px auto; max-width: 1000px; }
+.pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr)); gap: 18px; max-width: 1080px; margin: 10px auto; }
+.pair figure { margin: 8px 0; max-width: none; min-width: 0; }
 figure.narrow { max-width: 760px; }
 .frame { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 18px 18px 12px; overflow-x: auto; position: relative; }
 figcaption { font-size: 0.9rem; color: var(--ink-2); margin-top: 10px; max-width: 720px; margin-inline: auto; }
@@ -84,6 +86,7 @@ figcaption b { color: var(--ink); font-weight: 600; }
 .chart { width: 100%; min-height: 120px; }
 
 .math { overflow-x: auto; overflow-y: hidden; margin: 14px 0 18px; padding: 6px 0; }
+mjx-container[display="true"] { display: block; max-width: 100%; overflow-x: auto; overflow-y: hidden; padding: 2px 0; }
 .defs { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; font-size: 0.95rem; margin: 10px 0 18px; }
 .defs dt { font-family: var(--mono); font-size: 0.86rem; color: var(--ink-2); }
 .defs dd { margin: 0; min-width: 0; }
@@ -101,6 +104,8 @@ th { font: 600 0.76rem/1.3 var(--mono); letter-spacing: 0.04em; text-transform: 
 td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--mono); font-size: 0.84rem; }
 tr:last-child td { border-bottom: none; }
 td.best { color: var(--accent); font-weight: 600; }
+td.strong { font-weight: 600; }
+.wide { max-width: 1000px; margin-inline: auto; }
 .algo { color: var(--ink-3); font-size: 0.8rem; }
 details { margin: 14px 0; }
 summary { cursor: pointer; color: var(--accent); font-weight: 500; }
@@ -216,7 +221,9 @@ flowchart LR
 <section class="col" id="codecs">
   <h2>Representations</h2>
   <p>The 13 representations fall into four families. All lists in a query share one universe, and every docID is below \(2^{32}-1\), which the cursors use as the end-of-list sentinel.</p>
-  <div class="codecs" id="codec-cards"></div>
+</section>
+<div class="wide" id="codec-cards"></div>
+<section class="col">
 
   <h3>Gap coding in blocks: VByte, BP128, OptPFor, interpolative</h3>
   <p>Block codecs cut a list into blocks of 128 postings. Within a block they code <em>d-gaps</em>, which are small when docIDs are dense, relative to a base \(b\) (the previous block's last docID plus one):</p>
@@ -315,7 +322,7 @@ flowchart LR
   <h3>Compact binary tries</h3>
   <p>Arroyuelo &amp; Castillo (CPM 2023) store a set as the binary trie of height \(h = \lceil \log_2 u \rceil\) that spells every docID most significant bit first. Each node contributes two bits, "left child present" and "right child present", and the bits of a level form a bitvector \(B_\ell\) with rank support. Children are found by counting ones:</p>
   <div class="math">\[ \mathrm{left}(i) = \mathrm{rank}_1(B_\ell, 2i), \qquad \mathrm{right}(i) = \mathrm{rank}_1(B_\ell, 2i + 1). \]</div>
-  <p>Intersection walks all \(k\) tries in lockstep and ANDs the 2-bit codes at each node, so a subtree missing from any input is pruned immediately. This runs in \(O(k\,\delta \log(u/\delta))\) time, where \(\delta\) is the alternation: the size of the smallest certificate that proves the result. Docids that are close share their upper paths, so clustered lists need few nodes. The run-compressed variant (Run-Trie) cuts every full subtree and codes its root as <code>00</code>.</p>
+  <p>Intersection walks all \(k\) tries in lockstep and ANDs the 2-bit codes at each node, so a subtree missing from any input is pruned immediately. This runs in \(O(k\,\delta \log(u/\delta))\) time, where \(\delta\) is the alternation: the size of the smallest certificate that proves the result. DocIDs that are close share their upper paths, so clustered lists need few nodes. The run-compressed variant (Run-Trie) cuts every full subtree and codes its root as <code>00</code>.</p>
   <figure>
     <div class="frame">
       <svg class="dg" viewBox="0 0 760 290" role="img" aria-label="Binary trie of the set 2, 3, 9, 12, 13 in a universe of 16, with each node's 2-bit code and the level bitvectors">
@@ -323,7 +330,7 @@ flowchart LR
         <g id="trie-levels"></g>
       </svg>
     </div>
-    <figcaption><b>Trie of {2, 3, 9, 12, 13} with \(u = 16\).</b> 18 bits encode 5 values here. With dense or clustered docIDs the cost per value falls fast, because sibling values share every node above them. Node <span class="mono">10</span> is node 1 of level 2. Its code is <span class="mono">10</span>, so it has only a left child, at index \(\mathrm{rank}_1(B_2, 2) = 1\) of level 3.</figcaption>
+    <figcaption><b>Trie of {2, 3, 9, 12, 13} with \(u = 16\).</b> 18 bits encode 5 values here. With dense or clustered docIDs the cost per value falls fast, because sibling values share every node above them. The highlighted node (prefix <span class="mono">10</span>, node 1 of level 2) has code <span class="mono">10</span>: only a left child, which is node \(\mathrm{rank}_1(B_2, 2) = 1\) of level 3.</figcaption>
   </figure>
 
   <h3>Hybrid bitmap + list index</h3>
@@ -379,7 +386,9 @@ flowchart LR
 
 <section class="col" id="setup">
   <h2>Experimental setup</h2>
-  <div id="setup-table"></div>
+</section>
+<div class="wide" id="setup-table"></div>
+<section class="col">
   <p>The <b>clustered</b> collection mimics an index whose docIDs were reordered by URL or topic, the setting where modern indexes operate. The docID space is split into 1000 topic regions; each term draws 85% of its postings from a few preferred regions, in runs of about 4 consecutive documents, and the rest uniformly. The <b>uniform</b> collection uses the same list lengths with random docIDs, like an index in crawl order. <b>WikiText-103</b> is real text: every paragraph of the training split is a document, in corpus order, so the paragraphs of one article are adjacent.</p>
   <p>List lengths follow Zipf's law (\(n_r \approx n_1 / r\)). Queries take 2 to 4 terms that co-occur in a randomly sampled document, so conjunctions are rarely empty, as for real queries. Every measurement is the best of 3 timed passes over the whole query log, single-threaded, after a verified warm-up pass.</p>
 </section>

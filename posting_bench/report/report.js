@@ -76,8 +76,8 @@
       { a: 120, b: 330, kind: "Elias-Fano", cls: "box", density: 0.12 },
       { a: 330, b: 455, kind: "bitvector", cls: "box-warm", density: 0.55 },
       { a: 455, b: 625, kind: "Elias-Fano", cls: "box", density: 0.08 },
-      { a: 625, b: 668, kind: "run", cls: "box-acc", density: 1 },
-      { a: 668, b: 740, kind: "EF", cls: "box", density: 0.15 },
+      { a: 625, b: 680, kind: "run", cls: "box-acc", density: 1 },
+      { a: 680, b: 740, kind: "EF", cls: "box", density: 0.15 },
     ];
     let seed = 7;
     const rnd = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
@@ -87,11 +87,11 @@
       for (let x = p.a + 5; x < p.b - 3; x += 4) {
         if (p.density >= 1 || rnd() < p.density) s("circle", { cx: x, cy: 100, r: 1.7, class: "dot" }, g);
       }
-      s("rect", { x: p.b - 23, y: 14, width: 44, height: 22, rx: 3, class: "box" }, g);
-      s("text", { x: p.b - 1, y: 29, class: "ts", "text-anchor": "middle" }, g, "last");
-      s("line", { x1: p.b - 1, y1: 36, x2: p.b - 1, y2: 52, class: "ln" }, g);
+      s("rect", { x: p.b - 44, y: 20, width: 42, height: 22, rx: 3, class: "box" }, g);
+      s("text", { x: p.b - 23, y: 35, class: "ts", "text-anchor": "middle" }, g, "last");
+      s("line", { x1: p.b - 2, y1: 42, x2: p.b - 2, y2: 52, class: "ln" }, g);
     });
-    s("text", { x: 40, y: 29, class: "tl" }, g, "upper level →");
+    s("text", { x: 40, y: 12, class: "ts" }, g, "upper level: last docID + descriptor per partition (64 bits)");
   }
 
   function roaringDiagram() {
@@ -99,7 +99,7 @@
     const items = [
       { key: 0, title: "array · 3 values", body: "[17, 902, 4410]", size: "6 bytes", cls: "box" },
       { key: 1, title: "bitmap · 31,207 values", body: "1024 × 64-bit words", size: "8 KiB", cls: "box-acc" },
-      { key: 5, title: "run · 2 runs", body: "(100, 2999) (8000, 199)", size: "10 bytes", cls: "box-warm" },
+      { key: 5, title: "run · 2 runs", body: "(100,2999) (8000,199)", size: "10 bytes", cls: "box-warm" },
       { key: 9, title: "array · 1 value", body: "[65530]", size: "2 bytes", cls: "box" },
     ];
     s("text", { x: 20, y: 86, class: "tl" }, g, "keys");
@@ -209,17 +209,18 @@
     const g = $("#leap");
     const lists = { A: [3, 12, 40, 41, 77], B: [5, 15, 40, 60, 77, 90], C: [1, 12, 40, 44, 77, 80] };
     const ys = { A: 56, B: 112, C: 168 };
-    const x = (v) => 110 + v * 6.2;
+    const vals = [...new Set(Object.values(lists).flat())].sort((p, q) => p - q);
+    const x = (v) => 130 + vals.indexOf(v) * 52;
     [40, 77].forEach((v) => s("rect", { x: x(v) - 11, y: 30, width: 22, height: 156, rx: 6, class: "band" }, g));
     s("text", { x: x(40), y: 204, class: "ts", "text-anchor": "middle" }, g, "result");
     s("text", { x: x(77), y: 204, class: "ts", "text-anchor": "middle" }, g, "result");
     Object.entries(lists).forEach(([name, vals]) => {
       const y = ys[name];
-      s("line", { x1: 100, y1: y, x2: 730, y2: y, class: "axis" }, g);
+      s("line", { x1: 110, y1: y, x2: 740, y2: y, class: "axis" }, g);
       s("text", { x: 4, y: y + 4, class: "tl" }, g, name === "A" ? "A (rarest)" : name);
       vals.forEach((v) => {
         s("circle", { cx: x(v), cy: y, r: 4.5, class: "dot" }, g);
-        s("text", { x: x(v), y: y - 10, class: "ts", "text-anchor": "middle" }, g, v);
+        s("text", { x: x(v) + 8, y: y + 17, class: "ts" }, g, v);
       });
     });
     const jumps = [["A", 3, "B", 5], ["B", 5, "A", 12], ["A", 12, "B", 15], ["B", 15, "A", 40], ["A", 40, "B", 40], ["B", 40, "C", 40],
@@ -230,8 +231,8 @@
       const mx = (x1 + x2) / 2 + (x1 === x2 ? 16 : 0);
       s("path", { d: `M${x1} ${y1 + dy} Q ${mx + 6} ${(y1 + y2) / 2} ${x2} ${y2 - dy}`, class: "ln-acc", "marker-end": "url(#ar3)" }, g);
     });
-    s("path", { d: `M${x(40) + 4} ${ys.A + 9} Q ${x(40.5)} ${ys.A + 20} ${x(41) - 1} ${ys.A + 8}`, class: "ln" }, g);
-    s("text", { x: x(41) + 6, y: ys.A + 24, class: "ts" }, g, "next()");
+    s("path", { d: `M${x(40) + 5} ${ys.A - 2} Q ${(x(40) + x(41)) / 2} ${ys.A - 26} ${x(41) - 5} ${ys.A - 4}`, class: "ln" }, g);
+    s("text", { x: (x(40) + x(41)) / 2, y: ys.A - 30, class: "ts", "text-anchor": "middle" }, g, "next()");
   }
 
   // ---------------------------------------------------------------- charts
@@ -304,11 +305,11 @@
   // Scatter of space vs time with a highlighted Pareto frontier.
   function scatter(container, pts, opt) {
     const f = frame(container, opt.height || 360, { l: 58, r: 20, t: 14, b: 42 });
-    const xmin = 0, xmax = Math.max(...pts.map((p) => p.x)) * 1.08;
+    const xmin = Math.min(...pts.map((p) => p.x)) / 1.12, xmax = Math.max(...pts.map((p) => p.x)) * 1.12;
     const ylo = Math.min(...pts.map((p) => p.y)) / 1.35, yhi = Math.max(...pts.map((p) => p.y)) * 1.35;
-    const xs = (v) => ((v - xmin) / (xmax - xmin)) * f.iw;
+    const xs = (v) => ((Math.log(v) - Math.log(xmin)) / (Math.log(xmax) - Math.log(xmin))) * f.iw;
     const ys = (v) => f.ih - ((Math.log(v) - Math.log(ylo)) / (Math.log(yhi) - Math.log(ylo))) * f.ih;
-    axes(f, xs, ys, linTicks(xmin, xmax, 6), logTicks(ylo, yhi), opt.xTitle, opt.yTitle);
+    axes(f, xs, ys, [4, 5, 6, 8, 10, 12, 16, 20, 32].filter((v) => v >= xmin && v <= xmax), logTicks(ylo, yhi), opt.xTitle, opt.yTitle);
     const sorted = pts.slice().sort((a, b) => a.x - b.x);
     let best = Infinity;
     const front = [];
@@ -511,36 +512,34 @@
   }
 
   function codecCards() {
-    const fam = {
-      "Uncompressed": ["baseline", "Sorted u32 array; NextGEQ by galloping. 32 bits per posting."],
-      "VByte": ["block", "Byte-aligned varint gaps; 128 per block."],
-      "BP128": ["block", "One bit width per 128 gaps, vertical 4-lane SIMD layout."],
-      "BP128 (bitpacking crate)": ["baseline", "Tantivy's bitpacking crate (BitPacker4x) in the same block framework."],
-      "OptPFor": ["block", "Per-block optimal width with patched exceptions."],
-      "Interpolative": ["block", "Binary interpolative coding per block; smallest, slowest."],
-      "Elias-Fano": ["succinct", "Low bits verbatim, high bits unary; select0 skips."],
-      "PEF": ["succinct", "Partitions by DP; each a run, bitvector or Elias-Fano."],
-      "Hybrid (bitmap + BP128)": ["bitmap", "Dense lists as plain bitmaps, others BP128."],
-      "Roaring": ["bitmap", "2¹⁶ chunks: array, bitmap or run containers; SIMD kernels."],
-      "Roaring (roaring crate)": ["baseline", "The roaring crate, a production Rust Roaring."],
-      "Trie": ["succinct", "Level-wise 2-bit binary trie with rank navigation."],
-      "Run-Trie": ["succinct", "Trie with full subtrees cut (rTrie)."],
-    };
-    const box = $("#codec-cards");
-    (DATA.clustered ? DATA.clustered.codecs.map((c) => c.codec) : Object.keys(fam)).forEach((name) => {
-      const [tag, text] = fam[name] || ["", ""];
-      const d = h("div", { class: "codec" }, box);
-      const h4 = h("h4", {}, d, name);
-      h("span", { class: "tag" }, h4, tag);
-      h("p", {}, d, text);
-    });
+    const rows = [
+      ["Uncompressed", "baseline", "sorted u32 array", "galloping", "—"],
+      ["VByte", "block", "varint d-gaps, 128 per block + skip table", "skip table, decode block", "—"],
+      ["BP128", "block", "one bit width per 128 gaps (SIMD-BP128 layout)", "skip table, decode block", "—"],
+      ["BP128 (bitpacking crate)", "baseline", "Tantivy's BitPacker4x in the same blocks", "skip table, decode block", "—"],
+      ["OptPFor", "block", "per-block optimal width + patched exceptions", "skip table, decode block", "—"],
+      ["Interpolative", "block", "binary interpolative coding per block", "skip table, decode block", "—"],
+      ["Elias-Fano", "succinct", "low bits + unary high bits", "select₀ on high bits", "—"],
+      ["PEF", "succinct", "DP partitions: run, bitvector or Elias-Fano", "gallop partitions, then local", "—"],
+      ["Roaring", "bitmap", "2¹⁶ chunks: array, bitmap or run containers", "gallop keys, then container", "SvS over containers, lazy k-way OR"],
+      ["Roaring (roaring crate)", "baseline", "the roaring crate, run-optimised", "iterator advance_to", "MultiOps"],
+      ["Hybrid (bitmap + BP128)", "bitmap", "bitmap if u/n ≤ 8, else BP128", "word scan or block", "leapfrog sparse lists + bit probes"],
+      ["Trie", "succinct", "2 bits per trie node, rank navigation", "descend along target bits", "synchronised traversal"],
+      ["Run-Trie", "succinct", "trie with full subtrees cut", "descend along target bits", "synchronised traversal"],
+    ];
+    const wrap = h("div", { class: "table-wrap" }, $("#codec-cards"));
+    const t = h("table", {}, wrap);
+    const hr = h("tr", {}, h("thead", {}, t));
+    ["codec", "family", "layout", "NextGEQ", "native AND / OR"].forEach((x) => h("th", {}, hr, x));
+    const tb = h("tbody", {}, t);
+    rows.forEach((r) => { const tr = h("tr", {}, tb); r.forEach((c, i) => h("td", i === 0 ? { class: "strong" } : {}, tr, c)); });
   }
 
   function runSection(key) {
     const run = DATA[key];
     if (!run) return;
-    chart(key + "-and", (el) => scatter(el, run.codecs.map((c) => ({ label: short(c.codec), x: c.query_bits_per_posting, y: best(c, "AND").ms_per_query, algo: best(c, "AND").algorithm })), { xTitle: "bits per posting (query lists)", yTitle: "AND ms/query (log)" }));
-    chart(key + "-or", (el) => scatter(el, run.codecs.map((c) => ({ label: short(c.codec), x: c.query_bits_per_posting, y: best(c, "OR").ms_per_query, algo: best(c, "OR").algorithm })), { xTitle: "bits per posting (query lists)", yTitle: "OR ms/query (log)" }));
+    chart(key + "-and", (el) => scatter(el, run.codecs.map((c) => ({ label: short(c.codec), x: c.query_bits_per_posting, y: best(c, "AND").ms_per_query, algo: best(c, "AND").algorithm })), { xTitle: "bits per posting, query lists (log)", yTitle: "AND ms/query (log)" }));
+    chart(key + "-or", (el) => scatter(el, run.codecs.map((c) => ({ label: short(c.codec), x: c.query_bits_per_posting, y: best(c, "OR").ms_per_query, algo: best(c, "OR").algorithm })), { xTitle: "bits per posting, query lists (log)", yTitle: "OR ms/query (log)" }));
     const tbl = document.getElementById(key + "-table");
     if (tbl) { summaryTable(tbl, run); allTable(tbl, run); }
   }
