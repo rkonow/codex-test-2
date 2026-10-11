@@ -251,8 +251,8 @@ fn print_run(w: &Workload, reports: &[CodecReport]) {
     println!("| CPU | {} ({}) |", cpu_model(), simd_features().join(", "));
 
     println!("\n## Summary\n");
-    println!("| codec | bits/posting | bits/posting (query lists) | build s | decode ns/posting | best AND ms | best OR ms |");
-    println!("|---|---:|---:|---:|---:|---|---|");
+    println!("| codec | bits/posting | bits/posting (query lists) | build s | decode ns/posting | decode ns/posting (query lists) | best AND ms | best OR ms |");
+    println!("|---|---:|---:|---:|---:|---:|---|---|");
     for r in reports {
         let best = |op| {
             r.best(op)
@@ -260,12 +260,13 @@ fn print_run(w: &Workload, reports: &[CodecReport]) {
                 .unwrap_or_else(|| "—".into())
         };
         println!(
-            "| {} | {:.2} | {:.2} | {:.2} | {:.2} | {} | {} |",
+            "| {} | {:.2} | {:.2} | {:.2} | {:.2} | {:.2} | {} | {} |",
             r.codec,
             r.bits_per_posting,
             r.query_bits_per_posting,
             r.build_secs,
             r.decode_ns_per_posting,
+            r.query_decode_ns_per_posting,
             best(Op::And),
             best(Op::Or)
         );
@@ -298,7 +299,7 @@ fn run_json(w: &Workload, reports: &[CodecReport], args: &RunArgs) -> String {
     let _ = writeln!(s, "  \"simd\": [{}],", feats.join(", "));
     s.push_str("  \"codecs\": [\n");
     for (i, r) in reports.iter().enumerate() {
-        let _ = writeln!(s, "    {{\"codec\": {}, \"bits_per_posting\": {:.4}, \"query_bits_per_posting\": {:.4}, \"build_secs\": {:.4}, \"decode_ns_per_posting\": {:.4}, \"measurements\": [", json_str(&r.codec), r.bits_per_posting, r.query_bits_per_posting, r.build_secs, r.decode_ns_per_posting);
+        let _ = writeln!(s, "    {{\"codec\": {}, \"bits_per_posting\": {:.4}, \"query_bits_per_posting\": {:.4}, \"build_secs\": {:.4}, \"decode_ns_per_posting\": {:.4}, \"query_decode_ns_per_posting\": {:.4}, \"measurements\": [", json_str(&r.codec), r.bits_per_posting, r.query_bits_per_posting, r.build_secs, r.decode_ns_per_posting, r.query_decode_ns_per_posting);
         for (j, m) in r.measurements.iter().enumerate() {
             let _ = write!(
                 s,

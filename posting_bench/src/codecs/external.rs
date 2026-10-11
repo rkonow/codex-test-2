@@ -59,7 +59,10 @@ impl PostingList for RoaringRs {
     const NAME: &'static str = "Roaring (roaring crate)";
 
     fn build(docs: &[u32], _universe: u32) -> Self {
-        Self(RoaringBitmap::from_sorted_iter(docs.iter().copied()).expect("sorted input"))
+        let mut bitmap = RoaringBitmap::from_sorted_iter(docs.iter().copied()).expect("sorted input");
+        // Convert chunks to run containers where smaller (CRoaring's runOptimize).
+        bitmap.optimize();
+        Self(bitmap)
     }
 
     fn len(&self) -> usize {

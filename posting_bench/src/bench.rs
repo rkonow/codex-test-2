@@ -42,15 +42,20 @@ pub struct CodecReport {
     /// Bits per posting over the lists that appear in queries.
     pub query_bits_per_posting: f64,
     pub build_secs: f64,
+    /// Full decoding speed over every list of the collection.
     pub decode_ns_per_posting: f64,
+    /// Full decoding speed over the lists that appear in queries.
+    pub query_decode_ns_per_posting: f64,
     pub measurements: Vec<Measurement>,
 }
 
 impl CodecReport {
+    /// Fastest algorithm for `op` that materialises docIDs (cardinality-only
+    /// variants are excluded).
     pub fn best(&self, op: Op) -> Option<&Measurement> {
         self.measurements
             .iter()
-            .filter(|m| m.op == op)
+            .filter(|m| m.op == op && !m.algorithm.contains("count only"))
             .min_by(|a, b| a.ms_per_query.total_cmp(&b.ms_per_query))
     }
 }
@@ -212,6 +217,17 @@ pub fn report<C: PostingList>(w: &Workload, cfg: &BenchConfig, algos: AlgoSuite<
         best = best.min(t.elapsed().as_secs_f64());
     }
 
+    let mut qbest = f64::INFINITY;
+    for _ in 0..cfg.reps.max(1) {
+        let t = Instant::now();
+        for &term in &w.query_terms {
+            buf.clear();
+            lists[term as usize].decode_into(&mut buf);
+            black_box(&buf);
+        }
+        qbest = qbest.min(t.elapsed().as_secs_f64());
+    }
+
     let mut measurements = Vec::new();
     algos(&lists, w, cfg, &mut measurements);
     CodecReport {
@@ -220,6 +236,7 @@ pub fn report<C: PostingList>(w: &Workload, cfg: &BenchConfig, algos: AlgoSuite<
         query_bits_per_posting: qbits as f64 / qpostings.max(1) as f64,
         build_secs,
         decode_ns_per_posting: best * 1e9 / postings,
+        query_decode_ns_per_posting: qbest * 1e9 / qpostings.max(1) as f64,
         measurements,
     }
 }
