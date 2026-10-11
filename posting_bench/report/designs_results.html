@@ -1,0 +1,123 @@
+<div class="col">
+  <h3 id="r-head">Head to head</h3>
+  <!--NARR-HEAD-->
+</div>
+<div class="wide" id="ratio-table"></div>
+
+<div class="col">
+  <h3 id="r-clustered">Clustered collection</h3>
+  <!--NARR-CLUSTERED-->
+</div>
+<div class="pair">
+  <figure>
+    <div class="frame">
+      <p class="chart-title">AND: size vs time, clustered</p>
+      <p class="chart-sub">Best algorithm per codec · line: Pareto frontier</p>
+      <div class="chart" id="clustered-and"></div>
+    </div>
+  </figure>
+  <figure>
+    <div class="frame">
+      <p class="chart-title">OR: size vs time, clustered</p>
+      <p class="chart-sub">Best algorithm that writes docIDs out</p>
+      <div class="chart" id="clustered-or"></div>
+    </div>
+  </figure>
+</div>
+<div class="wide" id="clustered-table"></div>
+
+<div class="col">
+  <h3 id="r-uniform">Uniform docIDs</h3>
+  <!--NARR-UNIFORM-->
+</div>
+<div class="pair">
+  <figure>
+    <div class="frame">
+      <p class="chart-title">AND: size vs time, uniform</p>
+      <p class="chart-sub">Random docID order: no clustering to exploit</p>
+      <div class="chart" id="uniform-and"></div>
+    </div>
+  </figure>
+  <figure>
+    <div class="frame">
+      <p class="chart-title">OR: size vs time, uniform</p>
+      <p class="chart-sub">Best algorithm that writes docIDs out</p>
+      <div class="chart" id="uniform-or"></div>
+    </div>
+  </figure>
+</div>
+<div class="wide" id="uniform-table"></div>
+
+<div class="col">
+  <h3 id="r-wikitext">WikiText-103</h3>
+  <!--NARR-WIKITEXT-->
+</div>
+<div class="pair">
+  <figure>
+    <div class="frame">
+      <p class="chart-title">AND: size vs time, WikiText-103</p>
+      <p class="chart-sub">859,532 paragraphs · 500 queries</p>
+      <div class="chart" id="wikitext-and"></div>
+    </div>
+  </figure>
+  <figure>
+    <div class="frame">
+      <p class="chart-title">OR: size vs time, WikiText-103</p>
+      <p class="chart-sub">Best algorithm that writes docIDs out</p>
+      <div class="chart" id="wikitext-or"></div>
+    </div>
+  </figure>
+</div>
+<div class="wide" id="wikitext-table"></div>
+
+<div class="col">
+  <h3 id="r-extremes">Workload extremes</h3>
+  <!--NARR-EXTREMES-->
+</div>
+<div class="pair">
+  <figure>
+    <div class="frame">
+      <p class="chart-title">AND: selective queries</p>
+      <p class="chart-sub">Clustered collection · every term has ≤ 20,000 postings</p>
+      <div class="chart" id="selective-and"></div>
+    </div>
+  </figure>
+  <figure>
+    <div class="frame">
+      <p class="chart-title">AND: dense queries</p>
+      <p class="chart-sub">Clustered collection · every term has ≥ 200,000 postings</p>
+      <div class="chart" id="dense-and"></div>
+    </div>
+  </figure>
+</div>
+<div class="pair">
+  <figure>
+    <div class="frame">
+      <p class="chart-title">OR: selective queries</p>
+      <p class="chart-sub">Every term has ≤ 20,000 postings</p>
+      <div class="chart" id="selective-or"></div>
+    </div>
+  </figure>
+  <figure>
+    <div class="frame">
+      <p class="chart-title">OR: dense queries</p>
+      <p class="chart-sub">Every term has ≥ 200,000 postings</p>
+      <div class="chart" id="dense-or"></div>
+    </div>
+  </figure>
+</div>
+
+<div class="col">
+  <h3 id="r-terms">Longer queries</h3>
+  <!--NARR-TERMS-->
+</div>
+<figure class="narrow">
+  <div class="frame">
+    <p class="chart-title">AND time vs number of query terms</p>
+    <p class="chart-sub">Clustered collection · 300 queries per point · best algorithm per codec</p>
+    <div class="chart" id="terms"></div>
+  </div>
+</figure>
+<div class="col">
+  <!--NARR-MEMORY-->
+</div>
