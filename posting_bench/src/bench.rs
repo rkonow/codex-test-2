@@ -378,6 +378,11 @@ pub fn registry() -> Vec<CodecEntry> {
         },
         CodecEntry { name: pfor::OptPFor::NAME, run: |w, c| report::<pfor::OptPFor>(w, c, cursor_algos) },
         CodecEntry {
+            name: elias_fano::EliasFano::NAME,
+            run: |w, c| report::<elias_fano::EliasFano>(w, c, cursor_algos),
+        },
+        CodecEntry { name: pef::PartitionedEF::NAME, run: |w, c| report::<pef::PartitionedEF>(w, c, cursor_algos) },
+        CodecEntry {
             name: interpolative::Interpolative::NAME,
             run: |w, c| report::<interpolative::Interpolative>(w, c, cursor_algos),
         },

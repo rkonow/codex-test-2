@@ -7,14 +7,16 @@
 //! harness runs every applicable algorithm on every representation.
 
 pub mod block;
+pub mod bp128;
+pub mod elias_fano;
+pub mod external;
+pub mod hybrid;
+pub mod interpolative;
+pub mod pef;
+pub mod pfor;
 pub mod roaring;
 pub mod uncompressed;
 pub mod vbyte;
-pub mod bp128;
-pub mod pfor;
-pub mod interpolative;
-pub mod external;
-pub mod hybrid;
 
 #[cfg(test)]
 pub(crate) mod conformance;
