@@ -16,6 +16,7 @@ pub mod interpolative;
 pub mod loom;
 pub mod pef;
 pub mod pfor;
+pub mod pyramid;
 pub mod roaring;
 pub mod trie;
 pub mod uncompressed;

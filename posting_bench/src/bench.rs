@@ -384,6 +384,24 @@ pub fn loom_count_algos(lists: &[crate::codecs::loom::Loom], w: &Workload, cfg: 
     }
 }
 
+/// Pyramid: cardinality-only intersection and union (popcounts, no docIDs).
+pub fn pyramid_count_algos(
+    lists: &[crate::codecs::pyramid::Pyramid],
+    w: &Workload,
+    cfg: &BenchConfig,
+    m: &mut Vec<Measurement>,
+) {
+    use crate::codecs::pyramid::Pyramid;
+    let name = Pyramid::NAME;
+    let refs = |q: &[u32]| q.iter().map(|&t| &lists[t as usize]).collect::<Vec<_>>();
+    if cfg.and {
+        m.push(time_queries_count(w, cfg, Op::And, name, "native, count only", |q| Pyramid::and_count(&refs(q))));
+    }
+    if cfg.or {
+        m.push(time_queries_count(w, cfg, Op::Or, name, "native, count only", |q| Pyramid::or_count(&refs(q))));
+    }
+}
+
 /// A codec in the benchmark registry.
 pub struct CodecEntry {
     pub name: &'static str,
@@ -453,6 +471,16 @@ pub fn registry() -> Vec<CodecEntry> {
                 report::<roaring::Roaring>(w, c, |l, w, c, m| {
                     setops_algos(l, w, c, m);
                     roaring_count_algos(l, w, c, m);
+                    cursor_algos(l, w, c, m);
+                })
+            },
+        },
+        CodecEntry {
+            name: pyramid::Pyramid::NAME,
+            run: |w, c| {
+                report::<pyramid::Pyramid>(w, c, |l, w, c, m| {
+                    setops_algos(l, w, c, m);
+                    pyramid_count_algos(l, w, c, m);
                     cursor_algos(l, w, c, m);
                 })
             },
