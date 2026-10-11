@@ -107,6 +107,9 @@ struct QueryArgs {
     /// Generated queries only use lists with at least this many postings.
     #[arg(long, default_value_t = 1000)]
     min_list_len: usize,
+    /// Generated queries only use lists with at most this many postings.
+    #[arg(long)]
+    max_list_len: Option<usize>,
     #[arg(long, value_enum, default_value_t = QueryMode::Cooccur)]
     query_mode: QueryMode,
 }
@@ -205,6 +208,7 @@ fn load_queries(q: &QueryArgs, coll: &Collection, seed: u64) -> Vec<Vec<u32>> {
                 min_terms: q.min_terms,
                 max_terms: q.max_terms,
                 min_list_len: q.min_list_len,
+                max_list_len: q.max_list_len,
                 mode: q.query_mode,
                 seed: seed.wrapping_add(1000),
             },
@@ -280,6 +284,21 @@ fn print_run(w: &Workload, reports: &[CodecReport]) {
             best(Op::And),
             best(Op::Or)
         );
+    }
+
+    println!("\n## Pareto frontier (bits/posting on query lists vs best ms/query)\n");
+    for op in [Op::And, Op::Or] {
+        let pts: Vec<(&str, f64, f64)> = reports
+            .iter()
+            .filter_map(|r| r.best(op).map(|m| (r.codec.as_str(), r.query_bits_per_posting, m.ms_per_query)))
+            .collect();
+        let mut front: Vec<&(&str, f64, f64)> = pts
+            .iter()
+            .filter(|p| !pts.iter().any(|q| q.1 <= p.1 && q.2 <= p.2 && (q.1 < p.1 || q.2 < p.2)))
+            .collect();
+        front.sort_by(|a, b| a.1.total_cmp(&b.1));
+        let s: Vec<String> = front.iter().map(|p| format!("{} ({:.2} bits, {:.3} ms)", p.0, p.1, p.2)).collect();
+        println!("* {}: {}", op.label(), s.join(" → "));
     }
 
     println!("\n## All measurements (ms per query)\n");
