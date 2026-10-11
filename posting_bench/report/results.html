@@ -78,7 +78,12 @@
 
 <div class="col">
   <h3 id="r-terms">Longer queries</h3>
-  <p>DRAFT</p>
+  <p>Each point uses 300 queries with exactly \(k\) co-occurring terms. As \(k\) grows from 2 to 6, the lists in a query hold more postings in total (400k to 740k–880k), yet every codec answers faster: the mean result shrinks from 744 to 2 documents, and the cost of a rarest-first conjunction follows the shortest list and the number of candidates it proposes, not the total length.</p>
+  <ul>
+    <li><b>Roaring's lead narrows with more terms.</b> It is 1.9× faster than PEF for two-term queries (0.028 against 0.054 ms) but only 1.3× faster at six (0.011 against 0.014 ms). Selective conjunctions let cursor-based codecs take long <code>NextGEQ</code> jumps, while Roaring still visits every shared 2¹⁶ chunk, the effect Pibiri &amp; Venturini describe.</li>
+    <li><b>PEF matches or beats uncompressed arrays</b> from three terms on, at less than a sixth of the space, because a <code>select</code> jump over the high bits costs about as much as galloping over raw integers.</li>
+    <li><b>Tries stay 2.6–3.5× behind PEF</b> at every length. The likely reason is that the traversal pays a rank operation per trie level for every surviving region, which costs more than one cursor jump when a single list is very selective.</li>
+  </ul>
 </div>
 <figure class="narrow">
   <div class="frame">
