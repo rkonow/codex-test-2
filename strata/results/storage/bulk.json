@@ -1,0 +1,42 @@
+{
+  "dataset": "fiqa",
+  "experiment": "bulk",
+  "loadavg_at_start": "8.70 9.28 7.68 8/131 2416",
+  "n_docs": 57638,
+  "reps": 5,
+  "results": [
+    {
+      "build_seconds": 0.011603638,
+      "docs_per_s": 865097.8783999103,
+      "file_bytes": 1826816,
+      "seconds": 0.066625987,
+      "seconds_reps": [
+        0.067877421,
+        0.066625987,
+        0.056960661,
+        0.065972396,
+        0.076976548
+      ],
+      "segment_max_docs": 10000,
+      "segments": 6,
+      "storage_seconds": 0.055022349
+    },
+    {
+      "build_seconds": 0.013240386,
+      "docs_per_s": 768909.082924306,
+      "file_bytes": 1781760,
+      "seconds": 0.074960748,
+      "seconds_reps": [
+        0.081912206,
+        0.082358162,
+        0.061173495,
+        0.061720624,
+        0.074960748
+      ],
+      "segment_max_docs": 100000,
+      "segments": 1,
+      "storage_seconds": 0.061720361999999994
+    }
+  ],
+  "seconds": 1.486178991
+}

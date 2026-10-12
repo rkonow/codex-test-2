@@ -1,0 +1,25 @@
+{
+  "dataset": "fiqa",
+  "experiment": "merge",
+  "loadavg_at_start": "8.38 8.74 7.62 11/137 3396",
+  "n_docs": 57638,
+  "reps": 5,
+  "results": [
+    {
+      "bytes_written": 1108674,
+      "deleted_fraction": 0.1,
+      "docs_per_s": 449384.12467443524,
+      "docs_per_segment": 5000,
+      "merge_ms": 80.109639,
+      "merge_ms_reps": [
+        84.09840100000001,
+        76.08532199999999,
+        84.119249,
+        80.109639,
+        80.074485
+      ],
+      "segments_in": 8
+    }
+  ],
+  "seconds": 1.387240352
+}
