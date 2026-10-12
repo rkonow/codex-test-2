@@ -1,5 +1,5 @@
 {
-  "analyze_secs": 0.183742898,
+  "analyze_secs": 0.177166246,
   "avg_doc_len": 164.13177696314875,
   "boolean_queries": 300,
   "collection": "scifact",
@@ -10,178 +10,178 @@
         "fitted_constant": 1.189113957772264,
         "points": 2400,
         "threshold_x": 0.8409622925236214,
-        "total_ms_always_drive": 11.132593999999994,
-        "total_ms_always_probe": 7.256675000000013,
-        "total_ms_current": 4.285898,
-        "total_ms_fitted": 4.181916999999998
+        "total_ms_always_drive": 12.858291999999997,
+        "total_ms_always_probe": 7.2848919999999895,
+        "total_ms_current": 4.589059000000005,
+        "total_ms_fitted": 4.51071100000001
       },
       "bmw": {
-        "fitted_constant": 0.22035832942747083,
+        "fitted_constant": 0.2036972236990538,
         "points": 2400,
-        "threshold_x": 4.53806308387876,
-        "total_ms_always_drive": 63.015668000000005,
-        "total_ms_always_probe": 350.9076930000001,
-        "total_ms_current": 75.65607200000001,
-        "total_ms_fitted": 62.08928999999998
+        "threshold_x": 4.909247076815437,
+        "total_ms_always_drive": 63.49262199999997,
+        "total_ms_always_probe": 356.9442910000001,
+        "total_ms_current": 76.10793899999992,
+        "total_ms_fitted": 62.515291999999974
       },
       "maxscore": {
         "fitted_constant": 0.725365766435621,
         "points": 2400,
         "threshold_x": 1.3786148261640547,
-        "total_ms_always_drive": 62.709029000000065,
-        "total_ms_always_probe": 208.04141499999992,
-        "total_ms_current": 49.17633699999996,
-        "total_ms_fitted": 45.56655899999996
+        "total_ms_always_drive": 65.42017899999996,
+        "total_ms_always_probe": 201.3736409999999,
+        "total_ms_current": 51.49387899999997,
+        "total_ms_fitted": 48.940087999999925
       },
       "or": {
         "fitted_constant": 0.9809742809664178,
         "points": 2400,
         "threshold_x": 1.0193947174790747,
-        "total_ms_always_drive": 18.140736999999994,
-        "total_ms_always_probe": 32.02004100000005,
-        "total_ms_current": 10.659238999999989,
-        "total_ms_fitted": 9.984210999999991
+        "total_ms_always_drive": 20.25834099999997,
+        "total_ms_always_probe": 34.73448499999997,
+        "total_ms_current": 11.399889999999996,
+        "total_ms_fitted": 10.873875999999992
       }
     },
     "rows": [
       {
-        "and_auto_mean_us": 1.1511566666666673,
-        "and_drive_mean_us": 0.8078666666666666,
-        "and_probe_mean_us": 2.624173333333333,
-        "bmw_auto_mean_us": 5.713573333333334,
-        "bmw_drive_mean_us": 5.813989999999993,
-        "bmw_probe_mean_us": 136.9476599999999,
-        "maxscore_auto_mean_us": 5.791809999999998,
-        "maxscore_drive_mean_us": 6.576250000000003,
-        "maxscore_probe_mean_us": 104.7843,
+        "and_auto_mean_us": 1.1907200000000002,
+        "and_drive_mean_us": 0.9085633333333334,
+        "and_probe_mean_us": 2.652360000000002,
+        "bmw_auto_mean_us": 6.110020000000001,
+        "bmw_drive_mean_us": 6.108690000000002,
+        "bmw_probe_mean_us": 140.38590666666678,
+        "maxscore_auto_mean_us": 6.268646666666669,
+        "maxscore_drive_mean_us": 6.158496666666665,
+        "maxscore_probe_mean_us": 91.83496333333335,
         "members": 0,
-        "or_auto_mean_us": 1.1881366666666677,
-        "or_drive_mean_us": 0.8124399999999998,
-        "or_probe_mean_us": 10.956970000000005,
+        "or_auto_mean_us": 1.2153700000000005,
+        "or_drive_mean_us": 0.8293866666666667,
+        "or_probe_mean_us": 10.397056666666666,
         "selectivity": 0.0001
       },
       {
-        "and_auto_mean_us": 1.2876300000000014,
-        "and_drive_mean_us": 1.0965999999999998,
-        "and_probe_mean_us": 3.5998166666666678,
-        "bmw_auto_mean_us": 6.444883333333335,
-        "bmw_drive_mean_us": 6.875543333333335,
-        "bmw_probe_mean_us": 149.31481666666653,
-        "maxscore_auto_mean_us": 6.684833333333337,
-        "maxscore_drive_mean_us": 6.552890000000003,
-        "maxscore_probe_mean_us": 107.26553999999997,
+        "and_auto_mean_us": 1.1657299999999988,
+        "and_drive_mean_us": 0.8331033333333331,
+        "and_probe_mean_us": 2.5918099999999993,
+        "bmw_auto_mean_us": 5.769636666666668,
+        "bmw_drive_mean_us": 5.792213333333333,
+        "bmw_probe_mean_us": 141.30039666666656,
+        "maxscore_auto_mean_us": 5.75577,
+        "maxscore_drive_mean_us": 5.867143333333331,
+        "maxscore_probe_mean_us": 92.02524666666662,
         "members": 0,
-        "or_auto_mean_us": 1.2003766666666662,
-        "or_drive_mean_us": 0.8860333333333331,
-        "or_probe_mean_us": 10.87850333333333,
+        "or_auto_mean_us": 1.1314933333333337,
+        "or_drive_mean_us": 0.8316500000000003,
+        "or_probe_mean_us": 10.315993333333331,
         "selectivity": 0.0003
       },
       {
-        "and_auto_mean_us": 1.3273766666666675,
-        "and_drive_mean_us": 0.9461266666666671,
-        "and_probe_mean_us": 2.915476666666667,
-        "bmw_auto_mean_us": 6.874036666666669,
-        "bmw_drive_mean_us": 6.6908766666666635,
-        "bmw_probe_mean_us": 148.09093333333337,
-        "maxscore_auto_mean_us": 6.937886666666664,
-        "maxscore_drive_mean_us": 6.291173333333338,
-        "maxscore_probe_mean_us": 91.26067000000005,
+        "and_auto_mean_us": 1.2422966666666662,
+        "and_drive_mean_us": 0.8744699999999993,
+        "and_probe_mean_us": 2.6696533333333345,
+        "bmw_auto_mean_us": 6.176476666666667,
+        "bmw_drive_mean_us": 6.272600000000001,
+        "bmw_probe_mean_us": 146.8748933333333,
+        "maxscore_auto_mean_us": 6.1986066666666675,
+        "maxscore_drive_mean_us": 6.168176666666665,
+        "maxscore_probe_mean_us": 100.76962333333337,
         "members": 2,
-        "or_auto_mean_us": 1.3615199999999998,
-        "or_drive_mean_us": 1.0002033333333338,
-        "or_probe_mean_us": 11.400903333333332,
+        "or_auto_mean_us": 1.2635666666666667,
+        "or_drive_mean_us": 0.9217466666666667,
+        "or_probe_mean_us": 10.335393333333332,
         "selectivity": 0.001
       },
       {
-        "and_auto_mean_us": 1.347273333333333,
-        "and_drive_mean_us": 1.020836666666667,
-        "and_probe_mean_us": 2.691243333333331,
-        "bmw_auto_mean_us": 7.751546666666662,
-        "bmw_drive_mean_us": 7.3257866666666756,
-        "bmw_probe_mean_us": 149.90975333333327,
-        "maxscore_auto_mean_us": 7.622703333333332,
-        "maxscore_drive_mean_us": 7.526593333333332,
-        "maxscore_probe_mean_us": 97.78723000000004,
+        "and_auto_mean_us": 1.3598200000000005,
+        "and_drive_mean_us": 1.0505466666666667,
+        "and_probe_mean_us": 2.792250000000001,
+        "bmw_auto_mean_us": 7.888090000000002,
+        "bmw_drive_mean_us": 8.441370000000003,
+        "bmw_probe_mean_us": 160.00352333333328,
+        "maxscore_auto_mean_us": 6.909416666666669,
+        "maxscore_drive_mean_us": 7.028436666666672,
+        "maxscore_probe_mean_us": 98.84515999999995,
         "members": 9,
-        "or_auto_mean_us": 1.6791366666666678,
-        "or_drive_mean_us": 1.139013333333333,
-        "or_probe_mean_us": 13.94086333333334,
+        "or_auto_mean_us": 1.5788566666666666,
+        "or_drive_mean_us": 1.2172399999999994,
+        "or_probe_mean_us": 13.866556666666675,
         "selectivity": 0.003
       },
       {
-        "and_auto_mean_us": 2.106850000000002,
-        "and_drive_mean_us": 1.8739766666666666,
-        "and_probe_mean_us": 3.4470400000000003,
-        "bmw_auto_mean_us": 12.324746666666664,
-        "bmw_drive_mean_us": 12.992736666666657,
-        "bmw_probe_mean_us": 154.28530999999992,
-        "maxscore_auto_mean_us": 13.282413333333325,
-        "maxscore_drive_mean_us": 12.520463333333334,
-        "maxscore_probe_mean_us": 99.1232233333333,
+        "and_auto_mean_us": 3.746383333333333,
+        "and_drive_mean_us": 3.4115800000000003,
+        "and_probe_mean_us": 4.4823099999999965,
+        "bmw_auto_mean_us": 17.272313333333333,
+        "bmw_drive_mean_us": 12.53913,
+        "bmw_probe_mean_us": 179.91859000000005,
+        "maxscore_auto_mean_us": 11.756260000000003,
+        "maxscore_drive_mean_us": 11.666730000000003,
+        "maxscore_probe_mean_us": 86.48282000000002,
         "members": 68,
-        "or_auto_mean_us": 3.2967066666666667,
-        "or_drive_mean_us": 2.7274633333333336,
-        "or_probe_mean_us": 16.309693333333353,
+        "or_auto_mean_us": 6.09712,
+        "or_drive_mean_us": 4.895856666666669,
+        "or_probe_mean_us": 26.87096,
         "selectivity": 0.01
       },
       {
-        "and_auto_mean_us": 2.897163333333331,
-        "and_drive_mean_us": 3.0165566666666668,
-        "and_probe_mean_us": 3.280543333333333,
-        "bmw_auto_mean_us": 20.74419666666667,
-        "bmw_drive_mean_us": 19.949769999999997,
-        "bmw_probe_mean_us": 174.09227333333328,
-        "maxscore_auto_mean_us": 23.623176666666673,
-        "maxscore_drive_mean_us": 17.93951666666667,
-        "maxscore_probe_mean_us": 90.17338333333332,
+        "and_auto_mean_us": 2.956033333333334,
+        "and_drive_mean_us": 3.1145199999999997,
+        "and_probe_mean_us": 3.1494833333333343,
+        "bmw_auto_mean_us": 18.637153333333348,
+        "bmw_drive_mean_us": 19.64735,
+        "bmw_probe_mean_us": 163.31742333333338,
+        "maxscore_auto_mean_us": 22.04541,
+        "maxscore_drive_mean_us": 29.89237333333335,
+        "maxscore_probe_mean_us": 99.59665333333331,
         "members": 139,
-        "or_auto_mean_us": 5.7306599999999985,
-        "or_drive_mean_us": 4.460206666666669,
-        "or_probe_mean_us": 18.98015666666666,
+        "or_auto_mean_us": 6.373383333333329,
+        "or_drive_mean_us": 4.583813333333336,
+        "or_probe_mean_us": 20.24337333333334,
         "selectivity": 0.03
       },
       {
-        "and_auto_mean_us": 3.3559533333333333,
-        "and_drive_mean_us": 8.406806666666673,
-        "and_probe_mean_us": 2.986946666666668,
-        "bmw_auto_mean_us": 68.46575333333331,
-        "bmw_drive_mean_us": 45.10585000000001,
-        "bmw_probe_mean_us": 133.95809666666662,
-        "maxscore_auto_mean_us": 54.12024,
-        "maxscore_drive_mean_us": 47.43605333333333,
-        "maxscore_probe_mean_us": 56.800759999999975,
+        "and_auto_mean_us": 3.4047366666666674,
+        "and_drive_mean_us": 9.415740000000001,
+        "and_probe_mean_us": 3.034006666666666,
+        "bmw_auto_mean_us": 74.1986100000001,
+        "bmw_drive_mean_us": 48.20217333333332,
+        "bmw_probe_mean_us": 135.1102933333334,
+        "maxscore_auto_mean_us": 53.46783999999998,
+        "maxscore_drive_mean_us": 48.13517666666669,
+        "maxscore_probe_mean_us": 53.78311666666664,
         "members": 512,
-        "or_auto_mean_us": 10.976759999999999,
-        "or_drive_mean_us": 14.165556666666667,
-        "or_probe_mean_us": 11.864776666666673,
+        "or_auto_mean_us": 10.481243333333337,
+        "or_drive_mean_us": 14.700766666666672,
+        "or_probe_mean_us": 10.561596666666654,
         "selectivity": 0.1
       },
       {
-        "and_auto_mean_us": 2.949806666666665,
-        "and_drive_mean_us": 19.939876666666663,
-        "and_probe_mean_us": 2.6436766666666673,
-        "bmw_auto_mean_us": 132.3379099999999,
-        "bmw_drive_mean_us": 105.29767333333334,
-        "bmw_probe_mean_us": 123.09346666666661,
-        "maxscore_auto_mean_us": 46.49035333333332,
-        "maxscore_drive_mean_us": 104.18715666666667,
-        "maxscore_probe_mean_us": 46.276276666666675,
+        "and_auto_mean_us": 3.2565166666666663,
+        "and_drive_mean_us": 23.252449999999982,
+        "and_probe_mean_us": 2.911099999999998,
+        "bmw_auto_mean_us": 118.36880000000012,
+        "bmw_drive_mean_us": 104.63854666666676,
+        "bmw_probe_mean_us": 122.90327666666664,
+        "maxscore_auto_mean_us": 46.89692000000003,
+        "maxscore_drive_mean_us": 103.15072999999998,
+        "maxscore_probe_mean_us": 47.907886666666634,
         "members": 1545,
-        "or_auto_mean_us": 13.546196666666667,
-        "or_drive_mean_us": 35.27820666666663,
-        "or_probe_mean_us": 12.401603333333332,
+        "or_auto_mean_us": 13.026419999999995,
+        "or_drive_mean_us": 39.54734333333335,
+        "or_probe_mean_us": 13.190686666666664,
         "selectivity": 0.3
       }
     ]
   },
   "formats": [
     {
-      "build_secs": 0.220293951,
+      "build_secs": 0.20703481299999998,
       "cold": [
         {
-          "mean_us": 1200.1114699999998,
-          "p50_us": 1089.4170000000001,
-          "p99_us": 3080.934,
+          "mean_us": 980.6513199999999,
+          "p50_us": 936.165,
+          "p99_us": 2088.087,
           "pages_mean": 27.17,
           "pages_mean_by_section": {
             "dict": 14.83,
@@ -196,9 +196,9 @@
           "query": "bm25 maxscore"
         },
         {
-          "mean_us": 1504.0522199999991,
-          "p50_us": 1256.561,
-          "p99_us": 6838.155000000001,
+          "mean_us": 1031.26955,
+          "p50_us": 965.631,
+          "p99_us": 1934.498,
           "pages_mean": 27.14,
           "pages_mean_by_section": {
             "dict": 14.83,
@@ -213,9 +213,9 @@
           "query": "bm25 bmw"
         },
         {
-          "mean_us": 484.12421000000023,
-          "p50_us": 380.87899999999996,
-          "p99_us": 3931.276,
+          "mean_us": 269.92836000000005,
+          "p50_us": 255.15599999999998,
+          "p99_us": 548.772,
           "pages_mean": 8.81,
           "pages_mean_by_section": {
             "dict": 6.11,
@@ -230,9 +230,9 @@
           "query": "and"
         },
         {
-          "mean_us": 435.76408999999984,
-          "p50_us": 403.082,
-          "p99_us": 1106.763,
+          "mean_us": 350.8927299999999,
+          "p50_us": 323.79,
+          "p99_us": 831.61,
           "pages_mean": 8.82,
           "pages_mean_by_section": {
             "dict": 6.11,
@@ -337,52 +337,52 @@
                 "terms_min": 1
               },
               {
-                "mean_us": 30.773615384615386,
+                "mean_us": 28.021,
                 "queries": 13,
                 "terms_max": 4,
                 "terms_min": 3
               },
               {
-                "mean_us": 89.47226373626376,
+                "mean_us": 78.12816483516487,
                 "queries": 91,
                 "terms_max": 7,
                 "terms_min": 5
               },
               {
-                "mean_us": 182.37823469387754,
+                "mean_us": 186.18766326530618,
                 "queries": 196,
                 "terms_max": 18446744073709551615,
                 "terms_min": 8
               }
             ],
             "filter": null,
-            "mean_us": 147.62722333333332,
-            "p50_us": 129.144,
-            "p99_us": 440.81699999999995,
+            "mean_us": 146.5557266666667,
+            "p50_us": 125.084,
+            "p99_us": 521.5600000000001,
             "queries": 300
           },
           {
             "algo": "exhaustive",
             "filter": 0.01,
-            "mean_us": 10.019833333333334,
-            "p50_us": 8.891,
-            "p99_us": 23.755,
+            "mean_us": 10.220143333333331,
+            "p50_us": 9.052999999999999,
+            "p99_us": 25.333,
             "queries": 300
           },
           {
             "algo": "exhaustive",
             "filter": 0.1,
-            "mean_us": 59.70211666666672,
-            "p50_us": 52.577,
-            "p99_us": 194.352,
+            "mean_us": 63.79084666666672,
+            "p50_us": 54.748,
+            "p99_us": 190.433,
             "queries": 300
           },
           {
             "algo": "exhaustive",
             "filter": 0.5,
-            "mean_us": 148.77790333333343,
-            "p50_us": 139.805,
-            "p99_us": 379.269,
+            "mean_us": 124.46517999999992,
+            "p50_us": 118.388,
+            "p99_us": 330.241,
             "queries": 300
           },
           {
@@ -395,52 +395,52 @@
                 "terms_min": 1
               },
               {
-                "mean_us": 11.908384615384616,
+                "mean_us": 9.176846153846155,
                 "queries": 13,
                 "terms_max": 4,
                 "terms_min": 3
               },
               {
-                "mean_us": 23.489901098901104,
+                "mean_us": 18.739549450549454,
                 "queries": 91,
                 "terms_max": 7,
                 "terms_min": 5
               },
               {
-                "mean_us": 64.75181632653062,
+                "mean_us": 54.44260204081635,
                 "queries": 196,
                 "terms_max": 18446744073709551615,
                 "terms_min": 8
               }
             ],
             "filter": null,
-            "mean_us": 49.94581999999999,
-            "p50_us": 38.056000000000004,
-            "p99_us": 195.056,
+            "mean_us": 41.65116000000001,
+            "p50_us": 30.926000000000002,
+            "p99_us": 151.10399999999998,
             "queries": 300
           },
           {
             "algo": "maxscore",
             "filter": 0.01,
-            "mean_us": 10.185653333333336,
-            "p50_us": 9.325,
-            "p99_us": 24.570999999999998,
+            "mean_us": 10.784759999999997,
+            "p50_us": 9.578999999999999,
+            "p99_us": 28.157,
             "queries": 300
           },
           {
             "algo": "maxscore",
             "filter": 0.1,
-            "mean_us": 49.836069999999985,
-            "p50_us": 42.404,
-            "p99_us": 141.57,
+            "mean_us": 49.95733333333334,
+            "p50_us": 41.551,
+            "p99_us": 157.322,
             "queries": 300
           },
           {
             "algo": "maxscore",
             "filter": 0.5,
-            "mean_us": 48.135573333333305,
-            "p50_us": 35.458,
-            "p99_us": 172.30100000000002,
+            "mean_us": 48.55073333333338,
+            "p50_us": 35.957,
+            "p99_us": 162.64000000000001,
             "queries": 300
           },
           {
@@ -453,83 +453,83 @@
                 "terms_min": 1
               },
               {
-                "mean_us": 13.727615384615387,
+                "mean_us": 14.42469230769231,
                 "queries": 13,
                 "terms_max": 4,
                 "terms_min": 3
               },
               {
-                "mean_us": 36.602043956043964,
+                "mean_us": 38.155417582417584,
                 "queries": 91,
                 "terms_max": 7,
                 "terms_min": 5
               },
               {
-                "mean_us": 129.16738775510206,
+                "mean_us": 134.16228571428576,
                 "queries": 196,
                 "terms_max": 18446744073709551615,
                 "terms_min": 8
               }
             ],
             "filter": null,
-            "mean_us": 96.08684333333332,
-            "p50_us": 69.642,
-            "p99_us": 383.664,
+            "mean_us": 99.85157333333339,
+            "p50_us": 69.435,
+            "p99_us": 411.98,
             "queries": 300
           },
           {
             "algo": "bmw",
             "filter": 0.01,
-            "mean_us": 10.04602333333334,
-            "p50_us": 9.229,
-            "p99_us": 24.072,
+            "mean_us": 10.085703333333333,
+            "p50_us": 9.278,
+            "p99_us": 24.094,
             "queries": 300
           },
           {
             "algo": "bmw",
             "filter": 0.1,
-            "mean_us": 66.95518000000001,
-            "p50_us": 51.394000000000005,
-            "p99_us": 313.56899999999996,
+            "mean_us": 72.27859666666666,
+            "p50_us": 53.75,
+            "p99_us": 329.67,
             "queries": 300
           },
           {
             "algo": "bmw",
             "filter": 0.5,
-            "mean_us": 106.73676999999998,
-            "p50_us": 76.831,
-            "p99_us": 406.443,
+            "mean_us": 118.3593533333334,
+            "p50_us": 87.222,
+            "p99_us": 448.54699999999997,
             "queries": 300
           }
         ],
         "boolean": [
           {
             "mean_results": 29.11,
-            "mean_us": 2.467093333333336,
+            "mean_us": 2.70588,
             "op": "and",
-            "p50_us": 1.694,
-            "p99_us": 8.596,
+            "p50_us": 1.853,
+            "p99_us": 9.391,
             "queries": 300
           },
           {
             "mean_results": 1062.9433333333334,
-            "mean_us": 6.568790000000002,
+            "mean_us": 6.413369999999997,
             "op": "or",
-            "p50_us": 5.130999999999999,
-            "p99_us": 16.308999999999997,
+            "p50_us": 5.069,
+            "p99_us": 16.504,
             "queries": 300
           }
         ]
       },
-      "write_secs": 0.036551053
+      "write_secs": 0.029868567
     },
     {
-      "build_secs": 0.215091376,
+      "build_secs": 0.208048341,
       "cold": [
         {
-          "mean_us": 1275.5220100000001,
-          "p50_us": 1139.293,
-          "p99_us": 3414.589,
+          "mean_us": 769.9269300000003,
+          "p50_us": 729.089,
+          "p99_us": 1622.277,
           "pages_mean": 26.95,
           "pages_mean_by_section": {
             "dict": 14.83,
@@ -544,9 +544,9 @@
           "query": "bm25 maxscore"
         },
         {
-          "mean_us": 1414.1631399999997,
-          "p50_us": 1276.251,
-          "p99_us": 2723.898,
+          "mean_us": 836.9441699999998,
+          "p50_us": 756.583,
+          "p99_us": 1687.662,
           "pages_mean": 27.0,
           "pages_mean_by_section": {
             "dict": 14.83,
@@ -561,9 +561,9 @@
           "query": "bm25 bmw"
         },
         {
-          "mean_us": 379.13715000000013,
-          "p50_us": 359.843,
-          "p99_us": 1006.601,
+          "mean_us": 260.84238999999997,
+          "p50_us": 247.159,
+          "p99_us": 424.118,
           "pages_mean": 8.82,
           "pages_mean_by_section": {
             "dict": 6.11,
@@ -578,9 +578,9 @@
           "query": "and"
         },
         {
-          "mean_us": 372.75075000000004,
-          "p50_us": 356.15799999999996,
-          "p99_us": 618.6740000000001,
+          "mean_us": 342.30322,
+          "p50_us": 290.79200000000003,
+          "p99_us": 1215.24,
           "pages_mean": 8.87,
           "pages_mean_by_section": {
             "dict": 6.11,
@@ -685,52 +685,52 @@
                 "terms_min": 1
               },
               {
-                "mean_us": 20.70384615384615,
+                "mean_us": 21.305999999999997,
                 "queries": 13,
                 "terms_max": 4,
                 "terms_min": 3
               },
               {
-                "mean_us": 63.27934065934064,
+                "mean_us": 65.19809890109889,
                 "queries": 91,
                 "terms_max": 7,
                 "terms_min": 5
               },
               {
-                "mean_us": 132.5145153061224,
+                "mean_us": 137.61646428571424,
                 "queries": 196,
                 "terms_max": 18446744073709551615,
                 "terms_min": 8
               }
             ],
             "filter": null,
-            "mean_us": 106.6680500000001,
-            "p50_us": 97.202,
-            "p99_us": 292.943,
+            "mean_us": 110.60944,
+            "p50_us": 104.104,
+            "p99_us": 280.01000000000005,
             "queries": 300
           },
           {
             "algo": "exhaustive",
             "filter": 0.01,
-            "mean_us": 13.78533999999999,
-            "p50_us": 12.529,
-            "p99_us": 32.916000000000004,
+            "mean_us": 14.259023333333323,
+            "p50_us": 12.883000000000001,
+            "p99_us": 32.249,
             "queries": 300
           },
           {
             "algo": "exhaustive",
             "filter": 0.1,
-            "mean_us": 72.16510999999998,
-            "p50_us": 66.306,
-            "p99_us": 198.59,
+            "mean_us": 64.25761999999992,
+            "p50_us": 59.019,
+            "p99_us": 175.321,
             "queries": 300
           },
           {
             "algo": "exhaustive",
             "filter": 0.5,
-            "mean_us": 114.02617333333338,
-            "p50_us": 104.997,
-            "p99_us": 294.625,
+            "mean_us": 110.64273000000001,
+            "p50_us": 101.762,
+            "p99_us": 284.00399999999996,
             "queries": 300
           },
           {
@@ -743,52 +743,52 @@
                 "terms_min": 1
               },
               {
-                "mean_us": 9.65076923076923,
+                "mean_us": 11.540230769230769,
                 "queries": 13,
                 "terms_max": 4,
                 "terms_min": 3
               },
               {
-                "mean_us": 20.5551978021978,
+                "mean_us": 23.031593406593398,
                 "queries": 91,
                 "terms_max": 7,
                 "terms_min": 5
               },
               {
-                "mean_us": 57.232515306122416,
+                "mean_us": 64.966056122449,
                 "queries": 196,
                 "terms_max": 18446744073709551615,
                 "terms_min": 8
               }
             ],
             "filter": null,
-            "mean_us": 44.04518666666666,
-            "p50_us": 32.999,
-            "p99_us": 156.745,
+            "mean_us": 49.93081666666671,
+            "p50_us": 36.998,
+            "p99_us": 178.423,
             "queries": 300
           },
           {
             "algo": "maxscore",
             "filter": 0.01,
-            "mean_us": 13.298833333333329,
-            "p50_us": 12.109,
-            "p99_us": 33.759,
+            "mean_us": 16.065693333333325,
+            "p50_us": 14.323,
+            "p99_us": 41.928000000000004,
             "queries": 300
           },
           {
             "algo": "maxscore",
             "filter": 0.1,
-            "mean_us": 54.88712333333333,
-            "p50_us": 46.535000000000004,
-            "p99_us": 157.396,
+            "mean_us": 56.72162666666664,
+            "p50_us": 47.717999999999996,
+            "p99_us": 166.77700000000002,
             "queries": 300
           },
           {
             "algo": "maxscore",
             "filter": 0.5,
-            "mean_us": 51.28711333333333,
-            "p50_us": 38.457,
-            "p99_us": 183.488,
+            "mean_us": 54.42668666666667,
+            "p50_us": 41.611,
+            "p99_us": 199.369,
             "queries": 300
           },
           {
@@ -801,75 +801,75 @@
                 "terms_min": 1
               },
               {
-                "mean_us": 14.261230769230771,
+                "mean_us": 16.760538461538463,
                 "queries": 13,
                 "terms_max": 4,
                 "terms_min": 3
               },
               {
-                "mean_us": 40.6183076923077,
+                "mean_us": 43.66181318681321,
                 "queries": 91,
                 "terms_max": 7,
                 "terms_min": 5
               },
               {
-                "mean_us": 136.8458979591837,
+                "mean_us": 144.26060714285708,
                 "queries": 196,
                 "terms_max": 18446744073709551615,
                 "terms_min": 8
               }
             ],
             "filter": null,
-            "mean_us": 102.34486000000001,
-            "p50_us": 73.77,
-            "p99_us": 416.815,
+            "mean_us": 108.22063666666666,
+            "p50_us": 77.72500000000001,
+            "p99_us": 436.928,
             "queries": 300
           },
           {
             "algo": "bmw",
             "filter": 0.01,
-            "mean_us": 12.808833333333336,
-            "p50_us": 11.628,
-            "p99_us": 30.877999999999997,
+            "mean_us": 13.16690333333334,
+            "p50_us": 11.905000000000001,
+            "p99_us": 33.673,
             "queries": 300
           },
           {
             "algo": "bmw",
             "filter": 0.1,
-            "mean_us": 79.9810666666667,
-            "p50_us": 65.667,
-            "p99_us": 334.312,
+            "mean_us": 85.44625666666673,
+            "p50_us": 67.833,
+            "p99_us": 398.679,
             "queries": 300
           },
           {
             "algo": "bmw",
             "filter": 0.5,
-            "mean_us": 119.78344000000007,
-            "p50_us": 87.694,
-            "p99_us": 479.043,
+            "mean_us": 114.99180000000005,
+            "p50_us": 83.60900000000001,
+            "p99_us": 466.107,
             "queries": 300
           }
         ],
         "boolean": [
           {
             "mean_results": 29.11,
-            "mean_us": 4.169613333333336,
+            "mean_us": 3.9217199999999965,
             "op": "and",
-            "p50_us": 2.2689999999999997,
-            "p99_us": 22.175,
+            "p50_us": 2.187,
+            "p99_us": 19.441,
             "queries": 300
           },
           {
             "mean_results": 1062.9433333333334,
-            "mean_us": 4.315013333333334,
+            "mean_us": 4.5657133333333375,
             "op": "or",
-            "p50_us": 3.746,
-            "p99_us": 11.351,
+            "p50_us": 3.8569999999999998,
+            "p99_us": 12.037,
             "queries": 300
           }
         ]
       },
-      "write_secs": 0.031348478
+      "write_secs": 0.030882095
     }
   ],
   "impact_tightness": {
@@ -899,28 +899,28 @@
               "terms_min": 1
             },
             {
-              "mean_us": 28.68215384615385,
+              "mean_us": 23.727076923076922,
               "queries": 13,
               "terms_max": 4,
               "terms_min": 3
             },
             {
-              "mean_us": 76.95984615384614,
+              "mean_us": 74.3706263736264,
               "queries": 91,
               "terms_max": 7,
               "terms_min": 5
             },
             {
-              "mean_us": 165.22210714285706,
+              "mean_us": 158.35703061224496,
               "queries": 196,
               "terms_max": 18446744073709551615,
               "terms_min": 8
             }
           ],
           "filter": null,
-          "mean_us": 132.53248999999997,
-          "p50_us": 123.63700000000001,
-          "p99_us": 333.205,
+          "mean_us": 127.0471900000001,
+          "p50_us": 118.88499999999999,
+          "p99_us": 329.74399999999997,
           "queries": 300
         },
         {
@@ -933,28 +933,28 @@
               "terms_min": 1
             },
             {
-              "mean_us": 13.197846153846154,
+              "mean_us": 9.434846153846154,
               "queries": 13,
               "terms_max": 4,
               "terms_min": 3
             },
             {
-              "mean_us": 26.759109890109883,
+              "mean_us": 19.24742857142857,
               "queries": 91,
               "terms_max": 7,
               "terms_min": 5
             },
             {
-              "mean_us": 71.44367346938778,
+              "mean_us": 57.20616836734695,
               "queries": 196,
               "terms_max": 18446744073709551615,
               "terms_min": 8
             }
           ],
           "filter": null,
-          "mean_us": 55.36537000000003,
-          "p50_us": 44.534,
-          "p99_us": 182.731,
+          "mean_us": 43.62192666666664,
+          "p50_us": 31.741,
+          "p99_us": 156.388,
           "queries": 300
         },
         {
@@ -967,46 +967,46 @@
               "terms_min": 1
             },
             {
-              "mean_us": 22.446076923076923,
+              "mean_us": 14.563615384615385,
               "queries": 13,
               "terms_max": 4,
               "terms_min": 3
             },
             {
-              "mean_us": 51.10556043956047,
+              "mean_us": 38.89871428571429,
               "queries": 91,
               "terms_max": 7,
               "terms_min": 5
             },
             {
-              "mean_us": 176.37585204081634,
+              "mean_us": 138.81098979591835,
               "queries": 196,
               "terms_max": 18446744073709551615,
               "terms_min": 8
             }
           ],
           "filter": null,
-          "mean_us": 131.70690666666658,
-          "p50_us": 95.634,
-          "p99_us": 537.858,
+          "mean_us": 103.12021333333334,
+          "p50_us": 72.963,
+          "p99_us": 410.51800000000003,
           "queries": 300
         }
       ],
       "boolean": [
         {
           "mean_results": 29.11,
-          "mean_us": 2.046676666666666,
+          "mean_us": 2.137606666666667,
           "op": "and",
-          "p50_us": 1.653,
-          "p99_us": 5.1610000000000005,
+          "p50_us": 1.71,
+          "p99_us": 5.563999999999999,
           "queries": 300
         },
         {
           "mean_results": 1062.9433333333334,
-          "mean_us": 5.7484800000000025,
+          "mean_us": 6.10606,
           "op": "or",
-          "p50_us": 4.649,
-          "p99_us": 14.318999999999999,
+          "p50_us": 4.982,
+          "p99_us": 15.444999999999999,
           "queries": 300
         }
       ],
@@ -1087,7 +1087,7 @@
         },
         "segment_bytes": 2147391
       },
-      "write_secs": 0.037555979
+      "write_secs": 0.034489353
     },
     {
       "bm25": [
@@ -1101,28 +1101,28 @@
               "terms_min": 1
             },
             {
-              "mean_us": 22.682846153846153,
+              "mean_us": 20.86146153846154,
               "queries": 13,
               "terms_max": 4,
               "terms_min": 3
             },
             {
-              "mean_us": 71.42625274725275,
+              "mean_us": 68.05078021978021,
               "queries": 91,
               "terms_max": 7,
               "terms_min": 5
             },
             {
-              "mean_us": 150.6378010204081,
+              "mean_us": 143.55110204081626,
               "queries": 196,
               "terms_max": 18446744073709551615,
               "terms_min": 8
             }
           ],
           "filter": null,
-          "mean_us": 121.06558333333334,
-          "p50_us": 110.378,
-          "p99_us": 321.553,
+          "mean_us": 115.33278666666668,
+          "p50_us": 109.622,
+          "p99_us": 310.69,
           "queries": 300
         },
         {
@@ -1135,28 +1135,28 @@
               "terms_min": 1
             },
             {
-              "mean_us": 10.172692307692305,
+              "mean_us": 10.774153846153846,
               "queries": 13,
               "terms_max": 4,
               "terms_min": 3
             },
             {
-              "mean_us": 19.184,
+              "mean_us": 20.58513186813187,
               "queries": 91,
               "terms_max": 7,
               "terms_min": 5
             },
             {
-              "mean_us": 56.540331632653064,
+              "mean_us": 59.759137755102046,
               "queries": 196,
               "terms_max": 18446744073709551615,
               "terms_min": 8
             }
           ],
           "filter": null,
-          "mean_us": 43.19964666666668,
-          "p50_us": 30.982999999999997,
-          "p99_us": 153.24699999999999,
+          "mean_us": 45.75367333333331,
+          "p50_us": 35.778999999999996,
+          "p99_us": 161.13,
           "queries": 300
         },
         {
@@ -1169,46 +1169,46 @@
               "terms_min": 1
             },
             {
-              "mean_us": 14.240076923076924,
+              "mean_us": 15.718538461538461,
               "queries": 13,
               "terms_max": 4,
               "terms_min": 3
             },
             {
-              "mean_us": 39.21334065934066,
+              "mean_us": 40.58818681318682,
               "queries": 91,
               "terms_max": 7,
               "terms_min": 5
             },
             {
-              "mean_us": 138.26205102040802,
+              "mean_us": 140.58626020408164,
               "queries": 196,
               "terms_max": 18446744073709551615,
               "terms_min": 8
             }
           ],
           "filter": null,
-          "mean_us": 102.84298999999989,
-          "p50_us": 72.333,
-          "p99_us": 438.687,
+          "mean_us": 104.84257666666669,
+          "p50_us": 74.005,
+          "p99_us": 458.445,
           "queries": 300
         }
       ],
       "boolean": [
         {
           "mean_results": 29.11,
-          "mean_us": 3.1081133333333346,
+          "mean_us": 3.252436666666669,
           "op": "and",
-          "p50_us": 1.951,
-          "p99_us": 12.626999999999999,
+          "p50_us": 2.062,
+          "p99_us": 13.583,
           "queries": 300
         },
         {
           "mean_results": 1062.9433333333334,
-          "mean_us": 6.496249999999994,
+          "mean_us": 6.364203333333332,
           "op": "or",
-          "p50_us": 3.775,
-          "p99_us": 24.736,
+          "p50_us": 3.773,
+          "p99_us": 23.087,
           "queries": 300
         }
       ],
@@ -1289,7 +1289,7 @@
         },
         "segment_bytes": 2106431
       },
-      "write_secs": 0.031711173
+      "write_secs": 0.029751941
     },
     {
       "bm25": [
@@ -1303,28 +1303,28 @@
               "terms_min": 1
             },
             {
-              "mean_us": 22.49407692307693,
+              "mean_us": 23.436153846153847,
               "queries": 13,
               "terms_max": 4,
               "terms_min": 3
             },
             {
-              "mean_us": 73.4903406593407,
+              "mean_us": 68.00520879120879,
               "queries": 91,
               "terms_max": 7,
               "terms_min": 5
             },
             {
-              "mean_us": 150.21685714285712,
+              "mean_us": 141.77575000000007,
               "queries": 196,
               "terms_max": 18446744073709551615,
               "terms_min": 8
             }
           ],
           "filter": null,
-          "mean_us": 121.40849333333317,
-          "p50_us": 113.388,
-          "p99_us": 318.424,
+          "mean_us": 114.27063666666663,
+          "p50_us": 104.382,
+          "p99_us": 333.315,
           "queries": 300
         },
         {
@@ -1337,28 +1337,28 @@
               "terms_min": 1
             },
             {
-              "mean_us": 9.947076923076924,
+              "mean_us": 9.392846153846154,
               "queries": 13,
               "terms_max": 4,
               "terms_min": 3
             },
             {
-              "mean_us": 21.054428571428577,
+              "mean_us": 20.509351648351654,
               "queries": 91,
               "terms_max": 7,
               "terms_min": 5
             },
             {
-              "mean_us": 59.88002040816325,
+              "mean_us": 57.54689795918368,
               "queries": 196,
               "terms_max": 18446744073709551615,
               "terms_min": 8
             }
           ],
           "filter": null,
-          "mean_us": 45.93916333333332,
-          "p50_us": 34.061,
-          "p99_us": 172.315,
+          "mean_us": 44.225500000000004,
+          "p50_us": 34.031,
+          "p99_us": 163.377,
           "queries": 300
         },
         {
@@ -1371,46 +1371,46 @@
               "terms_min": 1
             },
             {
-              "mean_us": 16.599615384615387,
+              "mean_us": 15.227846153846153,
               "queries": 13,
               "terms_max": 4,
               "terms_min": 3
             },
             {
-              "mean_us": 41.34358241758241,
+              "mean_us": 43.0826923076923,
               "queries": 91,
               "terms_max": 7,
               "terms_min": 5
             },
             {
-              "mean_us": 143.71907653061217,
+              "mean_us": 140.3926887755102,
               "queries": 196,
               "terms_max": 18446744073709551615,
               "terms_min": 8
             }
           ],
           "filter": null,
-          "mean_us": 107.15666666666664,
-          "p50_us": 73.854,
-          "p99_us": 451.06,
+          "mean_us": 105.45151333333334,
+          "p50_us": 75.729,
+          "p99_us": 436.928,
           "queries": 300
         }
       ],
       "boolean": [
         {
           "mean_results": 29.11,
-          "mean_us": 4.131423333333334,
+          "mean_us": 3.7331833333333306,
           "op": "and",
-          "p50_us": 2.316,
-          "p99_us": 21.980999999999998,
+          "p50_us": 2.1069999999999998,
+          "p99_us": 19.14,
           "queries": 300
         },
         {
           "mean_results": 1062.9433333333334,
-          "mean_us": 5.217699999999999,
+          "mean_us": 5.760960000000001,
           "op": "or",
-          "p50_us": 3.9829999999999997,
-          "p99_us": 20.342,
+          "p50_us": 4.398,
+          "p99_us": 21.532999999999998,
           "queries": 300
         }
       ],
@@ -1491,7 +1491,7 @@
         },
         "segment_bytes": 2106431
       },
-      "write_secs": 0.029126554
+      "write_secs": 0.03318202
     }
   ],
   "ndcg@10": {
@@ -1501,7 +1501,7 @@
     "bm25 k1=1.2 b=0.75, exact lengths": 0.6867649556844372,
     "judged_queries": 300
   },
-  "peak_rss_mb": 39.99609375,
+  "peak_rss_mb": 40.3203125,
   "positions": 850695,
   "postings": 513267,
   "queries": 300,
