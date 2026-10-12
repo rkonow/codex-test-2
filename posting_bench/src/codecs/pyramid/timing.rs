@@ -444,7 +444,7 @@ fn workload_profile() {
                 let masks: Vec<([u64; 4], [u64; 4], bool)> = mem
                     .iter()
                     .map(|(l, c)| {
-                        if c.small {
+                        if c.small() {
                             let mut p = [0u64; 4];
                             for &x in l.small_vals(c) {
                                 p[(x >> 14) as usize] |= 1 << ((x >> 8) & 63);
@@ -571,7 +571,7 @@ fn workload_profile() {
                         continue;
                     }
                     let lj = order[j];
-                    if c.small {
+                    if c.small() {
                         probes_small += cand.len();
                         let s = lj.small_vals(c);
                         cand.retain(|&x| s.contains(&(x as u16)));

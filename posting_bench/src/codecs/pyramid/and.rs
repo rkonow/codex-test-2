@@ -41,7 +41,7 @@ impl PView {
     /// `c` is a chunk of `l`.
     #[inline(always)]
     unsafe fn of(l: &Pyramid, c: &Chunk) -> PView {
-        if c.small {
+        if c.small() {
             let v = l.small_vals(c);
             PView::Small(v.as_ptr(), v.len() as u32)
         } else {
@@ -278,7 +278,7 @@ unsafe fn plan(ls: &[&Pyramid], cis: &[u32], p: &mut Plan) {
     }
     let l = ls[dj];
     let c = l.chunks.get_unchecked(cis[dj] as usize);
-    p.n = if c.small {
+    p.n = if c.small() {
         // Fixed-size copy: `small` is padded past its last chunk.
         *(p.cand.as_mut_ptr() as *mut [u16; 64]) = *(l.small.as_ptr().add(c.off as usize) as *const [u16; 64]);
         c.card as usize

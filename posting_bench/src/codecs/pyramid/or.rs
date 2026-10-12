@@ -79,7 +79,7 @@ impl Member {
     /// `c` is a chunk of `p`.
     #[inline(always)]
     unsafe fn new(p: &Pyramid, c: &Chunk) -> Member {
-        if c.small {
+        if c.small() {
             let v = p.small_vals(c);
             let mut view = View::EMPTY;
             for &x in v {
@@ -97,7 +97,7 @@ impl Member {
         Member {
             view: View::new(p, c),
             small: false,
-            flat: c.flat,
+            flat: c.flat(),
             vals: std::ptr::null(),
             end: std::ptr::null(),
             ids_ready: false,
@@ -213,7 +213,7 @@ fn or_with<S: Sink>(s: &mut Scratch, lists: &[&Pyramid], sink: &mut S) {
                 sink.add(c.card as i64);
             }
             cards += c.card as u64;
-            flat |= c.flat;
+            flat |= c.flat();
             // SAFETY: chunk of lists[i].
             members.push(unsafe { Member::new(lists[i], c) });
         }

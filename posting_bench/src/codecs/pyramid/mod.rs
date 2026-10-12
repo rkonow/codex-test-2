@@ -92,6 +92,7 @@ pub mod simd;
 mod timing;
 
 use super::{Cursor, CursorList, PostingList, SetOps};
+use crate::bytes::{ByteReader, ByteWriter, OwnedBytes, Pod, Slice};
 use crate::codecs::roaring::simd::gallop;
 use crate::END;
 use simd::SLACK;
@@ -134,8 +135,9 @@ fn prefetch<T>(p: *const T) {
 #[repr(C, align(64))]
 struct Line([u64; 8]);
 
-/// A growable array of `u64` whose start is 64-byte aligned.
-#[derive(Clone, Debug, Default)]
+/// A growable array of `u64` whose start is 64-byte aligned: the meta and
+/// data arenas while building, then the owner of their words.
+#[derive(Default)]
 struct Arena {
     lines: Vec<Line>,
     len: usize,
@@ -145,11 +147,6 @@ impl Arena {
     #[inline]
     fn len(&self) -> usize {
         self.len
-    }
-
-    #[inline]
-    fn as_ptr(&self) -> *const u64 {
-        self.lines.as_ptr() as *const u64
     }
 
     fn words_mut(&mut self) -> &mut [u64] {
@@ -177,14 +174,29 @@ impl Arena {
         }
     }
 
-    fn shrink_to_fit(&mut self) {
+    /// The words as a [`Slice`] viewing the arena itself. A built list so
+    /// keeps its masks and bitmaps on cache lines, as a loaded one does in
+    /// a mapped file: a `Vec<u64>` is only 16-byte aligned, and 64-byte
+    /// loads of Flat bitmaps that split cache lines made count-only unions
+    /// about 20% slower.
+    fn into_slice(mut self) -> Slice<u64> {
         self.lines.shrink_to_fit();
+        Slice::view(OwnedBytes::new(self)).expect("arena words are aligned")
+    }
+}
+
+impl AsRef<[u8]> for Arena {
+    fn as_ref(&self) -> &[u8] {
+        // SAFETY: the first `len` words of `lines` are initialised.
+        unsafe { std::slice::from_raw_parts(self.lines.as_ptr() as *const u8, 8 * self.len) }
     }
 }
 
 /// Chunk descriptor. `card`, the kind and the data offset are the counted
 /// 64-bit header (with the key); the other fields are derived offsets.
+/// Plain integers in C layout, so that descriptors can be viewed in place.
 #[derive(Clone, Copy, Debug, Default)]
+#[repr(C)]
 struct Chunk {
     /// Number of values (1..=65536).
     card: u32,
@@ -203,24 +215,111 @@ struct Chunk {
     nd: u16,
     /// Tiered: number of sparse values.
     ns: u16,
-    small: bool,
-    /// Flat: a Tiered chunk whose dense mask is implicitly all ones (all 256
-    /// block bitmaps stored, absent ones zero).
-    flat: bool,
-    /// Tiered: the sparse directory is `u16` offsets (else unary `U`).
-    offs: bool,
+    /// [`Chunk::SMALL`], [`Chunk::FLAT`], [`Chunk::OFFS`].
+    flags: u32,
 }
 
-/// A Pyramid posting list.
+// SAFETY: `repr(C)` integers without padding (5 x 4 + 2 x 2 + 4 bytes).
+unsafe impl Pod for Chunk {}
+const _: () = assert!(std::mem::size_of::<Chunk>() == 28);
+
+impl Chunk {
+    /// A Small chunk.
+    const SMALL: u32 = 1;
+    /// Flat: a Tiered chunk whose dense mask is implicitly all ones (all 256
+    /// block bitmaps stored, absent ones zero).
+    const FLAT: u32 = 2;
+    /// Tiered: the sparse directory is `u16` offsets (else unary `U`).
+    const OFFS: u32 = 4;
+
+    #[inline(always)]
+    fn small(&self) -> bool {
+        self.flags & Chunk::SMALL != 0
+    }
+
+    #[inline(always)]
+    fn flat(&self) -> bool {
+        self.flags & Chunk::FLAT != 0
+    }
+
+    #[inline(always)]
+    fn offs(&self) -> bool {
+        self.flags & Chunk::OFFS != 0
+    }
+}
+
+/// A [`Slice`] with its pointer and length cached, so that reading it needs
+/// no match on the variant (a probe reads four arrays; matching on each
+/// made probes 10% slower).
+struct Arr<T: Pod> {
+    ptr: *const T,
+    len: usize,
+    /// Owns the elements; never mutated, so `ptr` stays valid (an owned
+    /// `Vec`'s buffer does not move with it).
+    own: Slice<T>,
+}
+
+// SAFETY: `ptr` points into `own`, which is immutable and Send + Sync.
+unsafe impl<T: Pod> Send for Arr<T> {}
+unsafe impl<T: Pod> Sync for Arr<T> {}
+
+impl<T: Pod> From<Slice<T>> for Arr<T> {
+    fn from(own: Slice<T>) -> Self {
+        Arr { ptr: own.as_ptr(), len: own.len(), own }
+    }
+}
+
+impl<T: Pod> std::ops::Deref for Arr<T> {
+    type Target = [T];
+    #[inline(always)]
+    fn deref(&self) -> &[T] {
+        // SAFETY: the elements of `own` (see the field).
+        unsafe { std::slice::from_raw_parts(self.ptr, self.len) }
+    }
+}
+
+impl<T: Pod> Clone for Arr<T> {
+    fn clone(&self) -> Self {
+        Arr::from(self.own.clone())
+    }
+}
+
+impl<T: Pod> Default for Arr<T> {
+    fn default() -> Self {
+        Arr::from(Slice::default())
+    }
+}
+
+impl<T: Pod + std::fmt::Debug> std::fmt::Debug for Arr<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.own.fmt(f)
+    }
+}
+
+/// A Pyramid posting list. Its arrays are [`Slice`]s: owned when built (the
+/// two arenas as views of their own cache-line aligned buffer), views into
+/// shared bytes when loaded with [`Pyramid::from_bytes`].
 #[derive(Clone, Debug, Default)]
 pub struct Pyramid {
+    keys: Arr<u16>,
+    chunks: Arr<Chunk>,
+    /// Values of Small chunks, plus 64 padding values.
+    small: Arr<u16>,
+    /// Masks and directories of Tiered chunks, plus two padding words.
+    meta: Arr<u64>,
+    /// Dense bitmaps and lows of Tiered chunks.
+    data: Arr<u64>,
+    card: u64,
+    bits: u64,
+}
+
+/// A Pyramid list under construction.
+#[derive(Default)]
+struct Builder {
     keys: Vec<u16>,
     chunks: Vec<Chunk>,
-    /// Values of Small chunks.
     small: Vec<u16>,
-    /// Masks and directories of Tiered chunks, plus two padding words.
     meta: Arena,
-    /// Dense bitmaps and lows of Tiered chunks.
     data: Arena,
     card: u64,
     bits: u64,
@@ -306,12 +405,12 @@ impl View {
     /// `c` must be a Tiered chunk of `p`.
     #[inline(always)]
     unsafe fn new(p: &Pyramid, c: &Chunk) -> View {
-        debug_assert!(!c.small);
+        debug_assert!(!c.small());
         let meta = p.meta.as_ptr();
         let data = p.data.as_ptr();
         let w = meta.add(c.off as usize);
         let present = [*w, *w.add(1), *w.add(2), *w.add(3)];
-        let dense = if c.flat {
+        let dense = if c.flat() {
             [!0; 4]
         } else if c.nd > 0 {
             [*w.add(4), *w.add(5), *w.add(6), *w.add(7)]
@@ -335,8 +434,8 @@ impl View {
             lows: (data as *const u8).add(c.lows as usize),
             ms: scum[3] + (present[3] & !dense[3]).count_ones(),
             ns: c.ns as u32,
-            flat: c.flat,
-            offs: c.offs,
+            flat: c.flat(),
+            offs: c.offs(),
         }
     }
 
@@ -593,15 +692,15 @@ impl Pyramid {
 
     /// Number of Small, Tiered and Flat chunks.
     pub fn chunk_counts(&self) -> [usize; 3] {
-        let s = self.chunks.iter().filter(|c| c.small).count();
-        let f = self.chunks.iter().filter(|c| c.flat).count();
+        let s = self.chunks.iter().filter(|c| c.small()).count();
+        let f = self.chunks.iter().filter(|c| c.flat()).count();
         [s, self.chunks.len() - s - f, f]
     }
 
     /// Number of dense and sparse blocks over all Tiered chunks.
     pub fn block_counts(&self) -> [usize; 2] {
         let mut n = [0; 2];
-        for c in self.chunks.iter().filter(|c| !c.small) {
+        for c in self.chunks.iter().filter(|c| !c.small()) {
             // SAFETY: Tiered chunk of self.
             let v = unsafe { View::new(self, c) };
             n[0] += c.nd as usize;
@@ -609,7 +708,9 @@ impl Pyramid {
         }
         n
     }
+}
 
+impl Builder {
     fn push_chunk(&mut self, key: u16, vals: &[u32]) {
         let n = vals.len();
         let mut counts = [0u32; 256];
@@ -632,7 +733,7 @@ impl Pyramid {
         self.keys.push(key);
         self.card += n as u64;
         if n <= SMALL_MAX && small <= tiered + SMALL_BIAS_BITS {
-            self.chunks.push(Chunk { card: n as u32, off: self.small.len() as u32, small: true, ..Chunk::default() });
+            self.chunks.push(Chunk { card: n as u32, off: self.small.len() as u32, flags: Chunk::SMALL, ..Chunk::default() });
             self.small.extend(vals.iter().map(|&v| v as u16));
             self.bits += 64 + small;
             return;
@@ -723,9 +824,7 @@ impl Pyramid {
             lows: 8 * lo as u32,
             nd: nd as u16,
             ns: ns as u16,
-            small: false,
-            flat: false,
-            offs,
+            flags: if offs { Chunk::OFFS } else { 0 },
         });
     }
 
@@ -760,15 +859,34 @@ impl Pyramid {
             lows: 8 * data.len() as u32,
             nd: nd as u16,
             ns: 0,
-            small: false,
-            flat: true,
-            offs: false,
+            flags: Chunk::FLAT,
         });
     }
 
+    fn finish(mut self) -> Pyramid {
+        // Padding: `U` windows may read two words past the last chunk, and
+        // intersections copy 64 values from a Small chunk's start.
+        self.meta.extend([0, 0]);
+        self.small.extend([0; 64]);
+        self.keys.shrink_to_fit();
+        self.chunks.shrink_to_fit();
+        self.small.shrink_to_fit();
+        Pyramid {
+            keys: Slice::Owned(self.keys).into(),
+            chunks: Slice::Owned(self.chunks).into(),
+            small: Slice::Owned(self.small).into(),
+            meta: self.meta.into_slice().into(),
+            data: self.data.into_slice().into(),
+            card: self.card,
+            bits: self.bits,
+        }
+    }
+}
+
+impl Pyramid {
     #[inline(always)]
     fn small_vals(&self, c: &Chunk) -> &[u16] {
-        debug_assert!(c.small);
+        debug_assert!(c.small());
         // SAFETY: Small chunks index valid ranges of `small`.
         unsafe { self.small.get_unchecked(c.off as usize..(c.off + c.card) as usize) }
     }
@@ -779,7 +897,7 @@ impl Pyramid {
         // SAFETY: ci indexes a chunk; offsets stay inside the arenas.
         unsafe {
             let c = self.chunks.get_unchecked(ci);
-            if c.small {
+            if c.small() {
                 prefetch(self.small.as_ptr().add(c.off as usize));
             } else {
                 prefetch(self.meta.as_ptr().add(c.off as usize));
@@ -794,7 +912,7 @@ impl Pyramid {
             return false;
         };
         let c = &self.chunks[ci];
-        if c.small {
+        if c.small() {
             let v = self.small_vals(c);
             // SAFETY: `v` is a valid slice of at most SMALL_MAX values.
             unsafe { simd::u16s_contain(v.as_ptr(), v.len(), x as u16) }
@@ -807,7 +925,7 @@ impl Pyramid {
     /// Appends the values of chunk `c` (`base` = key << 16) to `out`.
     #[inline]
     fn decode_chunk(&self, c: &Chunk, base: u32, out: &mut Vec<u32>) {
-        if c.small {
+        if c.small() {
             out.extend(self.small_vals(c).iter().map(|&v| base | v as u32));
             return;
         }
@@ -864,30 +982,298 @@ impl Pyramid {
             }
         }
     }
+
+    /// Sets the bit of every docID of the list in `words`, a bitset over
+    /// the docID space (bit `d % 64` of word `d / 64`) that must cover the
+    /// largest docID. Flat chunks and dense blocks are ORed word by word.
+    pub fn or_into_bits(&self, words: &mut [u64]) {
+        for (&k, c) in self.keys.iter().zip(self.chunks.iter()) {
+            let base = (k as usize) << 10;
+            if c.small() {
+                for &v in self.small_vals(c) {
+                    words[base + (v >> 6) as usize] |= 1 << (v & 63);
+                }
+                continue;
+            }
+            // SAFETY: Tiered chunk of self.
+            let v = unsafe { View::new(self, c) };
+            if c.flat() {
+                // A partial last chunk: the bitmap is zero past the bitset.
+                let n = 1024.min(words.len().saturating_sub(base));
+                // SAFETY: a Flat chunk holds 1024 bitmap words.
+                let bm = unsafe { std::slice::from_raw_parts(v.bitmaps, n) };
+                for (w, &b) in words[base..base + n].iter_mut().zip(bm) {
+                    *w |= b;
+                }
+                continue;
+            }
+            let mut d = 0;
+            let mut so = 0;
+            let mut sr = 0;
+            for w in 0..4 {
+                let mut m = v.present[w];
+                while m != 0 {
+                    let b = w << 6 | m.trailing_zeros() as usize;
+                    let bit = m & m.wrapping_neg();
+                    m &= m - 1;
+                    let dst = base + 4 * b;
+                    if v.dense[w] & bit != 0 {
+                        // SAFETY: dense block `d` of the chunk.
+                        let bm = unsafe { std::slice::from_raw_parts(v.bitmaps.add(4 * d), 4) };
+                        // The bitset may end inside the last block.
+                        let len = words.len();
+                        for (x, &y) in words[dst.min(len)..(dst + 4).min(len)].iter_mut().zip(bm) {
+                            *x |= y;
+                        }
+                        d += 1;
+                    } else {
+                        // SAFETY: sparse block `sr`, whose lows start at `so`.
+                        let e = unsafe { v.sparse_end(sr, so) };
+                        for i in so..e {
+                            // SAFETY: lows of the sparse block.
+                            let l = unsafe { *v.lows.add(i as usize) };
+                            words[dst + (l >> 6) as usize] |= 1 << (l & 63);
+                        }
+                        so = e;
+                        sr += 1;
+                    }
+                }
+            }
+        }
+    }
+
+    /// Number of docIDs of the list whose bit is set in `words` (a bitset as
+    /// for [`Pyramid::or_into_bits`]; docIDs past its end count as absent):
+    /// a count-only intersection with a bitset.
+    pub fn and_count_bits(&self, words: &[u64]) -> u64 {
+        let test = |x: usize| words.get(x >> 6).is_some_and(|w| w >> (x & 63) & 1 != 0) as u64;
+        let mut count = 0u64;
+        for (&k, c) in self.keys.iter().zip(self.chunks.iter()) {
+            let base = (k as usize) << 10;
+            if base >= words.len() {
+                break;
+            }
+            if c.small() {
+                count += self.small_vals(c).iter().map(|&v| test(base << 6 | v as usize)).sum::<u64>();
+                continue;
+            }
+            // SAFETY: Tiered chunk of self.
+            let v = unsafe { View::new(self, c) };
+            if c.flat() {
+                let n = 1024.min(words.len() - base);
+                // SAFETY: a Flat chunk holds 1024 bitmap words.
+                let bm = unsafe { std::slice::from_raw_parts(v.bitmaps, n) };
+                count += words[base..base + n].iter().zip(bm).map(|(&x, &y)| (x & y).count_ones() as u64).sum::<u64>();
+                continue;
+            }
+            let (mut d, mut so, mut sr) = (0, 0, 0);
+            for w in 0..4 {
+                let mut m = v.present[w];
+                while m != 0 {
+                    let b = w << 6 | m.trailing_zeros() as usize;
+                    let bit = m & m.wrapping_neg();
+                    m &= m - 1;
+                    let dst = base + 4 * b;
+                    if v.dense[w] & bit != 0 {
+                        for i in 0..4 {
+                            // SAFETY: dense block `d` of the chunk.
+                            let y = unsafe { *v.bitmaps.add(4 * d + i) };
+                            count += (words.get(dst + i).copied().unwrap_or(0) & y).count_ones() as u64;
+                        }
+                        d += 1;
+                    } else {
+                        // SAFETY: sparse block `sr`, whose lows start at `so`.
+                        let e = unsafe { v.sparse_end(sr, so) };
+                        for i in so..e {
+                            // SAFETY: lows of the sparse block.
+                            let l = unsafe { *v.lows.add(i as usize) } as usize;
+                            count += test((base << 6) + (b << 8) + l);
+                        }
+                        so = e;
+                        sr += 1;
+                    }
+                }
+            }
+        }
+        count
+    }
+}
+
+// --------------------------------------------------------- serialisation
+
+/// Tag of the serialised form: "PYRAMID" and a format version.
+const MAGIC: u64 = u64::from_le_bytes(*b"PYRAMID\x01");
+
+/// Pads with zero words so that the next [`ByteWriter::array`]'s elements
+/// start on a 64-byte boundary of the buffer (masks and bitmaps stay on
+/// cache lines when the buffer is line-aligned, e.g. in a mapped file).
+fn align_line(w: &mut ByteWriter) {
+    w.pad();
+    while (w.buf.len() + 8) % 64 != 0 {
+        w.u64(0);
+    }
+}
+
+/// Skips the padding written by [`align_line`].
+fn skip_line(r: &mut ByteReader) -> Result<(), String> {
+    while (r.position() + 8) % 64 != 0 {
+        r.u64()?;
+    }
+    Ok(())
+}
+
+impl Pyramid {
+    /// Appends the list to `w`: a tag, the counts, and every array
+    /// (`meta` and `data` 64-byte aligned relative to the buffer start).
+    /// Read back with [`Pyramid::read_from`].
+    pub fn write_to(&self, w: &mut ByteWriter) {
+        w.u64(MAGIC);
+        w.u64(self.card);
+        w.u64(self.bits);
+        w.array(&self.keys);
+        w.array(&self.chunks);
+        w.array(&self.small);
+        align_line(w);
+        w.array(&self.meta);
+        align_line(w);
+        w.array(&self.data);
+    }
+
+    /// The serialised list (see [`Pyramid::write_to`]).
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut w = ByteWriter::new();
+        self.write_to(&mut w);
+        w.finish()
+    }
+
+    /// Reads a list written by [`Pyramid::write_to`] as zero-copy views into
+    /// the reader's bytes. Checks the descriptors (O(chunks)): every offset
+    /// they hold is in bounds, so probes and set operations stay inside the
+    /// arrays; the payload bits themselves are trusted.
+    pub fn read_from(r: &mut ByteReader) -> Result<Pyramid, String> {
+        if r.u64()? != MAGIC {
+            return Err("not a Pyramid list".into());
+        }
+        let card = r.u64()?;
+        let bits = r.u64()?;
+        let keys = r.array()?.into();
+        let chunks = r.array()?.into();
+        let small = r.array()?.into();
+        skip_line(r)?;
+        let meta = r.array()?.into();
+        skip_line(r)?;
+        let data = r.array()?.into();
+        let p = Pyramid { keys, chunks, small, meta, data, card, bits };
+        p.validate()?;
+        Ok(p)
+    }
+
+    /// [`Pyramid::read_from`] over `bytes`.
+    pub fn from_bytes(bytes: OwnedBytes) -> Result<Pyramid, String> {
+        Pyramid::read_from(&mut ByteReader::new(bytes))
+    }
+
+    /// Whether every array is a view into shared bytes (a loaded list).
+    pub fn is_view(&self) -> bool {
+        fn shared<T: Pod>(s: &Arr<T>) -> bool {
+            matches!(s.own, Slice::Shared { .. })
+        }
+        shared(&self.keys) && shared(&self.chunks) && shared(&self.small) && shared(&self.meta) && shared(&self.data)
+    }
+
+    /// Bytes held by the arrays (descriptors and padding included), i.e.
+    /// the in-memory and serialised size, as opposed to the counted
+    /// [`PostingList::size_bits`].
+    pub fn heap_bytes(&self) -> usize {
+        self.keys.own.byte_len() + self.chunks.own.byte_len() + self.small.own.byte_len() + self.meta.own.byte_len() + self.data.own.byte_len()
+    }
+
+    /// Bounds checks of [`Pyramid::read_from`].
+    fn validate(&self) -> Result<(), String> {
+        let bad = |what: &str, i: usize| Err(format!("Pyramid chunk {i}: {what}"));
+        if self.keys.len() != self.chunks.len() || !self.keys.windows(2).all(|w| w[0] < w[1]) {
+            return Err("Pyramid keys are not strictly increasing, one per chunk".into());
+        }
+        if self.small.len() < 64 || self.meta.len() < 2 {
+            return Err("Pyramid padding missing".into());
+        }
+        let (meta, data) = (self.meta.len(), self.data.len());
+        let mut total = 0u64;
+        for (i, c) in self.chunks.iter().enumerate() {
+            if c.card == 0 || c.card > 65_536 || c.flags > 7 {
+                return bad("bad header", i);
+            }
+            total += c.card as u64;
+            if c.small() {
+                if c.card as usize > SMALL_MAX || c.off as usize + 64 > self.small.len() {
+                    return bad("Small values out of bounds", i);
+                }
+                continue;
+            }
+            let off = c.off as usize;
+            let masks = if c.nd > 0 && !c.flat() { 8 } else { 4 };
+            if off + masks > meta {
+                return bad("masks out of bounds", i);
+            }
+            if c.flat() {
+                if c.bm as usize + 1024 > data {
+                    return bad("Flat bitmap out of bounds", i);
+                }
+                continue;
+            }
+            let present = &self.meta[off..off + 4];
+            let dense = if masks == 8 { &self.meta[off + 4..off + 8] } else { &[0; 4][..] };
+            let nd: u32 = dense.iter().map(|w| w.count_ones()).sum();
+            let ms = present.iter().zip(dense).map(|(p, d)| (p & !d).count_ones() as usize).sum::<usize>();
+            let ns = c.ns as usize;
+            if nd != c.nd as u32 || dense.iter().zip(present).any(|(d, p)| d & !p != 0) || ns < ms || nd as usize + ms == 0 {
+                return bad("inconsistent masks", i);
+            }
+            if c.bm as usize + 4 * nd as usize > data || c.lows as usize + ns > 8 * data {
+                return bad("leaves out of bounds", i);
+            }
+            // The `u16` directory entry `j` (offsets or samples).
+            let dir = off + masks;
+            let entry = |j: usize| (self.meta[dir + j / 4] >> (16 * (j % 4))) as u16 as usize;
+            if c.offs() {
+                // `ms + 1` prefix offsets, ending with `ns`.
+                if dir + (ms + 1).div_ceil(4) > meta || entry(ms) != ns {
+                    return bad("bad offsets", i);
+                }
+            } else if ms > 0 {
+                // Samples, then `U` plus the two words select windows may
+                // read; the terminator at bit `ns` bounds every scan of `U`
+                // that starts at a sample.
+                let samples = (ms - 1) / SAMPLE as usize;
+                let u = c.u as usize;
+                if u < dir + samples.div_ceil(4) || u + (ns + 1).div_ceil(64) + 2 > meta {
+                    return bad("directory out of bounds", i);
+                }
+                if self.meta[u + ns / 64] >> (ns % 64) & 1 == 0 || self.meta[u] & 1 == 0 || (0..samples).any(|j| entry(j) >= ns) {
+                    return bad("bad directory", i);
+                }
+            }
+        }
+        if total != self.card {
+            return Err("Pyramid cardinality mismatch".into());
+        }
+        Ok(())
+    }
 }
 
 impl PostingList for Pyramid {
     const NAME: &'static str = "Pyramid";
 
     fn build(docs: &[u32], _universe: u32) -> Self {
-        let mut p = Pyramid { bits: 32, ..Pyramid::default() };
+        let mut b = Builder { bits: 32, ..Builder::default() };
         let mut i = 0;
         while i < docs.len() {
             let key = docs[i] >> 16;
             let end = i + docs[i..].partition_point(|&d| d >> 16 == key);
-            p.push_chunk(key as u16, &docs[i..end]);
+            b.push_chunk(key as u16, &docs[i..end]);
             i = end;
         }
-        // Padding: `U` windows may read two words past the last chunk, and
-        // intersections copy 64 values from a Small chunk's start.
-        p.meta.extend([0, 0]);
-        p.small.extend([0; 64]);
-        p.keys.shrink_to_fit();
-        p.chunks.shrink_to_fit();
-        p.small.shrink_to_fit();
-        p.meta.shrink_to_fit();
-        p.data.shrink_to_fit();
-        p
+        b.finish()
     }
 
     fn len(&self) -> usize {
@@ -900,7 +1286,7 @@ impl PostingList for Pyramid {
 
     fn decode_into(&self, out: &mut Vec<u32>) {
         out.reserve(self.card as usize + SLACK);
-        for (&k, c) in self.keys.iter().zip(&self.chunks) {
+        for (&k, c) in self.keys.iter().zip(self.chunks.iter()) {
             self.decode_chunk(c, (k as u32) << 16, out);
         }
     }
@@ -1120,7 +1506,7 @@ impl<'a> PyramidCursor<'a> {
             return;
         };
         self.base = (self.list.keys[ci] as u32) << 16;
-        if c.small {
+        if c.small() {
             let v = self.list.small_vals(c);
             self.st = St::Small { p: v.as_ptr(), n: v.len() as u32, i: 0 };
             self.cur = self.base | v[0] as u32;
@@ -1528,7 +1914,7 @@ mod tests {
         // bits plus a sample).
         let docs: Vec<u32> = (0..10).flat_map(|b| (0..20).map(move |i| b * 256 + 3 * i)).collect();
         let p = Pyramid::build(&docs, 1 << 16);
-        assert!(p.chunks[0].offs && !p.chunks[0].small);
+        assert!(p.chunks[0].offs() && !p.chunks[0].small());
         assert_eq!(p.size_bits(), 32 + 64 + 32 + 256 + 9 * 16 + 200 * 8);
         let mut out = Vec::new();
         p.decode_into(&mut out);
@@ -1559,7 +1945,7 @@ mod tests {
             }
             let p = Pyramid::build(&docs, 1 << 16);
             let c = &p.chunks[0];
-            assert!(!c.small);
+            assert!(!c.small());
             // SAFETY: Tiered chunk of p.
             let v = unsafe { View::new(&p, c) };
             let mut start = 0u32;
@@ -1642,6 +2028,118 @@ mod tests {
             assert!(got == want_or, "union {idx:?}");
             assert_eq!(Pyramid::and_count(&prefs), want_and.len() as u64);
             assert_eq!(Pyramid::or_count(&prefs), want_or.len() as u64);
+        }
+    }
+
+    #[test]
+    fn serialised_views_match_built_lists() {
+        let mut rng = StdRng::seed_from_u64(17);
+        let universe = 10 << 16;
+        let mut lists = mixed_lists(&mut rng, 8);
+        lists.push(Vec::new());
+        lists.push(vec![universe - 1]);
+        let built: Vec<Pyramid> = lists.iter().map(|l| Pyramid::build(l, universe)).collect();
+        // All lists in one buffer, as in a segment section.
+        let mut w = ByteWriter::new();
+        for p in &built {
+            w.u64(7);
+            p.write_to(&mut w);
+        }
+        let bytes = OwnedBytes::new(w.finish());
+        let base = bytes.as_ptr() as usize;
+        let mut r = ByteReader::new(bytes);
+        let loaded: Vec<Pyramid> = built
+            .iter()
+            .map(|_| {
+                assert_eq!(r.u64().unwrap(), 7);
+                Pyramid::read_from(&mut r).unwrap()
+            })
+            .collect();
+        for ((l, p), q) in lists.iter().zip(&built).zip(&loaded) {
+            assert!(q.is_view() && !p.is_view());
+            assert_eq!(q.cardinality(), p.cardinality());
+            assert_eq!(q.size_bits(), p.size_bits());
+            assert_eq!(q.heap_bytes(), p.heap_bytes());
+            assert_eq!((q.meta.as_ptr() as usize - base) % 64, 0);
+            assert_eq!((q.data.as_ptr() as usize - base) % 64, 0);
+            let mut out = Vec::new();
+            q.decode_into(&mut out);
+            assert!(&out == l);
+            for _ in 0..1000 {
+                let x = rng.gen_range(0..universe);
+                assert_eq!(q.contains(x), l.binary_search(&x).is_ok());
+            }
+            let mut cur = q.cursor();
+            for &x in l.iter().step_by(97) {
+                assert_eq!(cur.next_geq(x), x);
+            }
+        }
+        for _ in 0..100 {
+            let k = rng.gen_range(2..=4);
+            let idx: Vec<usize> = (0..k).map(|_| rng.gen_range(0..lists.len())).collect();
+            let refs: Vec<&Vec<u32>> = idx.iter().map(|&i| &lists[i]).collect();
+            // Mix built and loaded lists.
+            let prefs: Vec<&Pyramid> = idx.iter().enumerate().map(|(j, &i)| if j % 2 == 0 { &loaded[i] } else { &built[i] }).collect();
+            let mut got = Vec::new();
+            Pyramid::intersect(&prefs, &mut got);
+            assert!(got == reference_and(&refs));
+            got.clear();
+            Pyramid::union(&prefs, &mut got);
+            assert!(got == reference_or(&refs));
+        }
+        // A copy of a loaded list shares its bytes.
+        assert!(loaded[0].clone().is_view());
+    }
+
+    #[test]
+    fn corrupt_bytes_are_rejected() {
+        let mut rng = StdRng::seed_from_u64(19);
+        let lists = mixed_lists(&mut rng, 4);
+        for l in &lists {
+            let p = Pyramid::build(l, 10 << 16);
+            let bytes = p.to_bytes();
+            assert!(Pyramid::from_bytes(OwnedBytes::new(bytes.clone())).is_ok());
+            for cut in [8, bytes.len() / 2, bytes.len() - 8] {
+                assert!(Pyramid::from_bytes(OwnedBytes::new(bytes[..cut].to_vec())).is_err(), "truncated at {cut}");
+            }
+            // The tag, the total cardinality, the first key (the keys then
+            // collide or reorder) and the first chunk's cardinality.
+            let first_chunk = 32 + (2 * p.keys.len()).next_multiple_of(8) + 8;
+            assert!(p.keys.len() >= 2);
+            for (at, what) in [(0, "tag"), (8, "card"), (32, "key"), (first_chunk, "chunk card")] {
+                let mut b = bytes.clone();
+                b[at] ^= if at == 32 { p.keys[1] as u8 ^ p.keys[0] as u8 } else { 1 };
+                assert!(Pyramid::from_bytes(OwnedBytes::new(b)).is_err(), "{what}");
+            }
+        }
+    }
+
+    #[test]
+    fn bitset_operations() {
+        let mut rng = StdRng::seed_from_u64(23);
+        let universe = 10 << 16;
+        let lists = mixed_lists(&mut rng, 10);
+        for l in &lists {
+            let p = Pyramid::build(l, universe);
+            // Just long enough for the last docID (ending inside a block).
+            let n_words = l.last().map_or(0, |&x| x as usize / 64 + 1);
+            let mut words = vec![0u64; n_words];
+            p.or_into_bits(&mut words);
+            let mut want = vec![0u64; n_words];
+            for &x in l {
+                want[x as usize / 64] |= 1 << (x % 64);
+            }
+            assert!(words == want);
+            // Count against random bitsets of several densities, including
+            // ones shorter than the list's range.
+            for density in [0.001, 0.1, 0.5, 0.99] {
+                let len = if rng.gen_bool(0.3) { rng.gen_range(0..=n_words) } else { n_words };
+                let bits: Vec<u64> = (0..len)
+                    .map(|_| (0..64).fold(0u64, |w, b| w | (rng.gen_bool(density) as u64) << b))
+                    .collect();
+                let want = l.iter().filter(|&&x| bits.get(x as usize / 64).is_some_and(|w| w >> (x % 64) & 1 == 1)).count();
+                assert_eq!(p.and_count_bits(&bits), want as u64);
+            }
         }
     }
 
