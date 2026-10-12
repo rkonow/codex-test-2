@@ -105,18 +105,17 @@ struct Meta {
     dim: usize,
 }
 
+/// Reads the first `n` vectors, one row at a time (the whole file can be
+/// larger than what a prefix needs, and Quora's is 2 GB).
 fn read_vectors(path: &Path, n: usize, dim: usize) -> Result<Vec<Arc<[f32]>>> {
-    let mut bytes = Vec::new();
-    File::open(path)?.read_to_end(&mut bytes)?;
-    if bytes.len() < n * dim * 4 {
-        return Err(corrupt(format!("{} holds fewer than {n} vectors", path.display())));
+    let mut f = BufReader::with_capacity(1 << 20, File::open(path)?);
+    let mut row = vec![0u8; dim * 4];
+    let mut out = Vec::with_capacity(n);
+    for _ in 0..n {
+        f.read_exact(&mut row).map_err(|_| corrupt(format!("{} holds fewer than {n} vectors", path.display())))?;
+        out.push(row.chunks_exact(4).map(|c| f32::from_le_bytes(c.try_into().unwrap())).collect::<Vec<f32>>().into());
     }
-    Ok((0..n)
-        .map(|i| {
-            let row = &bytes[i * dim * 4..(i + 1) * dim * 4];
-            row.chunks_exact(4).map(|c| f32::from_le_bytes(c.try_into().unwrap())).collect::<Vec<f32>>().into()
-        })
-        .collect())
+    Ok(out)
 }
 
 /// Loads collection `name` from [`data_dir`], keeping the first `limit`

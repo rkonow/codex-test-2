@@ -135,6 +135,17 @@ pub struct Select {
     pub order: Option<OrderBy>,
     /// A KEYWORD field to group by (facets), with `COUNT(*)` per group.
     pub group_by: Option<usize>,
+    /// Secondary order for rows that tie on the primary one.
+    pub tiebreak: Option<Tiebreak>,
     pub limit: Option<usize>,
     pub offset: usize,
+}
+
+/// A secondary ORDER BY key (`ORDER BY rating DESC, id`; `ORDER BY 2 DESC, 1`).
+#[derive(Clone, Debug, PartialEq)]
+pub enum Tiebreak {
+    /// The primary key field.
+    Key { desc: bool },
+    /// The group value of a facet query.
+    GroupValue { desc: bool },
 }

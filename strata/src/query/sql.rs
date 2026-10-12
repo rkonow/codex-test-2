@@ -16,7 +16,7 @@ use sqlparser::dialect::GenericDialect;
 use sqlparser::parser::Parser;
 
 use crate::error::{Error, Result};
-use crate::query::logical::{OrderBy, Opts, Pred, Projection, Score, Select};
+use crate::query::logical::{OrderBy, Opts, Pred, Projection, Score, Select, Tiebreak};
 use crate::schema::{FieldType, Schema};
 use crate::value::Value;
 
@@ -105,14 +105,19 @@ impl Binder<'_> {
             }
             projection.push((alias.unwrap_or_else(|| e.to_string()), p));
         }
-        let order = match &q.order_by {
-            None => None,
+        let (order, tiebreak) = match &q.order_by {
+            None => (None, None),
             Some(ob) => match &ob.kind {
-                sql::OrderByKind::Expressions(es) if es.len() == 1 => {
+                sql::OrderByKind::Expressions(es) if (1..=2).contains(&es.len()) => {
                     let desc = es[0].options.asc == Some(false);
-                    Some(self.order(&es[0].expr, desc, &projection, group_by)?)
+                    let order = self.order(&es[0].expr, desc, &projection, group_by)?;
+                    let tiebreak = match es.get(1) {
+                        None => None,
+                        Some(e) => Some(self.tiebreak(&e.expr, e.options.asc == Some(false), &projection, group_by)?),
+                    };
+                    (Some(order), tiebreak)
                 }
-                _ => return Err(err("ORDER BY supports one expression")),
+                _ => return Err(err("ORDER BY supports a key and an optional tie-break")),
             },
         };
         let (limit, offset) = match &q.limit_clause {
@@ -125,7 +130,25 @@ impl Binder<'_> {
                 (Some(self.usize_lit(limit)?), self.usize_lit(offset)?)
             }
         };
-        Ok(Select { projection, filter, order, group_by, limit, offset })
+        Ok(Select { projection, filter, order, group_by, tiebreak, limit, offset })
+    }
+
+    /// The second ORDER BY key: the primary key, or the group value of a facet.
+    fn tiebreak(&self, e: &Expr, desc: bool, proj: &[(String, Projection)], group: Option<usize>) -> Result<Tiebreak> {
+        let field = match literal_usize(e) {
+            Some(n) => match proj.get(n.wrapping_sub(1)) {
+                Some((_, Projection::Field(f))) => *f,
+                _ => return Err(err(format!("ORDER BY ..., {n}: not a column"))),
+            },
+            None => self.field_of(e)?,
+        };
+        if Some(field) == group {
+            Ok(Tiebreak::GroupValue { desc })
+        } else if Some(field) == self.schema.primary_key {
+            Ok(Tiebreak::Key { desc })
+        } else {
+            Err(err("the second ORDER BY key must be the primary key or the group field"))
+        }
     }
 
     fn projection(&self, e: &Expr) -> Result<Projection> {
@@ -518,6 +541,11 @@ mod tests {
         assert_eq!(s.group_by, Some(5));
         assert_eq!(s.order, Some(OrderBy::Count { desc: true }));
         assert_eq!(s.projection[1].1, Projection::Count);
+        let s = bind("SELECT category, COUNT(*) FROM docs GROUP BY category ORDER BY 2 DESC, 1 LIMIT 5", &schema(), &q()).unwrap();
+        assert_eq!(s.tiebreak, Some(Tiebreak::GroupValue { desc: false }));
+        let s = bind("SELECT id FROM docs WHERE rating BETWEEN 2.0 AND 2.0 ORDER BY rating DESC, id LIMIT 10", &schema(), &q()).unwrap();
+        assert_eq!(s.tiebreak, Some(Tiebreak::Key { desc: false }));
+        assert!(matches!(s.order, Some(OrderBy::Score { score: Score::Column { field: 6 }, desc: true })));
 
         for bad in [
             "SELECT id FROM other",
@@ -525,6 +553,7 @@ mod tests {
             "SELECT id FROM docs WHERE category > 'c01'",
             "SELECT id FROM docs ORDER BY similarity(emb, :missing)",
             "SELECT id FROM docs ORDER BY bm25(body, :t) * similarity(emb, :q)",
+            "SELECT id FROM docs ORDER BY year, rating",
             "DELETE FROM docs",
         ] {
             assert!(bind(bad, &schema(), &q()).is_err(), "{bad}");

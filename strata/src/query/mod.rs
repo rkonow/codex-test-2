@@ -8,5 +8,5 @@ pub mod logical;
 pub mod plan;
 pub mod sql;
 
-pub use logical::{OrderBy, Pred, Projection, Score, Select};
+pub use logical::{OrderBy, Pred, Projection, Score, Select, Tiebreak};
 pub use sql::{bind, Params};
