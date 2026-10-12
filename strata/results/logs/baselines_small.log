@@ -1,9 +1,0 @@
-== scifact
-   loaded 5183 documents, 300 queries (0.0s)
-   sqlite: built in 0.6s, 36.0 MiB (0.6s with reopen)
-   tantivy: built in 0.7s, 7.3 MiB (0.7s with reopen)
-   sqlite: running
-   bm25             n=300   x3 warm mean     3.902 p50     3.769 p99     9.111 ms | cold n=100 p50     6.765 ms, pages p50     73 | nDCG@10 0.6842
-   and2             n=300   x3 warm mean     0.087 p50     0.086 p99     0.180 ms | cold n=100 p50     1.017 ms, pages p50     34 | nDCG@10 -
-   and3             n=299   x3 warm mean     0.113 p50     0.106 p99     0.197 ms | cold n=100 p50     0.874 ms, pages p50     31 | nDCG@10 -
-   or3              n=299   x3 warm mean     0.129 p50     0.119 p99     0.264 ms | cold n=100 p50     0.949 ms, pages p50     36 | nDCG@10 -
