@@ -1,0 +1,3 @@
+== strata_small 03:46:22: target/release/strata-eval --collections scifact,fiqa,trec-covid
+   strata_small ok after 286 s
+== strata_quora 03:51:08: target/release/strata-eval --collections quora

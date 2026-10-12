@@ -1,0 +1,51 @@
+== scifact
+   built in 1.2s (1.2s here), 33.1 MiB
+   bm25            warm p50 0.077 ms, cold p50 1.12 ms
+   and2            warm p50 0.034 ms, cold p50 0.65 ms
+   and3            warm p50 0.041 ms, cold p50 0.78 ms
+   or3             warm p50 0.049 ms, cold p50 0.77 ms
+   filter          warm p50 0.064 ms, cold p50 0.68 ms
+   filtered_bm25   warm p50 0.080 ms, cold p50 1.16 ms
+   vector          warm p50 0.092 ms, cold p50 9.16 ms
+   filtered_vector warm p50 0.053 ms, cold p50 6.83 ms
+   hybrid          warm p50 0.357 ms, cold p50 15.13 ms
+   filtered_hybrid warm p50 0.261 ms, cold p50 9.71 ms
+   facet           warm p50 0.031 ms, cold p50 0.60 ms
+   hybrid: bm25 0.684, vector 0.718, vector_exact 0.718, rrf 0.728, weighted_0.1 0.728, weighted_0.2 0.738, weighted_0.3 0.744, weighted_0.4 0.740, weighted_0.5 0.731, weighted_0.6 0.724, weighted_0.7 0.715, weighted_0.8 0.704, weighted_0.9 0.694
+   planner filtered_vector 300 queries: regret geo-mean 1.26, within 1.25x 54%, total auto 28 ms vs oracle 21 ms
+   planner filtered_bm25   120 queries: regret geo-mean 1.27, within 1.25x 48%, total auto 11 ms vs oracle 9 ms
+   planner filter          104 queries: regret geo-mean 1.10, within 1.25x 94%, total auto 3 ms vs oracle 3 ms
+== fiqa
+   built in 18.1s (18.1s here), 333.9 MiB
+   bm25            warm p50 0.338 ms, cold p50 3.74 ms
+   and2            warm p50 0.080 ms, cold p50 1.95 ms
+   and3            warm p50 0.063 ms, cold p50 2.16 ms
+   or3             warm p50 0.106 ms, cold p50 1.94 ms
+   filter          warm p50 0.197 ms, cold p50 2.27 ms
+   filtered_bm25   warm p50 0.206 ms, cold p50 2.68 ms
+   vector          warm p50 0.138 ms, cold p50 55.39 ms
+   filtered_vector warm p50 0.159 ms, cold p50 43.31 ms
+   hybrid          warm p50 0.878 ms, cold p50 65.52 ms
+   filtered_hybrid warm p50 0.598 ms, cold p50 54.98 ms
+   facet           warm p50 0.047 ms, cold p50 1.33 ms
+   hybrid: bm25 0.260, vector 0.434, vector_exact 0.437, rrf 0.380, weighted_0.1 0.440, weighted_0.2 0.440, weighted_0.3 0.438, weighted_0.4 0.422, weighted_0.5 0.399, weighted_0.6 0.377, weighted_0.7 0.347, weighted_0.8 0.316, weighted_0.9 0.286
+   planner filtered_vector 300 queries: regret geo-mean 1.35, within 1.25x 42%, total auto 94 ms vs oracle 74 ms
+   planner filtered_bm25   120 queries: regret geo-mean 1.21, within 1.25x 66%, total auto 37 ms vs oracle 34 ms
+   planner filter          100 queries: regret geo-mean 1.10, within 1.25x 72%, total auto 8 ms vs oracle 7 ms
+== trec-covid
+   built in 56.0s (56.0s here), 1031.1 MiB
+   bm25            warm p50 0.833 ms, cold p50 6.74 ms
+   and2            warm p50 0.143 ms, cold p50 3.82 ms
+   and3            warm p50 0.123 ms, cold p50 3.99 ms
+   or3             warm p50 0.243 ms, cold p50 2.49 ms
+   filter          warm p50 0.511 ms, cold p50 4.82 ms
+   filtered_bm25   warm p50 0.443 ms, cold p50 4.99 ms
+   vector          warm p50 0.147 ms, cold p50 71.16 ms
+   filtered_vector warm p50 0.261 ms, cold p50 78.36 ms
+   hybrid          warm p50 1.551 ms, cold p50 96.18 ms
+   filtered_hybrid warm p50 1.158 ms, cold p50 123.83 ms
+   facet           warm p50 0.088 ms, cold p50 2.18 ms
+   hybrid: bm25 0.587, vector 0.817, vector_exact 0.818, rrf 0.809, weighted_0.1 0.840, weighted_0.2 0.847, weighted_0.3 0.841, weighted_0.4 0.823, weighted_0.5 0.798, weighted_0.6 0.781, weighted_0.7 0.752, weighted_0.8 0.700, weighted_0.9 0.655
+   planner filtered_vector 300 queries: regret geo-mean 1.31, within 1.25x 50%, total auto 204 ms vs oracle 143 ms
+   planner filtered_bm25   120 queries: regret geo-mean 1.15, within 1.25x 75%, total auto 95 ms vs oracle 87 ms
+   planner filter          100 queries: regret geo-mean 1.10, within 1.25x 87%, total auto 11 ms vs oracle 10 ms
