@@ -1,0 +1,27 @@
+== quora
+   built in 242.5s (242.6s here), 2689.0 MiB
+   bm25            warm p50 0.159 ms, cold p50 7.54 ms
+   and2            warm p50 0.047 ms, cold p50 1.68 ms
+   and3            warm p50 0.047 ms, cold p50 1.39 ms
+   or3             warm p50 0.137 ms, cold p50 1.36 ms
+   filter          warm p50 1.601 ms, cold p50 18.00 ms
+   filtered_bm25   warm p50 0.374 ms, cold p50 8.15 ms
+   vector          warm p50 0.210 ms, cold p50 114.18 ms
+   filtered_vector warm p50 0.564 ms, cold p50 180.57 ms
+   hybrid          warm p50 0.737 ms, cold p50 180.48 ms
+   filtered_hybrid warm p50 1.708 ms, cold p50 348.12 ms
+   facet           warm p50 0.048 ms, cold p50 1.37 ms
+   hybrid: bm25 0.775, vector 0.899, vector_exact 0.909, rrf 0.859, weighted_0.1 0.920, weighted_0.2 0.920, weighted_0.3 0.919, weighted_0.4 0.910, weighted_0.5 0.903, weighted_0.6 0.887, weighted_0.7 0.869, weighted_0.8 0.843, weighted_0.9 0.814
+   showcase phrase, boolean and negation: 6.199 ms, 10 rows
+   showcase prefix and conjunction: 0.181 ms, 1 rows
+   showcase ranked text, OR / NOT filter: 0.992 ms, 10 rows
+   showcase filtered vector, OR filter: 0.348 ms, 10 rows
+   showcase filtered hybrid, weighted: 1.726 ms, 10 rows
+   showcase hybrid, RRF on a correlated filter: 7.356 ms, 10 rows
+   showcase facets over a text match: 0.368 ms, 5 rows
+   showcase text filter, ordered by a column: 0.080 ms, 5 rows
+   showcase count over a boolean and a range: 0.190 ms, 1 rows
+   showcase nearest by distance, exact: 21.049 ms, 10 rows
+   planner filtered_vector 300 queries: regret geo-mean 1.40, within 1.25x 39%, total auto 451 ms vs oracle 342 ms
+   planner filtered_bm25   120 queries: regret geo-mean 1.18, within 1.25x 80%, total auto 55 ms vs oracle 47 ms
+   planner filter          100 queries: regret geo-mean 1.07, within 1.25x 95%, total auto 20 ms vs oracle 19 ms

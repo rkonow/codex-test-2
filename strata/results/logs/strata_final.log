@@ -1,0 +1,92 @@
+== scifact
+   built in 0.9s (0.0s here), 33.1 MiB
+   bm25            warm p50 0.083 ms, cold p50 1.65 ms
+   and2            warm p50 0.036 ms, cold p50 0.72 ms
+   and3            warm p50 0.053 ms, cold p50 0.76 ms
+   or3             warm p50 0.052 ms, cold p50 0.67 ms
+   filter          warm p50 0.060 ms, cold p50 0.86 ms
+   filtered_bm25   warm p50 0.111 ms, cold p50 1.62 ms
+   vector          warm p50 0.093 ms, cold p50 29.24 ms
+   filtered_vector warm p50 0.069 ms, cold p50 15.77 ms
+   hybrid          warm p50 0.358 ms, cold p50 40.27 ms
+   filtered_hybrid warm p50 0.233 ms, cold p50 16.17 ms
+   facet           warm p50 0.032 ms, cold p50 0.49 ms
+   showcase phrase, boolean and negation: 0.081 ms, 1 rows
+   showcase prefix and conjunction: 0.028 ms, 1 rows
+   showcase ranked text, OR / NOT filter: 0.093 ms, 10 rows
+   showcase filtered vector, OR filter: 0.062 ms, 10 rows
+   showcase filtered hybrid, weighted: 0.286 ms, 10 rows
+   showcase hybrid, RRF on a correlated filter: 0.218 ms, 10 rows
+   showcase facets over a text match: 0.049 ms, 2 rows
+   showcase text filter, ordered by a column: 0.054 ms, 0 rows
+   showcase count over a boolean and a range: 0.036 ms, 1 rows
+   showcase nearest by distance, exact: 0.213 ms, 10 rows
+== fiqa
+   built in 17.4s (0.0s here), 333.9 MiB
+   bm25            warm p50 0.313 ms, cold p50 3.14 ms
+   and2            warm p50 0.074 ms, cold p50 1.29 ms
+   and3            warm p50 0.061 ms, cold p50 1.62 ms
+   or3             warm p50 0.101 ms, cold p50 1.01 ms
+   filter          warm p50 0.286 ms, cold p50 2.99 ms
+   filtered_bm25   warm p50 0.223 ms, cold p50 2.80 ms
+   vector          warm p50 0.150 ms, cold p50 46.17 ms
+   filtered_vector warm p50 0.181 ms, cold p50 33.42 ms
+   hybrid          warm p50 0.816 ms, cold p50 64.63 ms
+   filtered_hybrid warm p50 0.645 ms, cold p50 64.42 ms
+   facet           warm p50 0.060 ms, cold p50 0.68 ms
+   showcase phrase, boolean and negation: 1.795 ms, 5 rows
+   showcase prefix and conjunction: 0.062 ms, 1 rows
+   showcase ranked text, OR / NOT filter: 0.265 ms, 10 rows
+   showcase filtered vector, OR filter: 0.334 ms, 10 rows
+   showcase filtered hybrid, weighted: 1.677 ms, 10 rows
+   showcase hybrid, RRF on a correlated filter: 1.623 ms, 10 rows
+   showcase facets over a text match: 0.072 ms, 5 rows
+   showcase text filter, ordered by a column: 0.127 ms, 5 rows
+   showcase count over a boolean and a range: 0.065 ms, 1 rows
+   showcase nearest by distance, exact: 2.985 ms, 10 rows
+== trec-covid
+   built in 63.6s (0.1s here), 1031.1 MiB
+   bm25            warm p50 0.613 ms, cold p50 3.76 ms
+   and2            warm p50 0.093 ms, cold p50 1.56 ms
+   and3            warm p50 0.137 ms, cold p50 1.69 ms
+   or3             warm p50 0.416 ms, cold p50 1.72 ms
+   filter          warm p50 0.592 ms, cold p50 6.43 ms
+   filtered_bm25   warm p50 0.360 ms, cold p50 3.96 ms
+   vector          warm p50 0.165 ms, cold p50 38.13 ms
+   filtered_vector warm p50 0.276 ms, cold p50 53.86 ms
+   hybrid          warm p50 1.331 ms, cold p50 66.87 ms
+   filtered_hybrid warm p50 0.977 ms, cold p50 86.49 ms
+   facet           warm p50 0.132 ms, cold p50 1.33 ms
+   showcase phrase, boolean and negation: 0.469 ms, 0 rows
+   showcase prefix and conjunction: 0.132 ms, 1 rows
+   showcase ranked text, OR / NOT filter: 0.473 ms, 10 rows
+   showcase filtered vector, OR filter: 0.400 ms, 10 rows
+   showcase filtered hybrid, weighted: 3.100 ms, 10 rows
+   showcase hybrid, RRF on a correlated filter: 3.344 ms, 10 rows
+   showcase facets over a text match: 0.078 ms, 5 rows
+   showcase text filter, ordered by a column: 0.056 ms, 4 rows
+   showcase count over a boolean and a range: 0.026 ms, 1 rows
+   showcase nearest by distance, exact: 5.100 ms, 10 rows
+== quora
+   built in 242.5s (0.2s here), 2689.0 MiB
+   bm25            warm p50 0.160 ms, cold p50 2.55 ms
+   and2            warm p50 0.058 ms, cold p50 1.63 ms
+   and3            warm p50 0.064 ms, cold p50 1.52 ms
+   or3             warm p50 0.122 ms, cold p50 1.60 ms
+   filter          warm p50 1.733 ms, cold p50 12.79 ms
+   filtered_bm25   warm p50 0.350 ms, cold p50 4.41 ms
+   vector          warm p50 0.196 ms, cold p50 43.12 ms
+   filtered_vector warm p50 0.571 ms, cold p50 83.75 ms
+   hybrid          warm p50 0.702 ms, cold p50 75.07 ms
+   filtered_hybrid warm p50 1.959 ms, cold p50 210.56 ms
+   facet           warm p50 0.049 ms, cold p50 1.29 ms
+   showcase phrase, boolean and negation: 5.403 ms, 10 rows
+   showcase prefix and conjunction: 0.158 ms, 1 rows
+   showcase ranked text, OR / NOT filter: 0.822 ms, 10 rows
+   showcase filtered vector, OR filter: 0.367 ms, 10 rows
+   showcase filtered hybrid, weighted: 1.478 ms, 10 rows
+   showcase hybrid, RRF on a correlated filter: 5.428 ms, 10 rows
+   showcase facets over a text match: 0.329 ms, 5 rows
+   showcase text filter, ordered by a column: 0.092 ms, 5 rows
+   showcase count over a boolean and a range: 0.179 ms, 1 rows
+   showcase nearest by distance, exact: 26.334 ms, 10 rows

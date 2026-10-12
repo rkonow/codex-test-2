@@ -1,0 +1,66 @@
+loaded 57638 documents of fiqa in 0.3s
+== wal
+sync=true txn=1: 3191 docs/s, 3191 commits/s, p50 273us
+sync=true txn=10: 21889 docs/s, 2189 commits/s, p50 406us
+sync=true txn=100: 63975 docs/s, 640 commits/s, p50 1512us
+sync=true txn=1000: 87215 docs/s, 87 commits/s, p50 10675us
+sync=false txn=1: 155461 docs/s, 155461 commits/s, p50 5us
+sync=false txn=10: 221708 docs/s, 22171 commits/s, p50 40us
+sync=false txn=100: 258207 docs/s, 2582 commits/s, p50 360us
+sync=false txn=1000: 268971 docs/s, 269 commits/s, p50 3713us
+wrote results/storage/wal.json (22.6s)
+== bulk
+segment_max=10000: 16738 docs/s, 3.444s (2.387s building)
+segment_max=100000: 14539 docs/s, 3.965s (2.382s building)
+wrote results/storage/bulk.json (63.2s)
+== open
+10 segments, cold=true: open 3.34ms, first snapshot 0.03ms
+10 segments, cold=false: open 0.29ms, first snapshot 0.02ms
+100 segments, cold=true: open 12.63ms, first snapshot 0.08ms
+100 segments, cold=false: open 1.07ms, first snapshot 0.07ms
+994 segments, cold=true: open 123.29ms, first snapshot 1.42ms
+994 segments, cold=false: open 8.04ms, first snapshot 0.60ms
+WAL replay of 1000 documents: open 5.3ms
+WAL replay of 10000 documents: open 62.9ms
+wrote results/storage/open.json (14.3s)
+== flush
+flush of 1000 documents: 49.1ms
+flush of 10000 documents: 504.9ms
+wrote results/storage/flush.json (4.2s)
+== merge
+merge of 8 x 5000 documents: 2213.8ms
+wrote results/storage/merge.json (23.8s)
+== space
+round 0 load: 57638 live, file 336180 KiB, live-data estimate 336143 KiB
+round 1 deletes: 54757 live, file 336212 KiB, live-data estimate 319340 KiB
+round 2 deletes: 51876 live, file 336236 KiB, live-data estimate 302539 KiB
+round 3 deletes: 48995 live, file 336260 KiB, live-data estimate 285736 KiB
+round 4 deletes: 46114 live, file 336260 KiB, live-data estimate 268935 KiB
+round 5 deletes: 43233 live, file 336260 KiB, live-data estimate 252133 KiB
+merge: 0 merges in 0.00s
+round 5 merge: 43233 live, file 336260 KiB, live-data estimate 252133 KiB
+vacuum: 48 KiB returned in 0.002s
+round 5 vacuum: 43233 live, file 336212 KiB, live-data estimate 252133 KiB
+round 6 deletes: 40352 live, file 336236 KiB, live-data estimate 235331 KiB
+round 7 deletes: 37471 live, file 336260 KiB, live-data estimate 218529 KiB
+round 8 deletes: 34590 live, file 336260 KiB, live-data estimate 201728 KiB
+round 9 deletes: 31709 live, file 336260 KiB, live-data estimate 184926 KiB
+round 10 deletes: 28828 live, file 336260 KiB, live-data estimate 168124 KiB
+merge: 6 merges in 1.70s
+round 10 merge: 28828 live, file 387040 KiB, live-data estimate 168834 KiB
+vacuum: 181548 KiB returned in 0.340s
+round 10 vacuum: 28828 live, file 205492 KiB, live-data estimate 168834 KiB
+final file 205492 KiB, compact 168176 KiB
+wrote results/storage/space.json (7.1s)
+== snapshot
+memtable 100, chunk 1024: snapshot after a write 6.15ms (1 segments), cached 0.1us
+memtable 1000, chunk 1024: snapshot after a write 38.59ms (1 segments), cached 0.1us
+memtable 10000, chunk 1024: snapshot after a write 30.91ms (10 segments), cached 0.2us
+memtable 10000, chunk 4096: snapshot after a write 73.31ms (3 segments), cached 0.2us
+memtable 1000, chunk all: snapshot after a write 54.35ms (1 segments), cached 0.1us
+memtable 10000, chunk all: snapshot after a write 410.81ms (1 segments), cached 0.2us
+wrote results/storage/snapshot.json (10.5s)
+== pk
+hit: radix 99ns 4.02 pages; binary search 126ns 9.77 pages
+miss: radix 51ns 2.01 pages; binary search 125ns 7.76 pages
+wrote results/storage/pk.json (4.5s)

@@ -1,0 +1,18 @@
+== trec-covid
+   built in 36.6s (36.6s here), 1179.1 MiB
+   vector          warm p50 0.328 ms, cold p50 11.76 ms
+   filtered_vector warm p50 0.435 ms, cold p50 24.15 ms
+   hybrid          warm p50 1.482 ms, cold p50 27.36 ms
+   filtered_hybrid warm p50 1.097 ms, cold p50 43.44 ms
+   planner filtered_vector 300 queries: regret geo-mean 1.15, within 1.25x 37%, total auto 155 ms vs oracle 307 ms
+   planner filtered_bm25   120 queries: regret geo-mean 1.21, within 1.25x 65%, total auto 71 ms vs oracle 64 ms
+   planner filter          100 queries: regret geo-mean 1.11, within 1.25x 80%, total auto 9 ms vs oracle 9 ms
+== quora
+   built in 91.2s (91.2s here), 3138.5 MiB
+   vector          warm p50 0.750 ms, cold p50 12.03 ms
+   filtered_vector warm p50 0.991 ms, cold p50 64.84 ms
+   hybrid          warm p50 1.144 ms, cold p50 29.19 ms
+   filtered_hybrid warm p50 1.810 ms, cold p50 73.02 ms
+   planner filtered_vector 300 queries: regret geo-mean 1.03, within 1.25x 50%, total auto 296 ms vs oracle 783 ms
+   planner filtered_bm25   120 queries: regret geo-mean 1.28, within 1.25x 58%, total auto 51 ms vs oracle 40 ms
+   planner filter          100 queries: regret geo-mean 1.05, within 1.25x 91%, total auto 21 ms vs oracle 20 ms
