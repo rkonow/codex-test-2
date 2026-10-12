@@ -79,6 +79,9 @@ struct Args {
     reuse: bool,
     #[arg(long)]
     keep: bool,
+    /// Open databases with kernel read-ahead off (`MADV_RANDOM`).
+    #[arg(long)]
+    no_read_ahead: bool,
 }
 
 fn results_root(args: &Args) -> PathBuf {
@@ -106,6 +109,7 @@ struct StrataSys {
     db: Option<Db>,
     path: PathBuf,
     exec: ExecOptions,
+    read_ahead: bool,
 }
 
 impl StrataSys {
@@ -147,7 +151,7 @@ impl System for StrataSys {
         for p in self.files() {
             iostat::evict(&p)?;
         }
-        self.db = Some(Db::open(&self.path, DbOptions::default())?);
+        self.db = Some(Db::open(&self.path, DbOptions { read_ahead: self.read_ahead, ..DbOptions::default() })?);
         Ok(())
     }
     fn files(&self) -> Vec<PathBuf> {
@@ -237,9 +241,13 @@ fn run_collection(args: &Args, name: &str) -> Result<()> {
     let t = Instant::now();
     let build_report = build(args, &mut coll, &path)?;
     eprintln!("   built in {:.1}s ({:.1}s here), {:.1} MiB", build_report.seconds, t.elapsed().as_secs_f64(), build_report.bytes as f64 / (1 << 20) as f64);
-    let mut sys = StrataSys { db: Some(Db::open(&path, DbOptions::default())?), path: path.clone(), exec: ExecOptions::default() };
+    let read_ahead = !args.no_read_ahead;
+    let mut sys = StrataSys { db: Some(Db::open(&path, DbOptions { read_ahead, ..DbOptions::default() })?), path: path.clone(), exec: ExecOptions::default(), read_ahead };
     let out_dir = results_root(args).join("strata");
-    let suffix = if args.index == "hnsw" { String::new() } else { format!("_{}", args.index) };
+    let mut suffix = if args.index == "hnsw" { String::new() } else { format!("_{}", args.index) };
+    if !read_ahead {
+        suffix.push_str("_noreadahead");
+    }
 
     if args.studies.iter().any(|s| s == "workload") {
         let kinds: Vec<Kind> = if args.kinds.is_empty() {
@@ -270,7 +278,7 @@ fn run_collection(args: &Args, name: &str) -> Result<()> {
                 "collection": name,
                 "n_docs": w.n_docs,
                 "workload": format!("results/workloads/{name}.json"),
-                "config": {"index": args.index, "threads": args.threads, "segment_docs": args.segment_docs, "segments": sys.db().snapshot().segments().len()},
+                "config": {"index": args.index, "threads": args.threads, "read_ahead": read_ahead, "segment_docs": args.segment_docs, "segments": sys.db().snapshot().segments().len()},
                 "run": {"options": opts, "unix_time": SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).map_or(0, |d| d.as_secs()), "peak_rss_mib": peak_rss_mb()},
                 "build": build_report,
                 "kinds": reports,

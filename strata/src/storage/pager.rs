@@ -167,14 +167,18 @@ impl AsRef<[u8]> for MapOwner {
 
 /// Maps the whole file read-only. The bytes stay valid while any slice of
 /// them is alive, so snapshots opened against an older (shorter) mapping keep
-/// working after the file grows and is mapped again.
-pub fn map_file(file: &File) -> Result<OwnedBytes> {
+/// working after the file grows and is mapped again. Without `read_ahead`,
+/// the mapping is advised `MADV_RANDOM`.
+pub fn map_file(file: &File, read_ahead: bool) -> Result<OwnedBytes> {
     if file.metadata()?.len() == 0 {
         return Ok(OwnedBytes::empty());
     }
     // SAFETY: the mapping is read-only and Strata never writes a page that a
     // live reader can reach; the file is guarded by an exclusive lock.
     let map = unsafe { memmap2::MmapOptions::new().map(file)? };
+    if !read_ahead {
+        map.advise(memmap2::Advice::Random)?;
+    }
     Ok(OwnedBytes::new(MapOwner(map)))
 }
 

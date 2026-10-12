@@ -65,6 +65,11 @@ pub struct DbOptions {
     pub sync: bool,
     /// Needed by [`Database::merge`].
     pub doc_source: Option<Arc<dyn DocumentSource>>,
+    /// Kernel read-ahead on the file mapping. With it off (`MADV_RANDOM`) a
+    /// page fault reads one page instead of up to 32, which suits random
+    /// access (dictionary probes, graph hops, doc store fetches) when the
+    /// data is not cached.
+    pub read_ahead: bool,
 }
 
 impl Default for DbOptions {
@@ -76,6 +81,7 @@ impl Default for DbOptions {
             segment_max_docs: 100_000,
             sync: true,
             doc_source: None,
+            read_ahead: true,
         }
     }
 }
@@ -179,7 +185,7 @@ impl Database {
             // Left by a commit that did not finish; nothing valid lives there.
             file.set_len(meta.page_count * PAGE)?;
         }
-        let map = pager::map_file(&file)?;
+        let map = pager::map_file(&file, opts.read_ahead)?;
         let handles = manifest.segments.iter().map(|m| SegHandle::open(&map, m).map(Arc::new)).collect::<Result<_>>()?;
         let wal_path = wal_path(path);
         let (mut wal, txns) = Wal::open(&wal_path, meta.db_id, opts.sync)?;
@@ -605,7 +611,7 @@ impl Database {
             let st = lock(&self.state);
             (st.handles.clone(), st.map.clone())
         };
-        let map = if c.meta.page_count * PAGE > map.len() as u64 { pager::map_file(&self.file).map_err(|e| self.poison(e))? } else { map };
+        let map = if c.meta.page_count * PAGE > map.len() as u64 { pager::map_file(&self.file, self.opts.read_ahead).map_err(|e| self.poison(e))? } else { map };
         let handles = c
             .manifest
             .segments

@@ -3,7 +3,7 @@
 //! merges the per-segment results.
 
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use serde::Serialize;
 
@@ -22,17 +22,23 @@ use crate::vector::{self, SearchParams, VectorReader};
 /// Rows returned by ranked queries without a LIMIT.
 pub const DEFAULT_K: usize = 100;
 
-/// Readers of one segment's indexes, by schema field. Opening only parses
-/// headers (every structure is a zero-copy view), so readers are cheap and
-/// are cached per segment by [`crate::db::Db`].
+/// Readers of one segment's indexes, by schema field. Each opens on first
+/// use (opening only parses headers: every structure is a zero-copy view),
+/// so a query touches the headers of the fields it uses and no others, which
+/// matters on a cold cache. Cached per segment by [`crate::db::Db`].
 pub struct SegmentReaders {
     pub n_docs: u32,
-    text: Vec<Option<TextFieldReader>>,
-    numeric: Vec<Option<Numeric>>,
-    keyword: Vec<Option<KeywordColumn>>,
-    vector: Vec<Option<VectorReader>>,
-    store: Option<DocStore>,
+    seg: SegmentFile,
+    schema: Schema,
+    text: Vec<OnceLock<Opened<TextFieldReader>>>,
+    numeric: Vec<OnceLock<Opened<Numeric>>>,
+    keyword: Vec<OnceLock<Opened<KeywordColumn>>>,
+    vector: Vec<OnceLock<Opened<VectorReader>>>,
+    store: OnceLock<Opened<DocStore>>,
 }
+
+/// A reader, absent (the field has no such index), or the error opening it.
+type Opened<T> = std::result::Result<Option<T>, String>;
 
 enum Numeric {
     Plain(NumericColumn),
@@ -54,45 +60,80 @@ impl Numeric {
     }
 }
 
+fn cells<T>(n: usize) -> Vec<OnceLock<T>> {
+    (0..n).map(|_| OnceLock::new()).collect()
+}
+
+fn opened<'r, T>(cell: &'r OnceLock<Opened<T>>, open: impl FnOnce() -> Result<Option<T>>) -> Result<Option<&'r T>> {
+    match cell.get_or_init(|| open().map_err(|e| e.to_string())) {
+        Ok(r) => Ok(r.as_ref()),
+        Err(e) => Err(crate::error::corrupt(e)),
+    }
+}
+
 impl SegmentReaders {
     pub fn open(seg: &SegmentFile, schema: &Schema) -> Result<Self> {
         let n = schema.fields.len();
-        let mut r = SegmentReaders {
+        Ok(SegmentReaders {
             n_docs: seg.n_docs() as u32,
-            text: (0..n).map(|_| None).collect(),
-            numeric: (0..n).map(|_| None).collect(),
-            keyword: (0..n).map(|_| None).collect(),
-            vector: (0..n).map(|_| None).collect(),
-            store: None,
-        };
-        for (i, f) in schema.fields.iter().enumerate() {
-            match &f.ty {
-                FieldType::Text { .. } if f.indexed => r.text[i] = Some(TextFieldReader::open(seg, &f.name)?),
-                FieldType::Int | FieldType::Float if f.indexed => {
-                    r.numeric[i] = Some(match RangeIndex::open_if_present(seg, &f.name)? {
-                        Some(idx) => Numeric::Indexed(idx),
-                        None => Numeric::Plain(NumericColumn::open(seg, &f.name)?),
-                    })
-                }
-                FieldType::Keyword if f.indexed => r.keyword[i] = Some(KeywordColumn::open(seg, &f.name)?),
-                FieldType::Vector { .. } => r.vector[i] = Some(VectorReader::open(seg, &f.name)?),
-                _ => {}
-            }
-        }
-        if schema.fields.iter().any(|f| f.stored && !matches!(f.ty, FieldType::Vector { .. })) {
-            r.store = Some(DocStore::open(seg, schema)?);
-        }
-        Ok(r)
+            seg: seg.clone(),
+            schema: schema.clone(),
+            text: cells(n),
+            numeric: cells(n),
+            keyword: cells(n),
+            vector: cells(n),
+            store: OnceLock::new(),
+        })
     }
 
-    pub fn text(&self, field: usize) -> Option<&TextFieldReader> {
-        self.text.get(field)?.as_ref()
+    pub fn text(&self, field: usize) -> Result<Option<&TextFieldReader>> {
+        let f = &self.schema.fields[field];
+        opened(&self.text[field], || {
+            Ok(match f.ty {
+                FieldType::Text { .. } if f.indexed => Some(TextFieldReader::open(&self.seg, &f.name)?),
+                _ => None,
+            })
+        })
     }
-    pub fn vector(&self, field: usize) -> Option<&VectorReader> {
-        self.vector.get(field)?.as_ref()
+
+    fn numeric(&self, field: usize) -> Result<Option<&Numeric>> {
+        let f = &self.schema.fields[field];
+        opened(&self.numeric[field], || {
+            Ok(match f.ty {
+                FieldType::Int | FieldType::Float if f.indexed => Some(match RangeIndex::open_if_present(&self.seg, &f.name)? {
+                    Some(idx) => Numeric::Indexed(idx),
+                    None => Numeric::Plain(NumericColumn::open(&self.seg, &f.name)?),
+                }),
+                _ => None,
+            })
+        })
     }
-    pub fn vector_mut(&mut self, field: usize) -> Option<&mut VectorReader> {
-        self.vector.get_mut(field)?.as_mut()
+
+    pub fn keyword(&self, field: usize) -> Result<Option<&KeywordColumn>> {
+        let f = &self.schema.fields[field];
+        opened(&self.keyword[field], || {
+            Ok(match f.ty {
+                FieldType::Keyword if f.indexed => Some(KeywordColumn::open(&self.seg, &f.name)?),
+                _ => None,
+            })
+        })
+    }
+
+    pub fn vector(&self, field: usize) -> Result<Option<&VectorReader>> {
+        let f = &self.schema.fields[field];
+        opened(&self.vector[field], || {
+            Ok(match f.ty {
+                FieldType::Vector { .. } => Some(VectorReader::open(&self.seg, &f.name)?),
+                _ => None,
+            })
+        })
+    }
+
+    pub fn store(&self) -> Result<Option<&DocStore>> {
+        opened(&self.store, || {
+            let any = self.schema.fields.iter().any(|f| f.stored && !matches!(f.ty, FieldType::Vector { .. }));
+            Ok(if any { Some(DocStore::open(&self.seg, &self.schema)?) } else { None })
+        })
     }
 }
 
@@ -271,16 +312,16 @@ impl<'a> Executor<'a> {
     // ---- readers ---------------------------------------------------------
 
     fn text(&self, s: &'a Seg, field: usize) -> Result<&'a TextFieldReader> {
-        s.r.text(field).ok_or_else(|| err(format!("{} has no text index", self.schema.fields[field].name)))
+        s.r.text(field)?.ok_or_else(|| err(format!("{} has no text index", self.schema.fields[field].name)))
     }
     fn numeric(&self, s: &'a Seg, field: usize) -> Result<&'a Numeric> {
-        s.r.numeric.get(field).and_then(|x| x.as_ref()).ok_or_else(|| err(format!("{} has no column", self.schema.fields[field].name)))
+        s.r.numeric(field)?.ok_or_else(|| err(format!("{} has no column", self.schema.fields[field].name)))
     }
     fn keyword(&self, s: &'a Seg, field: usize) -> Result<&'a KeywordColumn> {
-        s.r.keyword.get(field).and_then(|x| x.as_ref()).ok_or_else(|| err(format!("{} has no keyword index", self.schema.fields[field].name)))
+        s.r.keyword(field)?.ok_or_else(|| err(format!("{} has no keyword index", self.schema.fields[field].name)))
     }
     fn vector(&self, s: &'a Seg, field: usize) -> Result<&'a VectorReader> {
-        s.r.vector(field).ok_or_else(|| err(format!("{} has no vectors", self.schema.fields[field].name)))
+        s.r.vector(field)?.ok_or_else(|| err(format!("{} has no vectors", self.schema.fields[field].name)))
     }
 
     fn planner<'p>(&'p self, est: &'p SegEst<'p, 'a>) -> Planner<'p, SegEst<'p, 'a>> {
@@ -838,7 +879,7 @@ impl<'a> Executor<'a> {
         let mut rows = Vec::with_capacity(hits.len());
         for h in hits {
             let s = self.seg_by_ord(h.seg);
-            let fetched = match (&s.r.store, stored.is_empty()) {
+            let fetched = match (s.r.store()?, stored.is_empty()) {
                 (Some(store), false) => store.get_fields(h.doc, &stored),
                 _ => Vec::new(),
             };
@@ -861,9 +902,9 @@ impl<'a> Executor<'a> {
 
     fn unstored_value(&self, s: &'a Seg, field: usize, d: DocId) -> Value {
         match self.schema.fields[field].ty {
-            FieldType::Vector { .. } => s.r.vector(field).map_or(Value::Null, |v| Value::Vector(v.vector(d).into())),
-            FieldType::Int | FieldType::Float => s.r.numeric[field].as_ref().map_or(Value::Null, |n| n.col().get(d)),
-            FieldType::Keyword => s.r.keyword[field].as_ref().and_then(|k| k.value_of_doc(d)).map_or(Value::Null, |v| Value::Str(v.to_string())),
+            FieldType::Vector { .. } => s.r.vector(field).ok().flatten().map_or(Value::Null, |v| Value::Vector(v.vector(d).into())),
+            FieldType::Int | FieldType::Float => s.r.numeric(field).ok().flatten().map_or(Value::Null, |n| n.col().get(d)),
+            FieldType::Keyword => s.r.keyword(field).ok().flatten().and_then(|k| k.value_of_doc(d)).map_or(Value::Null, |v| Value::Str(v.to_string())),
             FieldType::Text { .. } => Value::Null,
         }
     }
@@ -933,32 +974,32 @@ impl Estimator for SegEst<'_, '_> {
         self.s.view.n_live as f64
     }
     fn match_count(&self, field: usize, query: &str) -> f64 {
-        match (self.s.r.text(field), text::parse_match(query)) {
+        match (self.s.r.text(field).ok().flatten(), text::parse_match(query)) {
             (Some(t), Ok(q)) => t.estimate(&q),
             _ => self.n_docs(),
         }
     }
     fn match_postings(&self, field: usize, query: &str) -> f64 {
-        match (self.s.r.text(field), text::parse_match(query)) {
+        match (self.s.r.text(field).ok().flatten(), text::parse_match(query)) {
             (Some(t), Ok(q)) => t.eval_cost(&q),
             _ => self.n_docs(),
         }
     }
     fn range_count(&self, field: usize, lo: f64, hi: f64) -> f64 {
-        self.s.r.numeric.get(field).and_then(|n| n.as_ref()).map_or(self.n_docs(), |n| n.col().estimate(lo, hi))
+        self.s.r.numeric(field).ok().flatten().map_or(self.n_docs(), |n| n.col().estimate(lo, hi))
     }
     fn range_cost(&self, field: usize, lo: f64, hi: f64) -> Option<f64> {
-        let n = self.s.r.numeric.get(field)?.as_ref()?;
+        let n = self.s.r.numeric(field).ok().flatten()?;
         forward::range_costs(n.col(), n.index(), lo, hi, false).map(|(scan, post)| scan.min(post))
     }
     fn in_count(&self, field: usize, values: &[Value]) -> f64 {
-        if let Some(kw) = self.s.r.keyword.get(field).and_then(|k| k.as_ref()) {
+        if let Some(kw) = self.s.r.keyword(field).ok().flatten() {
             return values.iter().filter_map(|v| v.as_str()).map(|v| kw.count(v) as f64).sum();
         }
         values.iter().filter_map(|v| v.as_f64()).map(|v| self.range_count(field, v, v)).sum()
     }
     fn vector_cost(&self, field: usize, s: VectorStrategy, k: usize, card: Option<f64>) -> f64 {
-        let Some(vr) = self.s.r.vector(field) else { return f64::INFINITY };
+        let Some(vr) = self.s.r.vector(field).ok().flatten() else { return f64::INFINITY };
         let params = self.params.as_ref().map(|(_, p)| p.clone()).unwrap_or_else(|| self.ex.opts.vector_params.clone());
         let st = to_vector_strategy(s, vr.index_kind(), card.is_some());
         // In-index search pays for the selectivity near the query, in both
