@@ -20,7 +20,8 @@ fallback, so it builds on Apple Silicon).
   top hits and the entities nearest the prompt start a walk over the links
   (`Store::reach`, a Strata `REACHABLE` query through entities and notes);
   what it reaches, ranked by similarity, is fused into the hybrid ranking by
-  reciprocal rank. It is on by default in `RankParams`.
+  reciprocal rank. It is off until the evaluations show it helps:
+  `ENGRAM_GRAPH=1` (or `rank.graph.enabled` in the config) turns it on.
 - `engram-structure` has a `turn+facts+graph` layout. Facts link to their
   turn and to their entities, and each graph variant in `graph_cfgs` is
   scored as `turn+facts+graph:<variant>`.
@@ -30,7 +31,7 @@ fallback, so it builds on Apple Silicon).
 - `scripts/long_session_ab.py`: one long Claude Code session per lane,
   compacted with `/compact` after each block of work. Every task forks it
   (`--resume ID --fork-session`). The lanes are `compact`,
-  `compact+engram` and `full` (never compacted).
+  `compact+engram`, `compact+engram+graph` and `full` (never compacted).
 
 ## Still to run
 
@@ -40,13 +41,15 @@ fallback, so it builds on Apple Silicon).
    LoCoMo (272): about $46 with a small model and 3 hours with 32 workers.
 3. Retrieval: `turn`, `turn+facts` and `turn+facts+graph` with every graph
    variant on LongMemEval_S (500) and LoCoMo. Pick the variant on one half
-   of the questions (md5(qid) parity) and report it on the other.
+   of the questions (md5(qid) parity) and report it on the other
+   (`scripts/graph_recall_stats.py`). Facts are matched to sessions by
+   content hash, since LoCoMo reuses session ids across conversations.
 4. Reader accuracy, with a small reader and a large judge: none, Engram
    today, +facts, +facts+graph, oracle, and full history on 100 questions.
    The earlier answers in `results/reader*` are cached by config and question.
 5. LongMemEval_M (every fifth question): Engram without facts. A full
    history does not fit in any context window.
-6. The long-session A/B: 2 scenarios × 3 lanes × 10 tasks × 3 repeats.
+6. The long-session A/B: 2 scenarios × 4 lanes × 10 tasks × 3 repeats.
 7. The report.
 
 ## Commands

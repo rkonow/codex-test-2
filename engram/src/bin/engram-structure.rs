@@ -116,7 +116,9 @@ enum Facts {
     Graph,
 }
 
-/// Facts by session id: (turn index within the session, sentence, entities).
+/// Facts by session content hash (see [`session_hash`]): (turn index within
+/// the session, sentence, entities). Session ids repeat across LoCoMo
+/// conversations, so the content picks the facts.
 type SessionFacts = Vec<(usize, String, Vec<String>)>;
 static FACTS: std::sync::OnceLock<HashMap<String, SessionFacts>> = std::sync::OnceLock::new();
 
@@ -266,8 +268,9 @@ fn rows(u: &Unit, texts: &[String], l: &Layout) -> Vec<Row> {
         for (i, t) in u.turns.iter().enumerate() {
             by.entry(t.session_id.as_str()).or_default().push(i);
         }
-        for (sid, idx) in &by {
-            for (k, f, ents) in facts.get(*sid).map(|v| v.as_slice()).unwrap_or(&[]) {
+        for idx in by.values() {
+            let h = session_hash(idx.iter().map(|&i| (u.turns[i].role.as_str(), u.turns[i].text.as_str())));
+            for (k, f, ents) in facts.get(&h).map(|v| v.as_slice()).unwrap_or(&[]) {
                 if let Some(&i) = idx.get(*k) {
                     turn_facts[i].push((f.as_str(), ents.as_slice()));
                 }
@@ -535,6 +538,90 @@ fn pack(u: &Unit, texts: &[String], rows: &[Row], hits: &[Hit], pres: Pres, term
             used -= before - q.text(u, texts).len();
         }
         out.push(p);
+    }
+    out
+}
+
+/// The key scripts/extract_facts.py gives a session: the first 16 hex digits
+/// of the SHA-1 of `json.dumps([[role, text], ...])` (Python's defaults:
+/// ", " between items, non-ASCII escaped as \uXXXX).
+fn session_hash<'a>(turns: impl Iterator<Item = (&'a str, &'a str)>) -> String {
+    fn esc(out: &mut String, s: &str) {
+        out.push('"');
+        for c in s.chars() {
+            match c {
+                '"' => out.push_str("\\\""),
+                '\\' => out.push_str("\\\\"),
+                '\n' => out.push_str("\\n"),
+                '\r' => out.push_str("\\r"),
+                '\t' => out.push_str("\\t"),
+                '\u{8}' => out.push_str("\\b"),
+                '\u{c}' => out.push_str("\\f"),
+                ' '..='~' => out.push(c),
+                _ => {
+                    let mut buf = [0u16; 2];
+                    for u in c.encode_utf16(&mut buf) {
+                        let _ = write!(out, "\\u{:04x}", u);
+                    }
+                }
+            }
+        }
+        out.push('"');
+    }
+    let mut j = String::from("[");
+    for (k, (role, text)) in turns.enumerate() {
+        if k > 0 {
+            j.push_str(", ");
+        }
+        j.push('[');
+        esc(&mut j, role);
+        j.push_str(", ");
+        esc(&mut j, text);
+        j.push(']');
+    }
+    j.push(']');
+    let d = sha1(j.as_bytes());
+    d.iter().take(8).map(|b| format!("{b:02x}")).collect()
+}
+
+fn sha1(data: &[u8]) -> [u8; 20] {
+    let mut h: [u32; 5] = [0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476, 0xC3D2E1F0];
+    let mut msg = data.to_vec();
+    msg.push(0x80);
+    while msg.len() % 64 != 56 {
+        msg.push(0);
+    }
+    msg.extend_from_slice(&((data.len() as u64) * 8).to_be_bytes());
+    for block in msg.chunks(64) {
+        let mut w = [0u32; 80];
+        for i in 0..16 {
+            w[i] = u32::from_be_bytes([block[4 * i], block[4 * i + 1], block[4 * i + 2], block[4 * i + 3]]);
+        }
+        for i in 16..80 {
+            w[i] = (w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16]).rotate_left(1);
+        }
+        let [mut a, mut b, mut c, mut d, mut e] = h;
+        for (i, &wi) in w.iter().enumerate() {
+            let (f, k) = match i {
+                0..=19 => ((b & c) | (!b & d), 0x5A827999),
+                20..=39 => (b ^ c ^ d, 0x6ED9EBA1),
+                40..=59 => ((b & c) | (b & d) | (c & d), 0x8F1BBCDC),
+                _ => (b ^ c ^ d, 0xCA62C1D6),
+            };
+            let t = a.rotate_left(5).wrapping_add(f).wrapping_add(e).wrapping_add(k).wrapping_add(wi);
+            e = d;
+            d = c;
+            c = b.rotate_left(30);
+            b = a;
+            a = t;
+        }
+        for (x, y) in h.iter_mut().zip([a, b, c, d, e]) {
+            *x = x.wrapping_add(y);
+        }
+    }
+    let mut out = [0u8; 20];
+    for (i, x) in h.iter().enumerate() {
+        out[4 * i..4 * i + 4].copy_from_slice(&x.to_be_bytes());
     }
     out
 }
@@ -857,12 +944,12 @@ fn main() {
         let mut m: HashMap<String, SessionFacts> = HashMap::new();
         for line in std::fs::read_to_string(path).expect("facts").lines() {
             let v: Json = serde_json::from_str(line).expect("facts line");
-            let sid = v["session_id"].as_str().unwrap_or("").to_string();
+            let sid = v["hash"].as_str().unwrap_or("").to_string();
             let ents = |f: &Json| -> Vec<String> { f["entities"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect()).unwrap_or_default() };
             let fs: SessionFacts = v["facts"].as_array().map(|a| a.iter().filter_map(|f| Some((f["turn"].as_u64()? as usize, f["fact"].as_str()?.to_string(), ents(f)))).collect()).unwrap_or_default();
             m.entry(sid).or_insert(fs);
         }
-        eprintln!("facts for {} sessions", m.len());
+        eprintln!("facts for {} distinct sessions", m.len());
         FACTS.set(m).unwrap();
     }
     GRAPHS.set(cli.graphs.clone()).unwrap();
@@ -1081,4 +1168,17 @@ fn transcript_mode(cli: &Cli, e: &Arc<dyn Embedder>) {
     let name = format!("transcript{}.json", if cli.tag.is_empty() { String::new() } else { format!("_{}", cli.tag) });
     std::fs::write(cli.out.join(&name), serde_json::to_string_pretty(&json!({"layouts": lays.iter().map(|l| l.name).collect::<Vec<_>>(), "presentations": press.iter().map(|p| p.name()).collect::<Vec<_>>(), "budgets": BUDGETS, "results": results})).unwrap()).unwrap();
     eprintln!("wrote {} in {:.0} s", cli.out.join(&name).display(), t0.elapsed().as_secs_f64());
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn session_hash_matches_extract_facts() {
+        let hex: String = sha1(b"abc").iter().map(|b| format!("{b:02x}")).collect();
+        assert_eq!(hex, "a9993e364706816aba3e25717850c26c9cd0d89d");
+        // hashlib.sha1(json.dumps([["user", "héllo \"q\" \\ \n\t😀 \x01 \x7f"]]).encode()).hexdigest()[:16]
+        assert_eq!(session_hash([("user", "héllo \"q\" \\ \n\t😀 \u{1} \u{7f}")].into_iter()), "0904fecd007f4f0f");
+    }
 }

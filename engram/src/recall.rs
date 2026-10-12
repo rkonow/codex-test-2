@@ -59,8 +59,10 @@ pub struct GraphParams {
 }
 
 impl Default for GraphParams {
+    /// Off unless `ENGRAM_GRAPH=1` (or the config turns it on) until the
+    /// evaluations in eval/graph_eval_plan.md show it helps.
     fn default() -> Self {
-        GraphParams { enabled: true, seeds: 5, entity_seeds: 3, min_entity_cos: 0.5, hops: 2, n: 20, k: 10.0, weight: 0.5, max_nodes: 5000 }
+        GraphParams { enabled: std::env::var("ENGRAM_GRAPH").is_ok_and(|v| v == "1"), seeds: 5, entity_seeds: 3, min_entity_cos: 0.5, hops: 2, n: 20, k: 10.0, weight: 0.5, max_nodes: 5000 }
     }
 }
 

@@ -5,11 +5,12 @@ The A/B test in ab_eval.py starts every task in a new session. This one keeps
 the whole history in a single session, as a long working day does, and
 compacts it after each block of work, as Claude Code does when the context
 fills up. Each follow-up task then forks that session (`--resume ID
---fork-session`), so every run starts from the same state. Three lanes per
+--fork-session`), so every run starts from the same state. Four lanes per
 scenario, each with its own history:
 
   compact         the history compacts after each block; no Engram
   compact+engram  the same, with Engram recording and recalling throughout
+  compact+engram+graph  the same, with graph recall on (ENGRAM_GRAPH=1)
   full            the history never compacts (the whole session stays in
                   context); no Engram
 
@@ -40,7 +41,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import ab_eval as ab  # noqa: E402
 
 RESULTS = os.path.join(ab.ROOT, "results", "long")
-LANES = ["compact", "compact+engram", "full"]
+LANES = ["compact", "compact+engram", "compact+engram+graph", "full"]
 
 
 def claude(prompt, cwd, env, model, session=None, resume=None, fork=False, timeout=1200):
@@ -110,6 +111,8 @@ class Lane:
     def env(self, distill):
         env = ab.base_env(self.home, self.engram, distill=distill)
         env["ENGRAM_DISTILL_MODEL"] = self.args.distill_model or self.args.model
+        if "graph" in self.name:
+            env["ENGRAM_GRAPH"] = "1"
         return env
 
     def history(self):
