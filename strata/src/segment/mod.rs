@@ -141,13 +141,13 @@ impl SegmentWriter {
 }
 
 /// Whether a section is read at random positions: graph hops, float32
-/// re-ranking, per-document lengths, dictionary blocks, doc store and key
-/// lookups. Everything else (postings, codes, columns, IVF clusters) is read
-/// a run at a time and benefits from the kernel's read-ahead.
+/// re-ranking, dictionary blocks, doc store and key lookups. Everything else
+/// (postings, codes, columns, IVF clusters, and document lengths, which
+/// ranking reads densely) is read a run at a time and benefits from the
+/// kernel's read-ahead.
 pub fn random_access(name: &str) -> bool {
     name == "pk"
         || name.starts_with("store.")
-        || name.ends_with(".norms")
         || name.ends_with(".dict")
         || name.ends_with(".f32")
         || name.contains(".hnsw")
