@@ -985,13 +985,28 @@ impl Pyramid {
 
     /// Sets the bit of every docID of the list in `words`, a bitset over
     /// the docID space (bit `d % 64` of word `d / 64`) that must cover the
-    /// largest docID. Flat chunks and dense blocks are ORed word by word.
+    /// largest docID. Flat chunks and dense blocks are ORed word by word;
+    /// chunks of sparse blocks only are decoded with the SIMD kernels first
+    /// (per-block directory lookups cost more than the values when blocks
+    /// hold a few values each).
     pub fn or_into_bits(&self, words: &mut [u64]) {
+        let mut buf = Vec::new();
         for (&k, c) in self.keys.iter().zip(self.chunks.iter()) {
             let base = (k as usize) << 10;
             if c.small() {
                 for &v in self.small_vals(c) {
                     words[base + (v >> 6) as usize] |= 1 << (v & 63);
+                }
+                continue;
+            }
+            if c.nd == 0 {
+                buf.clear();
+                self.decode_chunk(c, (k as u32) << 16, &mut buf);
+                let last = buf.last().map_or(0, |&x| x as usize >> 6);
+                assert!(last < words.len(), "bitset too short for docID {}", buf[buf.len() - 1]);
+                for &x in &buf {
+                    // SAFETY: x <= the last (largest) value, checked above.
+                    unsafe { *words.get_unchecked_mut(x as usize >> 6) |= 1 << (x & 63) };
                 }
                 continue;
             }
@@ -1007,9 +1022,7 @@ impl Pyramid {
                 }
                 continue;
             }
-            let mut d = 0;
-            let mut so = 0;
-            let mut sr = 0;
+            let (mut d, mut so, mut sr) = (0, 0, 0);
             for w in 0..4 {
                 let mut m = v.present[w];
                 while m != 0 {
@@ -1044,9 +1057,14 @@ impl Pyramid {
 
     /// Number of docIDs of the list whose bit is set in `words` (a bitset as
     /// for [`Pyramid::or_into_bits`]; docIDs past its end count as absent):
-    /// a count-only intersection with a bitset.
+    /// a count-only intersection with a bitset. Flat chunks and dense
+    /// blocks AND and count words, sparse blocks test up to 32 low bytes at
+    /// once ([`simd::test_bits`]), chunks of sparse blocks only are decoded
+    /// first.
     pub fn and_count_bits(&self, words: &[u64]) -> u64 {
+        let limit = words.len() << 6;
         let test = |x: usize| words.get(x >> 6).is_some_and(|w| w >> (x & 63) & 1 != 0) as u64;
+        let mut buf = Vec::new();
         let mut count = 0u64;
         for (&k, c) in self.keys.iter().zip(self.chunks.iter()) {
             let base = (k as usize) << 10;
@@ -1055,6 +1073,16 @@ impl Pyramid {
             }
             if c.small() {
                 count += self.small_vals(c).iter().map(|&v| test(base << 6 | v as usize)).sum::<u64>();
+                continue;
+            }
+            if c.nd == 0 {
+                buf.clear();
+                self.decode_chunk(c, (k as u32) << 16, &mut buf);
+                let end = buf.partition_point(|&x| (x as usize) < limit);
+                for &x in &buf[..end] {
+                    // SAFETY: x < limit = 64 * words.len().
+                    count += unsafe { *words.get_unchecked(x as usize >> 6) } >> (x & 63) & 1;
+                }
                 continue;
             }
             // SAFETY: Tiered chunk of self.
@@ -1074,6 +1102,7 @@ impl Pyramid {
                     let bit = m & m.wrapping_neg();
                     m &= m - 1;
                     let dst = base + 4 * b;
+                    let inside = dst + 4 <= words.len();
                     if v.dense[w] & bit != 0 {
                         for i in 0..4 {
                             // SAFETY: dense block `d` of the chunk.
@@ -1084,10 +1113,20 @@ impl Pyramid {
                     } else {
                         // SAFETY: sparse block `sr`, whose lows start at `so`.
                         let e = unsafe { v.sparse_end(sr, so) };
-                        for i in so..e {
-                            // SAFETY: lows of the sparse block.
-                            let l = unsafe { *v.lows.add(i as usize) } as usize;
-                            count += test((base << 6) + (b << 8) + l);
+                        let n = ((e - so) as usize).min(32);
+                        if inside {
+                            // SAFETY: the block's lows, and its 4 words of the bitset.
+                            let hits = unsafe {
+                                let lows = simd::load_bytes32(v.lows.add(so as usize), n);
+                                simd::test_bits(&lows, words.as_ptr().add(dst))
+                            };
+                            count += (hits & simd::low_mask32(n)).count_ones() as u64;
+                        } else {
+                            for i in so..so + n as u32 {
+                                // SAFETY: lows of the sparse block.
+                                let l = unsafe { *v.lows.add(i as usize) } as usize;
+                                count += test((base << 6) + (b << 8) + l);
+                            }
                         }
                         so = e;
                         sr += 1;
