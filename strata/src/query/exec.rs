@@ -302,7 +302,7 @@ impl<'a> Executor<'a> {
             FilterMode::Probe => {
                 let root = self.compile_probe(s, p)?;
                 let card = {
-                    let est = SegEst { ex: self, s, params: None };
+                    let est = SegEst { ex: self, s, params: None, local_sel: None };
                     self.planner(&est).estimate(p).card as usize
                 };
                 Ok(SegFilter::Probe(ProbeFilter { root, live: s.view.live.clone(), card }))
@@ -351,7 +351,7 @@ impl<'a> Executor<'a> {
             Pred::And(cs) => {
                 // Most selective first; once the running result is small,
                 // probing a child per survivor beats materialising it.
-                let est = SegEst { ex: self, s, params: None };
+                let est = SegEst { ex: self, s, params: None, local_sel: None };
                 let planner = self.planner(&est);
                 let mut ests: Vec<(f64, &Pred)> = cs.iter().map(|c| (planner.estimate(c).card, c)).collect();
                 ests.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
@@ -412,7 +412,7 @@ impl<'a> Executor<'a> {
             Pred::Not(c) => ProbeNode::Not(Box::new(self.compile_probe(s, c)?)),
             Pred::Or(cs) => ProbeNode::Or(cs.iter().map(|c| self.compile_probe(s, c)).collect::<Result<_>>()?),
             Pred::And(cs) => {
-                let est = SegEst { ex: self, s, params: None };
+                let est = SegEst { ex: self, s, params: None, local_sel: None };
                 let planner = self.planner(&est);
                 let mut ordered: Vec<(f64, &Pred)> = cs.iter().map(|c| (planner.estimate(c).card, c)).collect();
                 ordered.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
@@ -569,7 +569,7 @@ impl<'a> Executor<'a> {
             let mode = match self.opts.filter_mode {
                 Some(m) => m,
                 None => {
-                    let est = SegEst { ex: self, s, params: None };
+                    let est = SegEst { ex: self, s, params: None, local_sel: None };
                     self.planner(&est).filter_mode(p, candidates)
                 }
             };
@@ -613,7 +613,7 @@ impl<'a> Executor<'a> {
             let vr = self.vector(s, field)?;
             let has_index = vr.index_kind() != "flat";
             let (strategy, mode) = {
-                let est = SegEst { ex: self, s, params: Some((field, base.clone())) };
+                let est = SegEst { ex: self, s, params: Some((field, base.clone())), local_sel: None };
                 let planner = self.planner(&est);
                 match forced {
                     Some(VectorStrategy::PreFilter) | Some(VectorStrategy::Flat) => (forced.unwrap(), FilterMode::Materialize),
@@ -623,7 +623,17 @@ impl<'a> Executor<'a> {
                         (st, self.opts.filter_mode.unwrap_or(mode))
                     }
                     None => {
-                        let (st, mode, _) = planner.vector_plan(field, p, k, has_index);
+                        let global = planner.estimate(p).card / est.n_docs().max(1.0);
+                        let (mut st, mut mode, _) = planner.vector_plan(field, p, k, has_index);
+                        // An index strategy chosen on the global selectivity is
+                        // re-checked against the selectivity near the query.
+                        if st != VectorStrategy::PreFilter && has_index && *p != Pred::True {
+                            if let Some(l) = self.local_selectivity(s, vr, q, p, &base, global)? {
+                                let est = SegEst { ex: self, s, params: Some((field, base.clone())), local_sel: Some(l) };
+                                (st, mode, _) = self.planner(&est).vector_plan(field, p, k, has_index);
+                                self.stats.plan.push(format!("seg {}: selectivity {global:.4} global, {l:.4} near the query", s.ord));
+                            }
+                        }
                         (st, self.opts.filter_mode.unwrap_or(mode))
                     }
                 }
@@ -637,6 +647,31 @@ impl<'a> Executor<'a> {
             all.extend(out.hits.into_iter().map(|h| Hit { seg: s.ord, doc: h.doc, score: h.score as f64 }));
         }
         Ok(merge_top(all, k))
+    }
+
+    /// The fraction of the query's nearest neighbours that pass the filter,
+    /// from a cheap unfiltered index search (32 results). A filter correlated
+    /// with the query, or anti-correlated, has a local selectivity far from
+    /// its global one, and the local one decides how far an index search
+    /// must go to collect k matches. Only measured when the global
+    /// selectivity leaves the choice open.
+    fn local_selectivity(&mut self, s: &'a Seg, vr: &VectorReader, q: &[f32], p: &Pred, base: &SearchParams, global: f64) -> Result<Option<f64>> {
+        if !(0.0005..0.6).contains(&global) {
+            return Ok(None);
+        }
+        let probeable = {
+            let est = SegEst { ex: self, s, params: None, local_sel: None };
+            self.planner(&est).estimate(p).probeable
+        };
+        let f = self.seg_filter(s, p, if probeable { FilterMode::Probe } else { FilterMode::Materialize })?;
+        let mut sp = base.clone();
+        sp.strategy = to_vector_strategy(VectorStrategy::InIndex, vr.index_kind(), false);
+        sp.ef = 32;
+        sp.rerank = 0;
+        sp.nprobe = sp.nprobe.min(4);
+        let out = vr.search(q, 32, &sp, None);
+        let pass = out.hits.iter().filter(|h| f.as_dyn().is_none_or(|f| f.contains(h.doc))).count();
+        Ok(Some((pass as f64 + 0.5) / (out.hits.len() as f64 + 1.0)))
     }
 
     /// Weighted fusion: the union of each input's top candidates, re-scored
@@ -876,6 +911,9 @@ struct SegEst<'e, 'a> {
     s: &'a Seg<'a>,
     /// Vector field and search parameters, for vector cost estimates.
     params: Option<(usize, SearchParams)>,
+    /// Selectivity of the filter near the query (see
+    /// [`Executor::local_selectivity`]); index strategies are costed with it.
+    local_sel: Option<f64>,
 }
 
 impl Estimator for SegEst<'_, '_> {
@@ -911,6 +949,15 @@ impl Estimator for SegEst<'_, '_> {
         let Some(vr) = self.s.r.vector(field) else { return f64::INFINITY };
         let params = self.params.as_ref().map(|(_, p)| p.clone()).unwrap_or_else(|| self.ex.opts.vector_params.clone());
         let st = to_vector_strategy(s, vr.index_kind(), card.is_some());
+        // In-index search pays for the selectivity near the query, in both
+        // directions. Post-filtering sizes its candidate pool from the global
+        // selectivity, so correlation cannot make it cheaper, only
+        // anti-correlation dearer (retries).
+        let card = match (s, self.local_sel, card) {
+            (VectorStrategy::InIndex, Some(l), _) => Some(l * self.n_docs()),
+            (VectorStrategy::PostFilter, Some(l), Some(c)) => Some(c.min(l * self.n_docs())),
+            _ => card,
+        };
         vr.estimate_cost(st, k, card.map(|c| c.max(0.0) as usize), &params)
     }
 }
