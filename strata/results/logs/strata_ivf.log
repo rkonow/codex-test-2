@@ -4,3 +4,15 @@
    filtered_vector warm p50 0.409 ms, cold p50 27.92 ms
    hybrid          warm p50 2.054 ms, cold p50 24.95 ms
    filtered_hybrid warm p50 1.092 ms, cold p50 38.55 ms
+   planner filtered_vector 300 queries: regret geo-mean 1.13, within 1.25x 39%, total auto 133 ms vs oracle 245 ms
+   planner filtered_bm25   120 queries: regret geo-mean 1.19, within 1.25x 68%, total auto 78 ms vs oracle 72 ms
+   planner filter          100 queries: regret geo-mean 1.10, within 1.25x 89%, total auto 8 ms vs oracle 7 ms
+== quora
+   built in 72.0s (72.0s here), 3138.5 MiB
+   vector          warm p50 0.680 ms, cold p50 16.04 ms
+   filtered_vector warm p50 0.870 ms, cold p50 56.16 ms
+   hybrid          warm p50 1.531 ms, cold p50 31.42 ms
+   filtered_hybrid warm p50 1.729 ms, cold p50 66.18 ms
+   planner filtered_vector 300 queries: regret geo-mean 1.04, within 1.25x 49%, total auto 263 ms vs oracle 712 ms
+   planner filtered_bm25   120 queries: regret geo-mean 1.20, within 1.25x 72%, total auto 81 ms vs oracle 70 ms
+   planner filter          100 queries: regret geo-mean 1.05, within 1.25x 88%, total auto 21 ms vs oracle 21 ms
