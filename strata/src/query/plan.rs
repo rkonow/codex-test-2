@@ -29,6 +29,11 @@ pub trait Estimator {
     fn range_count(&self, field: usize, lo: f64, hi: f64) -> f64;
     /// Documents whose keyword field equals one of `values` (exact).
     fn in_count(&self, field: usize, values: &[Value]) -> f64;
+    /// Nanoseconds to materialise a range, if the index can estimate it
+    /// (otherwise the planner's own scan-vs-postings formula is used).
+    fn range_cost(&self, _field: usize, _lo: f64, _hi: f64) -> Option<f64> {
+        None
+    }
     /// Estimated microseconds of a vector search strategy for `k` results,
     /// given the filter's cardinality (`None` = unfiltered).
     fn vector_cost(&self, field: usize, strategy: VectorStrategy, k: usize, filter_card: Option<f64>) -> f64;
@@ -56,7 +61,9 @@ pub struct CostModel {
 
 impl Default for CostModel {
     fn default() -> Self {
-        CostModel { posting: 1.0, column_scan: 0.3, emit: 1.0, probe_column: 3.0, probe_keyword: 4.0, probe_match: 40.0, leaf: 500.0 }
+        // Probe costs from the forward-index measurements (column range
+        // 7–11 ns, code-set 6–9 ns per candidate); scan 0.35 ns per document.
+        CostModel { posting: 1.0, column_scan: 0.35, emit: 1.0, probe_column: 9.0, probe_keyword: 8.0, probe_match: 40.0, leaf: 500.0 }
     }
 }
 
@@ -125,7 +132,7 @@ impl<E: Estimator> Planner<'_, E> {
             }
             Pred::Range { field, lo, hi } => {
                 let card = self.est.range_count(*field, *lo, *hi).min(n);
-                let (_, cost) = self.range_strategy(n, card);
+                let cost = self.est.range_cost(*field, *lo, *hi).unwrap_or_else(|| self.range_strategy(n, card).1);
                 PredEstimate { card, mat_cost: c.leaf + cost, probe_cost: c.probe_column, probeable: true }
             }
             Pred::In { field, values } => {

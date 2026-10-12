@@ -3,6 +3,7 @@
 //! * [`sql`]: parses the dialect and binds it to a schema.
 //! * [`logical`]: the bound query: projection, predicate tree, score.
 
+pub mod exec;
 pub mod fusion;
 pub mod logical;
 pub mod plan;

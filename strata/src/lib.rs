@@ -20,6 +20,7 @@
 #[cfg(feature = "baselines")]
 pub mod baselines;
 pub mod data;
+pub mod db;
 pub mod error;
 pub mod forward;
 pub mod iostat;

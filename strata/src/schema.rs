@@ -38,11 +38,20 @@ pub struct Field {
     /// Indexed for search (text: postings; keyword: postings + column;
     /// numbers: column + range postings; vectors: the ANN index).
     pub indexed: bool,
+    /// A generated TEXT column (like SQLite's `GENERATED ALWAYS AS`): the
+    /// non-empty values of these fields joined by newlines. Merges recompute
+    /// it from the stored sources, so it need not be stored itself.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub generated_from: Vec<String>,
 }
 
 impl Field {
     pub fn new(name: &str, ty: FieldType) -> Self {
-        Field { name: name.to_string(), ty, stored: true, indexed: true }
+        Field { name: name.to_string(), ty, stored: true, indexed: true, generated_from: Vec::new() }
+    }
+    pub fn generated(mut self, sources: &[&str]) -> Self {
+        self.generated_from = sources.iter().map(|s| s.to_string()).collect();
+        self
     }
     pub fn stored_only(mut self) -> Self {
         self.indexed = false;
@@ -73,6 +82,14 @@ impl Schema {
             }
             s.primary_key = Some(i);
         }
+        for f in &s.fields {
+            for src in &f.generated_from {
+                let ok = s.field(src).is_some_and(|g| g.stored && matches!(g.ty, FieldType::Text { .. } | FieldType::Keyword));
+                if !ok || !matches!(f.ty, FieldType::Text { .. }) {
+                    return Err(Error::Schema(format!("{} must be TEXT generated from stored text fields", f.name)));
+                }
+            }
+        }
         let mut names: Vec<&str> = s.fields.iter().map(|f| f.name.as_str()).collect();
         names.sort();
         if names.windows(2).any(|w| w[0] == w[1]) {
@@ -87,5 +104,22 @@ impl Schema {
 
     pub fn field(&self, name: &str) -> Option<&Field> {
         self.field_index(name).map(|i| &self.fields[i])
+    }
+
+    /// Fills generated fields of `doc` from their sources.
+    pub fn fill_generated(&self, doc: &mut [crate::value::Value]) {
+        use crate::value::Value;
+        for (i, f) in self.fields.iter().enumerate() {
+            if f.generated_from.is_empty() {
+                continue;
+            }
+            let parts: Vec<&str> = f
+                .generated_from
+                .iter()
+                .filter_map(|src| self.field_index(src).and_then(|j| doc[j].as_str()))
+                .filter(|s| !s.is_empty())
+                .collect();
+            doc[i] = Value::Str(parts.join("\n"));
+        }
     }
 }

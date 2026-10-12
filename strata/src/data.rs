@@ -6,7 +6,7 @@
 //! |---|---|---|
 //! | `id` | KEYWORD, primary key | BEIR document id |
 //! | `title`, `text` | TEXT, stored only | returned by `SELECT` |
-//! | `body` | TEXT, indexed, positions, not stored | title + text, searched |
+//! | `body` | TEXT, indexed, positions, generated from title + text | searched |
 //! | `year` | INT | synthetic, uniform 1990..=2024 |
 //! | `category` | KEYWORD | synthetic, Zipf(1) over 64 values `c00`..`c63` |
 //! | `rating` | FLOAT | synthetic, uniform [0, 5) |
@@ -51,7 +51,7 @@ pub fn beir_schema(dim: usize, index: VectorIndexKind) -> Schema {
             Field::new("id", FieldType::Keyword),
             Field::new("title", FieldType::Text { positions: false }).stored_only(),
             Field::new("text", FieldType::Text { positions: false }).stored_only(),
-            Field::new("body", FieldType::Text { positions: true }).not_stored(),
+            Field::new("body", FieldType::Text { positions: true }).not_stored().generated(&["title", "text"]),
             Field::new("year", FieldType::Int),
             Field::new("category", FieldType::Keyword),
             Field::new("rating", FieldType::Float),
