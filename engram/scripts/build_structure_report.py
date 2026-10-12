@@ -58,7 +58,7 @@ def transcript():
     return {"pooled": out, "eligible": n, "sets": sets, "budgets": d["budgets"]}
 
 
-def reader(out_dir, judge="haiku"):
+def reader(out_dir, judge="small"):
     base = results / out_dir
     if not (base / "answers.jsonl").exists():
         return None
@@ -98,16 +98,16 @@ def summarize(rows, qids=None):
     return out
 
 
-main = reader("reader", judge="sonnet") or {}
-full = reader("reader_full", judge="sonnet") or {}
-facts = reader("reader_facts", judge="sonnet") or {}
+main = reader("reader", judge="large") or {}
+full = reader("reader_full", judge="large") or {}
+facts = reader("reader_facts", judge="large") or {}
 full_q = {r["qid"] for r in full.get("full", [])}
 facts_q = {r["qid"] for rs in facts.values() for r in rs}
 # The small judge against the large one, on every answer graded by both.
 agree = None
 pairs = []
 for d in ("reader", "reader_facts", "reader_full"):
-    small, large = reader(d, judge="haiku") or {}, reader(d, judge="sonnet") or {}
+    small, large = reader(d, judge="small") or {}, reader(d, judge="large") or {}
     for cfg, rs in large.items():
         sm = {r["qid"]: r["ok"] for r in small.get(cfg, [])}
         pairs += [(sm[r["qid"]], r["ok"]) for r in rs if r["qid"] in sm]

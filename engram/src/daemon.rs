@@ -421,6 +421,12 @@ impl Daemon {
                 let terms = |t: &str| -> HashSet<String> { strata::text::analyze(t).into_iter().collect() };
                 let mut seen: Vec<HashSet<String>> = known.iter().filter(|r| !replaced.contains(&r.id)).map(|r| terms(&r.text)).collect();
                 let ctx = format!("Turn {turn} request: {}", prompt.chars().take(200).collect::<String>());
+                // Each note links to the turn it was written from.
+                let source = self
+                    .store
+                    .query(&format!("SELECT id FROM memory WHERE session = '{}' AND turn = {turn} AND kind = 'prompt' ORDER BY seq ASC LIMIT 1", sid.replace('\'', "''")))
+                    .ok()
+                    .and_then(|rs| rs.rows.first().and_then(|r| r[0].as_str().map(String::from)));
                 let n = d.drafts.len();
                 let mut drafts = Vec::new();
                 for x in d.drafts {
@@ -432,7 +438,11 @@ impl Daemon {
                     });
                     if !dup {
                         seen.push(t);
-                        drafts.push(x.ctx(ctx.clone()));
+                        let mut x = x.ctx(ctx.clone());
+                        if let Some(src) = &source {
+                            x = x.link("from", src.clone());
+                        }
+                        drafts.push(x);
                     }
                 }
                 let kept = drafts.len();

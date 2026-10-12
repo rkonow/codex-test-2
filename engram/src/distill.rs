@@ -76,7 +76,7 @@ Write down what someone working on this project in a later session would need to
 - requirements for work the user announced or planned but that is not done yet, with every detail given (formats, names, numbers);
 - facts about the project or its environment that were stated or discovered (how to run or test it, quirks, people, external systems), and approaches that were tried and failed, with why.
 
-Each item is one self-contained sentence that names its subject and keeps the exact details and the reason. One item per distinct point; a planned piece of work with all its requirements is one item.
+Each item is one self-contained sentence that names its subject and keeps the exact details and the reason. One item per distinct point; a planned piece of work with all its requirements is one item. With each item list the entities it is about, so that notes about the same thing can be found together: the components, features, files, data formats, external systems and people it concerns (short names, e.g. "count sheet", "CSV export", "items.py", "Petra Keller").
 
 Leave out:
 - anything already noted above, unless this exchange changes it;
@@ -85,8 +85,8 @@ Leave out:
 - details of the code that reading it shows (signatures, what a function does).
 
 Output one JSON object per line and nothing else:
-{"kind": "decision" | "rule" | "requirement" | "fact", "text": "<sentence>"}
-{"kind": "decision" | "rule" | "requirement" | "fact", "text": "<new sentence>", "replaces": "<id of the noted item it updates>"}
+{"kind": "decision" | "rule" | "requirement" | "fact", "text": "<sentence>", "entities": ["<entity>", ...]}
+{"kind": "decision" | "rule" | "requirement" | "fact", "text": "<new sentence>", "entities": ["<entity>", ...], "replaces": "<id of the noted item it updates>"}
 {"kind": "done", "id": "<id of a noted requirement that this exchange completed>"}
 If there is nothing worth keeping, output nothing."#;
 
@@ -159,8 +159,14 @@ pub fn parse(text: &str) -> Distilled {
             "fact" => (Kind::Fact, "distilled"),
             _ => continue,
         };
-        out.replaced.extend(id_of(&v, "replaces"));
-        out.drafts.push(Draft::new(k, clip(&redact(text), 600)).tag(tag).files(crate::capture::paths_in(text)));
+        let replaces = id_of(&v, "replaces");
+        let entities: Vec<String> = v.get("entities").and_then(|e| e.as_array()).map(|a| a.iter().filter_map(|x| x.as_str()).map(|x| clip(x.trim(), 60)).filter(|x| !x.is_empty()).take(6).collect()).unwrap_or_default();
+        let mut d = Draft::new(k, clip(&redact(text), 600)).tag(tag).files(crate::capture::paths_in(text)).entities(entities);
+        if let Some(r) = &replaces {
+            d = d.link("supersedes", r.clone());
+        }
+        out.replaced.extend(replaces);
+        out.drafts.push(d);
     }
     out
 }
@@ -213,12 +219,14 @@ mod tests {
 
     #[test]
     fn parses_items_and_ignores_the_rest() {
-        let text = "Here you go:\n{\"kind\": \"decision\", \"text\": \"Storage stays JSON because admins edit the files by hand.\"}\n\
+        let text = "Here you go:\n{\"kind\": \"decision\", \"text\": \"Storage stays JSON because admins edit the files by hand.\", \"entities\": [\"storage\", \"JSON files\"]}\n\
                     {\"kind\": \"requirement\", \"text\": \"The CSV export uses semicolons and DD.MM.YYYY dates.\", \"replaces\": \"abc:3\"},\n\
                     {\"kind\": \"done\", \"id\": \"[abc:12]\"}\n{\"kind\": \"mood\", \"text\": \"The user seems happy today.\"}\nnot json";
         let d = parse(text);
         assert_eq!(d.drafts.len(), 2);
         assert_eq!(d.drafts[0].kind, Kind::Decision);
+        assert_eq!(d.drafts[0].entities, vec!["storage".to_string(), "JSON files".to_string()]);
+        assert_eq!(d.drafts[1].links, vec![crate::record::Link::new("supersedes", "abc:3")]);
         assert_eq!(d.drafts[1].kind, Kind::Todo);
         assert_eq!(d.drafts[1].tag, "planned");
         assert_eq!(d.replaced, vec!["abc:3".to_string()]);

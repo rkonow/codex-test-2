@@ -25,8 +25,8 @@ use serde_json::{json, Value as Json};
 use engram::benchdata::{parse_time, read_units, Question, Unit};
 use engram::capture::chunk_spans;
 use engram::embed::{self, Embedder};
-use engram::recall::{self, RankParams};
-use engram::record::{Kind, Record};
+use engram::recall::{self, GraphParams, RankParams};
+use engram::record::{entity_id, Kind, Link, Record};
 use engram::store::{Filter, Hit, Store, StoreOptions};
 use strata::VectorIndexKind;
 
@@ -68,6 +68,9 @@ struct Cli {
     /// question to `<out>/context_<...>.jsonl`.
     #[arg(long, value_delimiter = ',')]
     dump: Vec<String>,
+    /// Graph recall variants run on the graph layout (default: all).
+    #[arg(long, value_delimiter = ',')]
+    graphs: Vec<String>,
 }
 
 /// What the lexical key carries besides the row's own text.
@@ -107,10 +110,36 @@ enum Facts {
     WithTurns,
     /// A turn's facts join its key; the turn stays the value.
     Keys,
+    /// [`Facts::WithTurns`], with links: each fact to the turn it comes
+    /// from and to the entities it is about, which are rows of their own.
+    /// Graph recall walks them (see [`graph_cfgs`]).
+    Graph,
 }
 
-/// Facts by session id: (turn index within the session, sentence).
-static FACTS: std::sync::OnceLock<HashMap<String, Vec<(usize, String)>>> = std::sync::OnceLock::new();
+/// Facts by session id: (turn index within the session, sentence, entities).
+type SessionFacts = Vec<(usize, String, Vec<String>)>;
+static FACTS: std::sync::OnceLock<HashMap<String, SessionFacts>> = std::sync::OnceLock::new();
+
+/// Graph recall variants, each named; the first is the default.
+fn graph_cfgs() -> Vec<(&'static str, GraphParams)> {
+    let b = GraphParams::default();
+    vec![
+        ("g", b.clone()),
+        ("g-h3", GraphParams { hops: 3, ..b.clone() }),
+        ("g-w0.25", GraphParams { weight: 0.25, ..b.clone() }),
+        ("g-w1", GraphParams { weight: 1.0, ..b.clone() }),
+        ("g-s3", GraphParams { seeds: 3, ..b.clone() }),
+        ("g-s10", GraphParams { seeds: 10, ..b.clone() }),
+        ("g-e0", GraphParams { entity_seeds: 0, ..b.clone() }),
+        ("g-e5", GraphParams { entity_seeds: 5, ..b.clone() }),
+        ("g-n40", GraphParams { n: 40, ..b.clone() }),
+        ("g-k60", GraphParams { k: 60.0, ..b.clone() }),
+        ("g-h3-w1", GraphParams { hops: 3, weight: 1.0, ..b.clone() }),
+        ("g-h3-n40", GraphParams { hops: 3, n: 40, ..b }),
+    ]
+}
+/// The graph variants asked for (`--graphs`).
+static GRAPHS: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
 /// Characters each injected fact costs besides its text (a date and an id).
 const FACT_HEADER: usize = 40;
 
@@ -132,6 +161,7 @@ fn layouts() -> Vec<Layout> {
         Layout { facts: Facts::Only, ..l("facts", 1500, Ctx::None, 0) },
         Layout { facts: Facts::WithTurns, ..l("turn+facts", 1500, Ctx::None, 0) },
         Layout { facts: Facts::Keys, ..l("turn/fact-keys", 1500, Ctx::None, 0) },
+        Layout { facts: Facts::Graph, ..l("turn+facts+graph", 1500, Ctx::None, 0) },
     ]
 }
 
@@ -179,6 +209,10 @@ struct Row {
     dense: String,
     /// A fact row: the sentence is the row's text and its value.
     fact: Option<String>,
+    /// A fact row's entities.
+    entities: Vec<String>,
+    /// An entity row (never a result; walks pass through it).
+    entity: Option<String>,
 }
 
 /// The text of `turns` joined by newlines, with each turn's start offset.
@@ -220,12 +254,12 @@ fn rows(u: &Unit, texts: &[String], l: &Layout) -> Vec<Row> {
         for sid in order {
             let turns = by.remove(&sid).unwrap();
             let (text, _) = doc(texts, &turns);
-            out.push(Row { s: 0, e: text.len(), dense: text.clone(), text, ctx: String::new(), turns, fact: None });
+            out.push(Row { s: 0, e: text.len(), dense: text.clone(), text, ctx: String::new(), turns, fact: None, entities: Vec::new(), entity: None });
         }
         return out;
     }
     // Each turn's facts, when the layout uses them.
-    let mut turn_facts: Vec<Vec<&str>> = vec![Vec::new(); texts.len()];
+    let mut turn_facts: Vec<Vec<(&str, &[String])>> = vec![Vec::new(); texts.len()];
     if l.facts != Facts::No {
         let facts = FACTS.get().expect("--facts is needed for the fact layouts");
         let mut by: HashMap<&str, Vec<usize>> = HashMap::new();
@@ -233,17 +267,18 @@ fn rows(u: &Unit, texts: &[String], l: &Layout) -> Vec<Row> {
             by.entry(t.session_id.as_str()).or_default().push(i);
         }
         for (sid, idx) in &by {
-            for (k, f) in facts.get(*sid).map(|v| v.as_slice()).unwrap_or(&[]) {
+            for (k, f, ents) in facts.get(*sid).map(|v| v.as_slice()).unwrap_or(&[]) {
                 if let Some(&i) = idx.get(*k) {
-                    turn_facts[i].push(f.as_str());
+                    turn_facts[i].push((f.as_str(), ents.as_slice()));
                 }
             }
         }
     }
-    if matches!(l.facts, Facts::Only | Facts::WithTurns) {
+    if matches!(l.facts, Facts::Only | Facts::WithTurns | Facts::Graph) {
         for (i, fs) in turn_facts.iter().enumerate() {
-            for f in fs {
-                out.push(Row { turns: vec![i], s: 0, e: 0, text: f.to_string(), ctx: String::new(), dense: f.to_string(), fact: Some(f.to_string()) });
+            for (f, ents) in fs {
+                let entities = if l.facts == Facts::Graph { ents.to_vec() } else { Vec::new() };
+                out.push(Row { turns: vec![i], s: 0, e: 0, text: f.to_string(), ctx: String::new(), dense: f.to_string(), fact: Some(f.to_string()), entities, entity: None });
             }
         }
         if l.facts == Facts::Only {
@@ -262,13 +297,25 @@ fn rows(u: &Unit, texts: &[String], l: &Layout) -> Vec<Row> {
         };
         let mut ctx = other.map(|j| clip_bytes(&texts[j], l.ctx_chars).to_string()).unwrap_or_default();
         if l.facts == Facts::Keys && !turn_facts[i].is_empty() {
-            ctx = format!("{ctx}\n{}", turn_facts[i].join("\n")).trim().to_string();
+            let fs: Vec<&str> = turn_facts[i].iter().map(|f| f.0).collect();
+            ctx = format!("{ctx}\n{}", fs.join("\n")).trim().to_string();
         }
         for &w in &windows {
             for (s, e) in chunk_spans(text, w) {
                 let t = text[s..e].to_string();
                 let dense = if l.dense_ctx && !ctx.is_empty() { format!("{ctx}\n{t}") } else { t.clone() };
-                out.push(Row { turns: vec![i], s, e, text: t, ctx: ctx.clone(), dense, fact: None });
+                out.push(Row { turns: vec![i], s, e, text: t, ctx: ctx.clone(), dense, fact: None, entities: Vec::new(), entity: None });
+            }
+        }
+    }
+    if l.facts == Facts::Graph {
+        let mut seen = HashSet::new();
+        let names: Vec<String> = out.iter().flat_map(|r| r.entities.iter().cloned()).collect();
+        for n in names {
+            if let Some(id) = entity_id(&n) {
+                if seen.insert(id) {
+                    out.push(Row { turns: vec![0], s: 0, e: 0, text: n.clone(), ctx: String::new(), dense: n.clone(), fact: None, entities: Vec::new(), entity: Some(n) });
+                }
             }
         }
     }
@@ -643,26 +690,56 @@ fn run_unit(u: &Unit, e: &Arc<dyn Embedder>, lays: &[Layout], press: &[Pres], tm
             }
         })
         .collect();
+    let gcfgs: Vec<(&str, GraphParams)> = graph_cfgs().into_iter().filter(|(n, _)| GRAPHS.get().is_none_or(|g| g.is_empty() || g.iter().any(|x| x == n))).collect();
     for l in lays {
         let rs = rows(u, &texts, l);
+        // The first row of each turn, which a fact links to.
+        let mut first_row: HashMap<usize, usize> = HashMap::new();
+        for (k, r) in rs.iter().enumerate() {
+            if r.fact.is_none() && r.entity.is_none() {
+                first_row.entry(r.turns[0]).or_insert(k);
+            }
+        }
         let recs: Vec<Record> = rs
             .iter()
             .enumerate()
             .map(|(k, r)| {
                 let t = &u.turns[r.turns[0]];
-                let kind = if t.role == "assistant" { Kind::Answer } else { Kind::Prompt };
+                let kind = if r.entity.is_some() {
+                    Kind::Entity
+                } else if r.fact.is_some() {
+                    Kind::Fact
+                } else if t.role == "assistant" {
+                    Kind::Answer
+                } else {
+                    Kind::Prompt
+                };
+                let mut links = Vec::new();
+                if r.fact.is_some() && l.facts == Facts::Graph {
+                    if let Some(&j) = first_row.get(&r.turns[0]) {
+                        links.push(Link::new("from", format!("r{}", j + 1)));
+                    }
+                    for n in &r.entities {
+                        if let Some(id) = entity_id(n) {
+                            if !links.iter().any(|x: &Link| x.to == id) {
+                                links.push(Link::new("about", id));
+                            }
+                        }
+                    }
+                }
                 Record {
-                    id: format!("r{}", k + 1),
-                    session: t.session_id.clone(),
+                    id: if r.entity.is_some() { entity_id(&r.text).unwrap() } else { format!("r{}", k + 1) },
+                    session: if r.entity.is_some() { "-".into() } else { t.session_id.clone() },
                     kind,
                     tag: t.turn_id.clone(),
                     turn: r.turns[0] as i64,
                     seq: k as i64 + 1,
-                    ts: t.timestamp.as_deref().map(parse_time).unwrap_or(0),
+                    ts: if r.entity.is_some() { 0 } else { t.timestamp.as_deref().map(parse_time).unwrap_or(0) },
                     importance: kind.prior(),
                     files: String::new(),
                     text: r.text.clone(),
                     ctx: r.ctx.clone(),
+                    links,
                 }
             })
             .collect();
@@ -681,6 +758,14 @@ fn run_unit(u: &Unit, e: &Arc<dyn Embedder>, lays: &[Layout], press: &[Pres], tm
             let qv = e.embed_query(&q.question);
             let dv = store.vector_top(&qv, n, &Filter::default()).unwrap_or_default();
             let (hits, _) = recall::fuse(&store, &q.question, &terms, bm.clone(), dv.clone(), &hybrid);
+            // The hybrid ranking, and on the graph layout each graph variant.
+            let mut rankings: Vec<(String, Vec<Hit>)> = vec![(l.name.to_string(), hits.clone())];
+            if l.facts == Facts::Graph {
+                for (gname, gp) in &gcfgs {
+                    let g = recall::expand(&store, &qv, &hits, &Filter::default(), gp).unwrap_or_default();
+                    rankings.push((format!("{}:{gname}", l.name), recall::merge_graph(hits.clone(), g, gp)));
+                }
+            }
             if let Some(qr) = out.iter_mut().find(|r| r.qid == q.qid) {
                 let ev: HashSet<usize> = q.evidence_turn_ids.iter().filter_map(|t| ids.get(t.as_str()).copied()).collect();
                 let ans = verbatim_answer(q, &texts, &ids);
@@ -688,22 +773,22 @@ fn run_unit(u: &Unit, e: &Arc<dyn Embedder>, lays: &[Layout], press: &[Pres], tm
                     let p = RankParams { use_bm25: b, use_vectors: !b, lambda_imp: 0.0, lambda_rec: 0.0, ..RankParams::default() };
                     recall::fuse(&store, &q.question, &terms, if b { bm.clone() } else { Vec::new() }, if b { Vec::new() } else { dv.clone() }, &p).0
                 };
-                qr.rank.insert(format!("{}|hybrid", l.name), rank_metrics(&hits, &rs, &ev));
                 qr.rank.insert(format!("{}|bm25", l.name), rank_metrics(&only(true), &rs, &ev));
                 qr.rank.insert(format!("{}|dense", l.name), rank_metrics(&only(false), &rs, &ev));
-                for p in press {
-                    for &b in &BUDGETS {
-                        let pieces = pack(u, &texts, &rs, &hits, *p, &tset, b);
-                        qr.pack.insert(format!("{}|{}|{b}", l.name, p.name()), pack_metrics(&pieces, u, &texts, &ev, ans.as_deref()));
+                for (name, hs) in &rankings {
+                    qr.rank.insert(format!("{name}|hybrid"), rank_metrics(hs, &rs, &ev));
+                    for p in press {
+                        for &b in &BUDGETS {
+                            let pieces = pack(u, &texts, &rs, hs, *p, &tset, b);
+                            qr.pack.insert(format!("{name}|{}|{b}", p.name()), pack_metrics(&pieces, u, &texts, &ev, ans.as_deref()));
+                        }
                     }
                 }
             }
             for (lname, pname, b) in dumps {
-                if lname != l.name {
-                    continue;
-                }
+                let Some((_, hits)) = rankings.iter().find(|(n, _)| n == lname) else { continue };
                 let Some(p) = press.iter().find(|p| &p.name() == pname) else { continue };
-                let pieces = pack(u, &texts, &rs, &hits, *p, &tset, *b);
+                let pieces = pack(u, &texts, &rs, hits, *p, &tset, *b);
                 let key = format!("{lname}/{pname}/{b}");
                 let row = json!({
                     "qid": q.qid, "unit": u.unit_id, "question": q.question, "question_date": q.question_date, "answer": q.answer_text(),
@@ -769,16 +854,18 @@ fn main() {
         return transcript_mode(&cli, &e);
     }
     if let Some(path) = &cli.facts {
-        let mut m: HashMap<String, Vec<(usize, String)>> = HashMap::new();
+        let mut m: HashMap<String, SessionFacts> = HashMap::new();
         for line in std::fs::read_to_string(path).expect("facts").lines() {
             let v: Json = serde_json::from_str(line).expect("facts line");
             let sid = v["session_id"].as_str().unwrap_or("").to_string();
-            let fs: Vec<(usize, String)> = v["facts"].as_array().map(|a| a.iter().filter_map(|f| Some((f["turn"].as_u64()? as usize, f["fact"].as_str()?.to_string()))).collect()).unwrap_or_default();
+            let ents = |f: &Json| -> Vec<String> { f["entities"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect()).unwrap_or_default() };
+            let fs: SessionFacts = v["facts"].as_array().map(|a| a.iter().filter_map(|f| Some((f["turn"].as_u64()? as usize, f["fact"].as_str()?.to_string(), ents(f)))).collect()).unwrap_or_default();
             m.entry(sid).or_insert(fs);
         }
         eprintln!("facts for {} sessions", m.len());
         FACTS.set(m).unwrap();
     }
+    GRAPHS.set(cli.graphs.clone()).unwrap();
     let units = read_units(cli.data.as_deref().expect("--data or --transcript"), cli.every, cli.limit).expect("read data");
     let lays: Vec<Layout> = layouts()
         .into_iter()
@@ -939,7 +1026,7 @@ fn transcript_mode(cli: &Cli, e: &Arc<dyn Embedder>) {
                     .map(|(k, r)| {
                         let t = &u.turns[r.turns[0]];
                         let kind = Kind::parse(&t.role).unwrap_or(Kind::Prompt);
-                        Record { id: format!("r{}", k + 1), session: t.session_id.clone(), kind, tag: t.turn_id.clone(), turn: r.turns[0] as i64, seq: k as i64 + 1, ts: 0, importance: kind.prior(), files: String::new(), text: r.text.clone(), ctx: r.ctx.clone() }
+                        Record { id: format!("r{}", k + 1), session: t.session_id.clone(), kind, tag: t.turn_id.clone(), turn: r.turns[0] as i64, seq: k as i64 + 1, ts: 0, importance: kind.prior(), files: String::new(), text: r.text.clone(), ctx: r.ctx.clone(), links: Vec::new() }
                     })
                     .collect();
                 let dense: Vec<&str> = rs.iter().map(|r| r.dense.as_str()).collect();

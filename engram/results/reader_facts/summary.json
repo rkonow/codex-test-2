@@ -1,6 +1,6 @@
 {
- "reader": "haiku",
- "judge": "sonnet",
+ "reader": "small",
+ "judge": "large",
  "questions": 100,
  "configs": {
   "facts": {

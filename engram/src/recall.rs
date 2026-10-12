@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::capture::past_reference;
 use crate::record::{Kind, Record};
-use crate::store::{Filter, Hit, Store};
+use crate::store::{Filter, Hit, Reach, Store};
 use crate::Result;
 
 /// Ranking parameters (see DESIGN.md §5).
@@ -25,12 +25,94 @@ pub struct RankParams {
     /// Use BM25 / vectors at all.
     pub use_bm25: bool,
     pub use_vectors: bool,
+    /// Records linked to the best hits (see [`GraphParams`]).
+    #[serde(default)]
+    pub graph: GraphParams,
 }
 
 impl Default for RankParams {
     fn default() -> Self {
-        RankParams { n: 50, w_bm25: 0.5, lambda_imp: 0.2, lambda_rec: 0.05, tau: 5000.0, use_bm25: true, use_vectors: true }
+        RankParams { n: 50, w_bm25: 0.5, lambda_imp: 0.2, lambda_rec: 0.05, tau: 5000.0, use_bm25: true, use_vectors: true, graph: GraphParams::default() }
     }
+}
+
+/// Graph recall: the best hits, and the entities nearest the query, start a
+/// walk over the records' links that passes through entities and notes; the
+/// records it reaches, best by similarity to the query, are a second ranked
+/// list fused into the hybrid ranking by reciprocal rank,
+/// score = 1/(k + rank_hybrid) + weight/(k + rank_graph).
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default)]
+pub struct GraphParams {
+    pub enabled: bool,
+    /// Top hits whose links start the walk.
+    pub seeds: usize,
+    /// Entities nearest the query that start it too, at this cosine or more.
+    pub entity_seeds: usize,
+    pub min_entity_cos: f64,
+    pub hops: usize,
+    /// Records the walk returns.
+    pub n: usize,
+    pub k: f64,
+    pub weight: f64,
+    pub max_nodes: usize,
+}
+
+impl Default for GraphParams {
+    fn default() -> Self {
+        GraphParams { enabled: true, seeds: 5, entity_seeds: 3, min_entity_cos: 0.5, hops: 2, n: 20, k: 10.0, weight: 0.5, max_nodes: 5000 }
+    }
+}
+
+/// Kinds a graph walk passes through: entities and the notes about them.
+pub const THROUGH: [Kind; 6] = [Kind::Entity, Kind::Preference, Kind::Decision, Kind::Fact, Kind::Todo, Kind::Note];
+
+/// The records linked to the best hits and to the entities nearest the
+/// query, best first by cosine similarity to `qv`.
+pub fn expand(store: &Store, qv: &[f32], hits: &[Hit], filter: &Filter, p: &GraphParams) -> Result<Vec<(Record, f64)>> {
+    let mut seeds: Vec<String> = hits.iter().take(p.seeds).map(|h| h.record.id.clone()).collect();
+    if p.entity_seeds > 0 {
+        let f = Filter { kinds: vec![Kind::Entity], ..Default::default() };
+        for (r, c) in store.vector_top(qv, p.entity_seeds, &f)? {
+            if c >= p.min_entity_cos {
+                seeds.push(r.id);
+            }
+        }
+    }
+    let reach = Reach { hops: p.hops, through: THROUGH.to_vec(), max_nodes: p.max_nodes };
+    store.reach(&seeds, qv, p.n, filter, &reach)
+}
+
+/// Fuses the graph list into the hybrid ranking (see [`GraphParams`]).
+/// Graph records keep their cosine; their score is the fused one.
+pub fn merge_graph(hits: Vec<Hit>, graph: Vec<(Record, f64)>, p: &GraphParams) -> Vec<Hit> {
+    if graph.is_empty() {
+        return hits;
+    }
+    let mut by: HashMap<String, (Hit, f64)> = HashMap::new();
+    let mut order: Vec<String> = Vec::new();
+    for (i, h) in hits.into_iter().enumerate() {
+        order.push(h.record.id.clone());
+        by.insert(h.record.id.clone(), (h, 1.0 / (p.k + 1.0 + i as f64)));
+    }
+    for (j, (r, c)) in graph.into_iter().enumerate() {
+        let add = p.weight / (p.k + 1.0 + j as f64);
+        match by.get_mut(&r.id) {
+            Some(e) => e.1 += add,
+            None => {
+                order.push(r.id.clone());
+                by.insert(r.id.clone(), (Hit { record: r, bm25: None, cos: Some(c), score: 0.0 }, add));
+            }
+        }
+    }
+    let mut out: Vec<(Hit, f64)> = order.into_iter().filter_map(|id| by.remove(&id)).collect();
+    out.sort_by(|a, b| b.1.total_cmp(&a.1));
+    out.into_iter()
+        .map(|(mut h, s)| {
+            h.score = s;
+            h
+        })
+        .collect()
 }
 
 /// Absolute evidence about the best candidates, for the gate.
@@ -141,7 +223,14 @@ pub fn search(store: &Store, query: &str, filter: &Filter, p: &RankParams) -> Re
     let mut bm = bm;
     bm.retain(|(r, _)| useful(r));
     dv.retain(|(r, _)| useful(r));
-    Ok(fuse(store, query, &terms, bm, dv, p))
+    let (hits, ev) = fuse(store, query, &terms, bm, dv, p);
+    if !p.graph.enabled || hits.is_empty() {
+        return Ok((hits, ev));
+    }
+    let qv = vq.unwrap_or_else(|| store.embedder.embed_query(query));
+    let mut graph = expand(store, &qv, &hits, filter, &p.graph)?;
+    graph.retain(|(r, _)| useful(r));
+    Ok((merge_graph(hits, graph, &p.graph), ev))
 }
 
 /// Fuses BM25 and vector candidate lists (exposed for benchmarks that run

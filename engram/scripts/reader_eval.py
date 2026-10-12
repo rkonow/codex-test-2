@@ -115,8 +115,10 @@ def main():
     ap.add_argument("--oracle", default="/home/user/data/memory/longmemeval_oracle.jsonl")
     ap.add_argument("--config", action="append", required=True, help="name=context.jsonl[@field] | name=none | name=oracle | name=full")
     ap.add_argument("--out", default="results/reader")
-    ap.add_argument("--reader", default="haiku")
-    ap.add_argument("--judge", default="sonnet")
+    ap.add_argument("--reader", required=True, help="the reader's --model")
+    ap.add_argument("--judge", required=True, help="the judge's --model")
+    ap.add_argument("--reader-label", default="small", help="how results name the reader")
+    ap.add_argument("--judge-label", default="large", help="how results name the judge (and its verdict file)")
     ap.add_argument("--every", type=int, default=1, help="only every n-th question (in data order)")
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--workers", type=int, default=8)
@@ -151,7 +153,7 @@ def main():
 
     os.makedirs(args.out, exist_ok=True)
     cache_path = os.path.join(args.out, "answers.jsonl")
-    verdict_path = os.path.join(args.out, f"verdicts_{args.judge}.jsonl")
+    verdict_path = os.path.join(args.out, f"verdicts_{args.judge_label}.jsonl")
     done, verdicts = {}, {}
     if os.path.exists(cache_path):
         with open(cache_path) as f:
@@ -255,7 +257,7 @@ def main():
         }
         print(f"{name:<28} n={len(rows):<4} accuracy {summary[name]['accuracy']:.3f}  context {summary[name]['context_chars']:.0f} chars  reader tokens {summary[name]['reader_tokens']:.0f}", file=sys.stderr)
     with open(os.path.join(args.out, "summary.json"), "w") as f:
-        json.dump({"reader": args.reader, "judge": args.judge, "questions": len(qids), "configs": summary}, f, indent=1)
+        json.dump({"reader": args.reader_label, "judge": args.judge_label, "questions": len(qids), "configs": summary}, f, indent=1)
 
 
 if __name__ == "__main__":

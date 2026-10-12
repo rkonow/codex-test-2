@@ -12,7 +12,7 @@ use strata::storage::{DbOptions, MergePolicy};
 use strata::{Value, VectorIndexKind};
 
 use crate::embed::Embedder;
-use crate::record::{schema, Draft, Kind, Record, COLUMNS};
+use crate::record::{entity_id, file_entity_id, links_of, schema, Draft, Kind, Link, Record, COLUMNS};
 use crate::{err, Result};
 
 /// One search result with its component scores.
@@ -44,6 +44,17 @@ pub struct Filter {
 
 impl Filter {
     fn sql(&self) -> String {
+        let parts = self.conds();
+        if parts.is_empty() {
+            String::new()
+        } else {
+            format!("WHERE {}", parts.join(" AND "))
+        }
+    }
+
+    /// The filter's conditions. Entity records are never results unless
+    /// asked for by kind.
+    fn conds(&self) -> Vec<String> {
         let mut parts = Vec::new();
         if let Some((s, w)) = &self.exclude_window {
             parts.push(format!("NOT (session = '{}' AND seq >= {w})", quote(s)));
@@ -61,12 +72,21 @@ impl Filter {
         if let Some(s) = &self.session {
             parts.push(format!("session = '{}'", quote(s)));
         }
-        if parts.is_empty() {
-            String::new()
-        } else {
-            format!("WHERE {}", parts.join(" AND "))
+        if self.kinds.is_empty() {
+            parts.push("kind != 'entity'".into());
         }
+        parts
     }
+}
+
+/// How recall walks the links (see [`Store::reach`]).
+#[derive(Clone, Debug)]
+pub struct Reach {
+    pub hops: usize,
+    /// Kinds a walk may pass through (seeds and end points are exempt).
+    pub through: Vec<Kind>,
+    /// Stop after meeting this many records.
+    pub max_nodes: usize,
 }
 
 fn quote(s: &str) -> String {
@@ -111,6 +131,9 @@ impl Store {
         dbo.memtable_chunk_docs = opts.mem_chunk_docs.max(64);
         if opts.mem_flat {
             dbo.mem_build = Some(dbo.build.clone().set("vector.index", "flat"));
+        }
+        if path.exists() && Db::open(path, dbo.clone())?.schema().field("links").is_none() {
+            migrate(path, &embedder, &opts)?;
         }
         let db = if path.exists() {
             Db::open(path, dbo)?
@@ -191,11 +214,59 @@ impl Store {
     }
 
     /// Assigns sequence numbers and stores drafts for one session and turn.
+    /// A draft's entities and files become links, and entities the store has
+    /// not seen become records of their own.
     pub fn append(&self, session: &str, turn: i64, ts: i64, drafts: Vec<Draft>) -> Result<Vec<Record>> {
+        let mut drafts = drafts;
+        let mut names: Vec<(String, String)> = Vec::new();
+        for d in &mut drafts {
+            for n in std::mem::take(&mut d.entities) {
+                if let Some(id) = entity_id(&n) {
+                    if !d.links.iter().any(|l| l.to == id) {
+                        d.links.push(Link::new("about", id.clone()));
+                    }
+                    names.push((id, n.trim().to_string()));
+                }
+            }
+            if links_files(d.kind) {
+                for f in &d.files {
+                    let id = file_entity_id(f);
+                    if !d.links.iter().any(|l| l.to == id) {
+                        d.links.push(Link::new("touches", id.clone()));
+                    }
+                    names.push((id, f.clone()));
+                }
+            }
+        }
         let first = self.reserve(drafts.len());
-        let records: Vec<Record> = drafts.into_iter().enumerate().map(|(i, d)| Record::from_draft(d, session, turn, first + i as i64, ts)).collect();
+        let mut records: Vec<Record> = drafts.into_iter().enumerate().map(|(i, d)| Record::from_draft(d, session, turn, first + i as i64, ts)).collect();
+        let entities = self.new_entities(names, ts)?;
+        let out = records.clone();
+        records.extend(entities);
         self.insert(&records)?;
-        Ok(records)
+        Ok(out)
+    }
+
+    /// Entity records for the names not stored yet.
+    fn new_entities(&self, names: Vec<(String, String)>, ts: i64) -> Result<Vec<Record>> {
+        let mut seen = std::collections::HashSet::new();
+        let names: Vec<(String, String)> = names.into_iter().filter(|(id, _)| seen.insert(id.clone())).collect();
+        if names.is_empty() {
+            return Ok(Vec::new());
+        }
+        let ids: Vec<String> = names.iter().map(|(id, _)| id.clone()).collect();
+        let have: std::collections::HashSet<String> = self.get(&ids)?.into_iter().map(|r| r.id).collect();
+        let new: Vec<(String, String)> = names.into_iter().filter(|(id, _)| !have.contains(id)).collect();
+        let first = self.reserve(new.len());
+        Ok(new
+            .into_iter()
+            .enumerate()
+            .map(|(i, (id, name))| {
+                let mut r = Record::from_draft(Draft::new(Kind::Entity, name), "-", 0, first + i as i64, ts);
+                r.id = id;
+                r
+            })
+            .collect())
     }
 
     /// Builds the current snapshot's in-memory segments and readers now, so
@@ -284,6 +355,28 @@ impl Store {
         Ok(rs.rows.iter().filter_map(|r| Some((row_record(r)?, r.last()?.as_f64()?))).collect())
     }
 
+    /// The records reachable from `seeds` over links within `r.hops`, both
+    /// ways, passing only through the kinds `r.through` allows, best
+    /// `n` by cosine similarity to `v`. Seeds are left out.
+    pub fn reach(&self, seeds: &[String], v: &[f32], n: usize, filter: &Filter, r: &Reach) -> Result<Vec<(Record, f64)>> {
+        if seeds.is_empty() || r.hops == 0 {
+            return Ok(Vec::new());
+        }
+        let list: Vec<String> = seeds.iter().map(|i| format!("'{}'", quote(i))).collect();
+        let through = if r.through.is_empty() {
+            String::new()
+        } else {
+            let ks: Vec<String> = r.through.iter().map(|k| format!("'{}'", k.as_str())).collect();
+            format!(", through => kind IN ({})", ks.join(", "))
+        };
+        let mut conds = filter.conds();
+        conds.push(format!("REACHABLE(links, ({}), hops => {}, dir => 'both', max_nodes => {}{through})", list.join(", "), r.hops, r.max_nodes));
+        let sql = format!("SELECT {COLUMNS}, score() FROM memory WHERE {} ORDER BY similarity(emb, :v) DESC LIMIT {n}", conds.join(" AND "));
+        let rs = self.query_with(&sql, &Params::new().set("v", Value::Vector(v.to_vec().into())))?;
+        let seeds: std::collections::HashSet<&str> = seeds.iter().map(|s| s.as_str()).collect();
+        Ok(rs.rows.iter().filter_map(|r| Some((row_record(r)?, r.last()?.as_f64()?))).filter(|(r, _)| !seeds.contains(r.id.as_str())).collect())
+    }
+
     /// The top `n` by cosine similarity to `v`.
     pub fn vector_top(&self, v: &[f32], n: usize, filter: &Filter) -> Result<Vec<(Record, f64)>> {
         let sql = format!("SELECT {COLUMNS}, score() FROM memory {} ORDER BY similarity(emb, :v) DESC LIMIT {n}", filter.sql());
@@ -328,7 +421,50 @@ pub fn row_record(r: &[Value]) -> Option<Record> {
         files: s(8),
         text: s(9),
         ctx: s(10),
+        links: r.get(11).map(links_of).unwrap_or_default(),
     })
+}
+
+/// Kinds whose files become links: what was decided or went wrong about a
+/// file, not every read of it.
+fn links_files(k: Kind) -> bool {
+    k.is_knowledge() || matches!(k, Kind::Error | Kind::Episode)
+}
+
+/// Rewrites a store made before records had links into the current schema
+/// (vectors are not stored, so the records are embedded again). The old
+/// file is kept next to it as `<name>.v1`.
+fn migrate(path: &Path, embedder: &Arc<dyn Embedder>, opts: &StoreOptions) -> Result<()> {
+    let old = Db::open(path, DbOptions::default())?;
+    let cols = "id, session, kind, tag, turn, seq, ts, importance, files, text, ctx";
+    let rs = old.query(&format!("SELECT {cols} FROM memory ORDER BY seq ASC LIMIT 1000000000"), &Params::new())?;
+    let records: Vec<Record> = rs.rows.iter().filter_map(|r| row_record(r)).collect();
+    drop(old);
+    let tmp = path.with_extension("migrating");
+    let side = |p: &Path, suffix: &str| {
+        let mut s = p.as_os_str().to_owned();
+        s.push(suffix);
+        std::path::PathBuf::from(s)
+    };
+    for p in [tmp.clone(), side(&tmp, "-wal")] {
+        let _ = std::fs::remove_file(p);
+    }
+    {
+        let new = Store::open(&tmp, embedder.clone(), StoreOptions { sync: false, ..opts.clone() })?;
+        for chunk in records.chunks(4096) {
+            let texts: Vec<String> = chunk.iter().map(|r| r.embed_text()).collect();
+            let refs: Vec<&str> = texts.iter().map(|s| s.as_str()).collect();
+            new.bulk_insert(chunk, embedder.embed(&refs))?;
+        }
+        new.flush()?;
+    }
+    let bak = path.with_extension("v1");
+    std::fs::rename(path, &bak)?;
+    let _ = std::fs::rename(side(path, "-wal"), side(&bak, "-wal"));
+    std::fs::rename(&tmp, path)?;
+    let _ = std::fs::rename(side(&tmp, "-wal"), side(path, "-wal"));
+    eprintln!("engram: rewrote {} records of {} with links (the old file is {})", records.len(), path.display(), bak.display());
+    Ok(())
 }
 
 #[cfg(test)]
@@ -366,5 +502,55 @@ mod tests {
         assert_eq!(s.latest(&[Kind::Decision], 5, &Filter::default()).unwrap().len(), 1);
         assert!(s.delete("sessb:3").unwrap());
         assert_eq!(s.len(), 2);
+    }
+
+    #[test]
+    fn entities_link_records_across_sessions() {
+        let dir = tempfile::tempdir().unwrap();
+        let s = store(dir.path());
+        s.append("sess-a", 1, 100, vec![Draft::new(Kind::Prompt, "Build the count sheet in walking order")]).unwrap();
+        s.append("sess-a", 1, 101, vec![Draft::new(Kind::Todo, "The count sheet is sorted by bin location").entities(vec!["Count sheet".into(), "bins".into()]).link("from", "sessa:1")]).unwrap();
+        s.append("sess-b", 1, 200, vec![Draft::new(Kind::Fact, "The auditor wants a blind count sheet").entities(vec!["count sheets".into(), "auditor".into()])]).unwrap();
+        s.append("sess-c", 1, 300, vec![Draft::new(Kind::Fact, "Prices are stored in integer cents").entities(vec!["prices".into()])]).unwrap();
+        // Two notes, one prompt and three entities; the plural meets the singular.
+        assert_eq!(s.len(), 7);
+        assert_eq!(s.get(&["e:count sheet".into()]).unwrap()[0].text, "Count sheet");
+        // Entities are not search results.
+        assert!(s.bm25_top("count sheet", 10, &Filter::default()).unwrap().iter().all(|(r, _)| r.kind != Kind::Entity));
+        // From the first note: its source turn (1 hop) and, through the
+        // shared entity, the other session's note (2 hops); not the prices.
+        let v = s.embedder.embed_query("count sheet");
+        let r = Reach { hops: 2, through: crate::recall::THROUGH.to_vec(), max_nodes: 100 };
+        let got: Vec<String> = s.reach(&["sessa:2".into()], &v, 10, &Filter::default(), &r).unwrap().into_iter().map(|(r, _)| r.id).collect();
+        assert!(got.contains(&"sessa:1".to_string()) && got.contains(&"sessb:3".to_string()), "{got:?}");
+        assert!(!got.iter().any(|i| i.starts_with("e:") || i == "sessc:4" || i == "sessa:2"), "{got:?}");
+        // A retag keeps the links.
+        s.retag("sessa:2", "done").unwrap();
+        assert_eq!(s.get(&["sessa:2".into()]).unwrap()[0].links.len(), 3);
+    }
+
+    #[test]
+    fn stores_without_links_are_migrated() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("m.strata");
+        let mut fields = schema(64, VectorIndexKind::Flat).unwrap().fields;
+        fields.retain(|f| f.name != "links");
+        let old = strata::Schema::new("memory", fields, Some("id")).unwrap();
+        {
+            let db = Db::create(&path, old.clone(), DbOptions::default()).unwrap();
+            let mut txn = db.storage().begin().unwrap();
+            let r = Record::from_draft(Draft::new(Kind::Decision, "We use HNSW for the vector index"), "sess-a", 1, 1, 100);
+            let mut doc = r.to_doc(vec![0.1; 64]);
+            doc.pop();
+            old.fill_generated(&mut doc);
+            txn.upsert(doc).unwrap();
+            txn.commit().unwrap();
+            db.storage().flush().unwrap();
+        }
+        let s = store(dir.path());
+        assert!(s.db.schema().field("links").is_some());
+        assert_eq!(s.len(), 1);
+        assert_eq!(s.latest(&[Kind::Decision], 5, &Filter::default()).unwrap()[0].text, "We use HNSW for the vector index");
+        assert!(dir.path().join("m.v1").exists());
     }
 }

@@ -1,5 +1,5 @@
 {
- "model": "haiku (claude -p, headless)",
+ "model": "small (claude -p, headless)",
  "project": "scratch git repo with Engram installed (hooks + MCP)",
  "runs": [
   {

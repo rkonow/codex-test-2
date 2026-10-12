@@ -1,6 +1,7 @@
 //! Memory records and the Strata table that holds them.
 
 use serde::{Deserialize, Serialize};
+use strata::graph::{edges_value, parse_edges, Edge};
 use strata::{Field, FieldType, Schema, Value, VectorIndexKind};
 
 use crate::Result;
@@ -20,10 +21,14 @@ pub enum Kind {
     Fact,
     Todo,
     Note,
+    /// A thing records are about: a person, place, product, topic or file.
+    /// Records link to it, so records about the same thing are one hop
+    /// apart through it.
+    Entity,
 }
 
 impl Kind {
-    pub const ALL: [Kind; 12] = [
+    pub const ALL: [Kind; 13] = [
         Kind::Prompt,
         Kind::Answer,
         Kind::ToolCall,
@@ -36,6 +41,7 @@ impl Kind {
         Kind::Fact,
         Kind::Todo,
         Kind::Note,
+        Kind::Entity,
     ];
 
     pub fn as_str(self) -> &'static str {
@@ -52,6 +58,7 @@ impl Kind {
             Kind::Fact => "fact",
             Kind::Todo => "todo",
             Kind::Note => "note",
+            Kind::Entity => "entity",
         }
     }
 
@@ -69,6 +76,7 @@ impl Kind {
             Kind::Error | Kind::Episode => 0.6,
             Kind::Answer => 0.5,
             Kind::ToolCall | Kind::ToolResult => 0.3,
+            Kind::Entity => 0.0,
         }
     }
 
@@ -76,6 +84,62 @@ impl Kind {
     pub fn is_knowledge(self) -> bool {
         matches!(self, Kind::Preference | Kind::Decision | Kind::Fact | Kind::Todo | Kind::Note)
     }
+}
+
+/// An edge from one record to another: `about` an entity, `from` the turn a
+/// note was written from, `supersedes` an older note, `touches` a file.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Link {
+    pub label: String,
+    pub to: String,
+}
+
+impl Link {
+    pub fn new(label: &str, to: impl Into<String>) -> Link {
+        Link { label: label.to_string(), to: to.into() }
+    }
+}
+
+/// The id of the entity named `name`: `e:` and the name lowercased, without
+/// a leading article or punctuation, with a plural `s` dropped, so that
+/// "Houseplants" and "the houseplant" meet in one node. Files get `f:` and
+/// their path as is.
+pub fn entity_id(name: &str) -> Option<String> {
+    let words: Vec<String> = name
+        .split(|c: char| !(c.is_alphanumeric() || c == '\'' || c == '-' || c == '.'))
+        .map(|w| w.trim_matches(|c: char| c == '\'' || c == '-' || c == '.').to_lowercase())
+        .filter(|w| !w.is_empty())
+        .collect();
+    let mut words: Vec<String> = match words.first().map(|w| w.as_str()) {
+        Some("the" | "a" | "an" | "my" | "our" | "their" | "his" | "her") if words.len() > 1 => words[1..].to_vec(),
+        _ => words,
+    };
+    if let Some(last) = words.last_mut() {
+        *last = singular(last);
+    }
+    let s = words.join(" ");
+    (!s.is_empty() && s.len() <= 80).then(|| format!("e:{s}"))
+}
+
+pub fn file_entity_id(path: &str) -> String {
+    format!("f:{path}")
+}
+
+fn singular(w: &str) -> String {
+    if let Some(stem) = w.strip_suffix("'s") {
+        return stem.to_string();
+    }
+    let n = w.chars().count();
+    if n <= 3 || !w.ends_with('s') || w.ends_with("ss") || w.ends_with("us") || w.ends_with("is") {
+        return w.to_string();
+    }
+    if let Some(stem) = w.strip_suffix("ies") {
+        return format!("{stem}y");
+    }
+    if w.ends_with("ches") || w.ends_with("shes") || w.ends_with("xes") || w.ends_with("sses") {
+        return w[..w.len() - 2].to_string();
+    }
+    w[..w.len() - 1].to_string()
 }
 
 /// A record before the daemon assigns its sequence number.
@@ -91,11 +155,23 @@ pub struct Draft {
     pub ctx: String,
     /// Overrides the kind's prior.
     pub importance: Option<f64>,
+    pub links: Vec<Link>,
+    /// Names of the entities the record is about; the store links the
+    /// record to them and creates the ones it has not seen.
+    pub entities: Vec<String>,
 }
 
 impl Draft {
     pub fn new(kind: Kind, text: impl Into<String>) -> Draft {
-        Draft { kind, tag: "-".into(), files: Vec::new(), text: text.into(), ctx: String::new(), importance: None }
+        Draft { kind, tag: "-".into(), files: Vec::new(), text: text.into(), ctx: String::new(), importance: None, links: Vec::new(), entities: Vec::new() }
+    }
+    pub fn link(mut self, label: &str, to: impl Into<String>) -> Draft {
+        self.links.push(Link::new(label, to));
+        self
+    }
+    pub fn entities(mut self, names: Vec<String>) -> Draft {
+        self.entities = names;
+        self
     }
     pub fn tag(mut self, t: impl Into<String>) -> Draft {
         let t = t.into();
@@ -129,6 +205,7 @@ pub struct Record {
     pub files: String,
     pub text: String,
     pub ctx: String,
+    pub links: Vec<Link>,
 }
 
 impl Record {
@@ -145,6 +222,7 @@ impl Record {
             files: d.files.join(" "),
             text: d.text,
             ctx: d.ctx,
+            links: d.links,
         }
     }
 
@@ -164,7 +242,18 @@ impl Record {
             Value::Str(self.ctx.clone()),
             Value::Str(String::new()),
             Value::Vector(emb.into()),
+            self.links_value(),
         ]
+    }
+
+    pub fn links_value(&self) -> Value {
+        let edges: Vec<Edge> = self.links.iter().map(|l| Edge::labeled(&l.label, l.to.as_str())).collect();
+        edges_value(&edges)
+    }
+
+    /// Ids this record links to with `label`.
+    pub fn linked<'a>(&'a self, label: &'a str) -> impl Iterator<Item = &'a str> + 'a {
+        self.links.iter().filter(move |l| l.label == label).map(|l| l.to.as_str())
     }
 
     /// What the embedding is computed from: the text alone. The context
@@ -183,7 +272,7 @@ pub fn record_id(session: &str, seq: i64) -> String {
 }
 
 /// Columns every query projects, in this order (see [`crate::store::Hit`]).
-pub const COLUMNS: &str = "id, session, kind, tag, turn, seq, ts, importance, files, text, ctx";
+pub const COLUMNS: &str = "id, session, kind, tag, turn, seq, ts, importance, files, text, ctx, links";
 
 pub fn schema(dim: usize, index: VectorIndexKind) -> Result<Schema> {
     Ok(Schema::new(
@@ -203,7 +292,41 @@ pub fn schema(dim: usize, index: VectorIndexKind) -> Result<Schema> {
             // What MATCH and bm25 search: the text and its context.
             Field::new("body", FieldType::Text { positions: true }).not_stored().generated(&["text", "ctx"]),
             Field::new("emb", FieldType::Vector { dim, index }).not_stored(),
+            // Edges to other records (see [`Link`]); traversed by recall.
+            Field::new("links", FieldType::Edges),
         ],
         Some("id"),
     )?)
+}
+
+/// The links stored in an EDGES value.
+pub fn links_of(v: &Value) -> Vec<Link> {
+    parse_edges(v, false)
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|e| Some(Link { label: e.label.unwrap_or_default(), to: e.to.as_str()?.to_string() }))
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn entity_ids_meet() {
+        assert_eq!(entity_id("Houseplants"), entity_id("the houseplant"));
+        assert_eq!(entity_id("Honda Civic").as_deref(), Some("e:honda civic"));
+        assert_eq!(entity_id("bus").as_deref(), Some("e:bus"));
+        assert_eq!(entity_id("glasses").as_deref(), Some("e:glass"));
+        assert_eq!(entity_id("berries").as_deref(), Some("e:berry"));
+        assert_eq!(entity_id("Dr. Smith's").as_deref(), Some("e:dr smith"));
+        assert_eq!(entity_id("  "), None);
+    }
+
+    #[test]
+    fn links_round_trip() {
+        let r = Record::from_draft(Draft::new(Kind::Fact, "x").link("about", "e:car").link("from", "s:1"), "s", 1, 2, 3);
+        assert_eq!(links_of(&r.links_value()), r.links);
+        assert_eq!(r.linked("about").collect::<Vec<_>>(), vec!["e:car"]);
+    }
 }

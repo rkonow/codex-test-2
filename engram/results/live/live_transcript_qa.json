@@ -1,6 +1,6 @@
 {
  "store": "this repository's session transcript up to line 5,392 (before the Engram task), back-filled with engram ingest-transcript into a fresh project; file, shell and web tools disabled; round 2 repeats the questions after round 1's turns are in memory; round 0 is the control with Engram off",
- "model": "haiku",
+ "model": "small",
  "runs": [
   {
    "round": 1,

@@ -3,11 +3,13 @@
 extracts self-contained facts, each tied to the turn it comes from.
 
   python3 scripts/extract_facts.py --data /home/user/data/memory/longmemeval_s.jsonl \
-      --every 5 --out /home/user/data/memory/facts_every5.jsonl
+      --every 1 --model <model> --out /home/user/data/memory/facts_entities.jsonl
 
-The output has one line per session: {"session_id", "hash", "facts": [{"turn", "fact"}],
-"cost_usd", "input_chars"}; `engram-structure --facts` reads it. Sessions
-already in the output are skipped, so a run can resume.
+The output has one line per session: {"session_id", "hash", "facts": [{"turn",
+"fact", "entities"}], "cost_usd", "input_chars"}; `engram-structure --facts`
+reads it. Entities are the people, places, things and topics a fact is about;
+Engram links facts that share one. Sessions already in the output are
+skipped, so a run can resume.
 """
 
 import argparse
@@ -22,16 +24,23 @@ import time
 
 SYSTEM = "You extract facts from conversations for a long-term memory. Output JSON lines only."
 
-PROMPT = """Below is one conversation between a user and an AI assistant, held on {date}. Turns are numbered.
+PROMPT = """Below is one conversation between {who}, held on {date}. Turns are numbered.
 
 {turns}
 
 List the facts from this conversation that are worth remembering later:
-- about the user: personal details, preferences, plans, decisions, events and activities (with their dates, counts, names, places, prices);
-- specific information the assistant gave that the user might ask about again (names, recommendations, figures, steps).
+- about {subject}: personal details, preferences, plans, decisions, events and activities (with their dates, counts, names, places, prices);
+- specific information {other} gave that might be asked about again (names, recommendations, figures, steps).
 
-Write each fact as a self-contained sentence that names its subject (say "The user", not "I"), and resolve relative dates against the conversation date when you can. Skip greetings and generic advice. Output one JSON object per line, nothing else:
-{{"turn": <number of the turn it comes from>, "fact": "<sentence>"}}"""
+Write each fact as a self-contained sentence that names its subject (say "{subject_name}", not "I"), and resolve relative dates against the conversation date when you can. Skip greetings and generic advice.
+
+For each fact, also list the entities it is about, so that facts about the same thing can be found together later:
+- the specific named things: people, pets, places, organizations, products, titles, events (short names, e.g. "Luna", "Honda Civic", "Lisbon");
+- one or two general topics as plain lowercase nouns (e.g. "car", "houseplants", "running", "budget", "job").
+Do not list {skip} as entities.
+
+Output one JSON object per line, nothing else:
+{{"turn": <number of the turn it comes from>, "fact": "<sentence>", "entities": ["<entity>", ...]}}"""
 
 MAX_TURN_CHARS = 2500
 
@@ -44,6 +53,15 @@ def session_text(turns):
             text = text[:MAX_TURN_CHARS] + " …"
         out.append(f"[{i}] {t['role']}: {text}")
     return "\n\n".join(out)
+
+
+def prompt_for(turns, text):
+    roles = list(dict.fromkeys(t["role"] for t in turns))
+    date = turns[0].get("timestamp") or "an unknown date"
+    if set(roles) <= {"user", "assistant"}:
+        return PROMPT.format(who="a user and an AI assistant", date=date, turns=text, subject="the user", other="the assistant", subject_name="The user", skip="the user or the assistant")
+    who = " and ".join(roles[:2]) if len(roles) <= 2 else ", ".join(roles)
+    return PROMPT.format(who=who, date=date, turns=text, subject="each speaker", other="a speaker", subject_name=roles[0], skip="the speakers themselves")
 
 
 def call(prompt, model, retries=4):
@@ -73,8 +91,10 @@ def parse(text, n_turns):
             t, f = int(o["turn"]), str(o["fact"]).strip()
         except Exception:  # noqa: BLE001 - a malformed line is dropped
             continue
+        ents = o.get("entities") if isinstance(o.get("entities"), list) else []
+        ents = [str(e).strip()[:60] for e in ents if str(e).strip()][:6]
         if f and 0 <= t < n_turns:
-            facts.append({"turn": t, "fact": f})
+            facts.append({"turn": t, "fact": f, "entities": ents})
     return facts
 
 
@@ -83,7 +103,7 @@ def main():
     ap.add_argument("--data", required=True)
     ap.add_argument("--every", type=int, default=5)
     ap.add_argument("--out", required=True)
-    ap.add_argument("--model", default="haiku")
+    ap.add_argument("--model", required=True)
     ap.add_argument("--workers", type=int, default=12)
     args = ap.parse_args()
 
@@ -113,7 +133,7 @@ def main():
         sid, h = key
         ts = sessions[key]
         text = session_text(ts)
-        out, cost = call(PROMPT.format(date=ts[0].get("timestamp") or "an unknown date", turns=text), args.model)
+        out, cost = call(prompt_for(ts, text), args.model)
         r = {"session_id": sid, "hash": h, "facts": parse(out, len(ts)), "cost_usd": cost, "input_chars": len(text)}
         with lock:
             with open(args.out, "a") as f:

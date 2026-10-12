@@ -272,6 +272,7 @@ fn records(u: &Unit, ctx_mode: &str) -> Vec<Record> {
                 files: String::new(),
                 text: c,
                 ctx: ctx.clone(),
+                links: Vec::new(),
             });
             seq += 1;
         }

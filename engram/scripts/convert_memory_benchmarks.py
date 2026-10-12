@@ -103,6 +103,54 @@ def convert_longmemeval(path, dataset, report):
     return data, units
 
 
+def iter_json_array(path, chunk=1 << 24):
+    """The elements of a top-level JSON array, read a piece at a time (the
+    LongMemEval_M file is 2.7 GB, too big to load whole)."""
+    dec = json.JSONDecoder()
+    buf = ""
+    with open(path, encoding="utf-8") as f:
+        started = False
+        while True:
+            more = f.read(chunk)
+            buf += more
+            while True:
+                i = 0
+                while i < len(buf) and buf[i] in " \t\r\n,":
+                    i += 1
+                if not started and i < len(buf) and buf[i] == "[":
+                    started = True
+                    buf = buf[i + 1:]
+                    continue
+                buf = buf[i:]
+                if not buf or buf[0] == "]":
+                    break
+                try:
+                    obj, end = dec.raw_decode(buf)
+                except json.JSONDecodeError:
+                    break
+                yield obj
+                buf = buf[end:]
+            if not more:
+                return
+
+
+def convert_longmemeval_m(path, out, every):
+    """Every `every`-th LongMemEval_M question, converted as LongMemEval_S is."""
+    n = 0
+    with open(out, "w") as f:
+        for i, e in enumerate(iter_json_array(path)):
+            if i % every:
+                continue
+            rep = {}
+            tmp = os.path.join(os.path.dirname(out), ".lme_m_one.json")
+            json.dump([e], open(tmp, "w"))
+            _, units = convert_longmemeval(tmp, "longmemeval_m", rep)
+            os.remove(tmp)
+            f.write(json.dumps(units[0]) + "\n")
+            n += 1
+    return n
+
+
 # ----------------------------------------------------------------------------- LoCoMo
 DIA_RE = re.compile(r"^D:?(\d+):0*(\d+)$")
 
@@ -526,8 +574,14 @@ def write_stats(root, stats, manifest, out_sizes, extras):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", default="/home/user/data/memory")
+    ap.add_argument("--lme-m-every", type=int, default=0, help="only convert every n-th LongMemEval_M question to longmemeval_m_every<n>.jsonl")
     args = ap.parse_args()
     root = args.root
+    if args.lme_m_every:
+        out = os.path.join(root, f"longmemeval_m_every{args.lme_m_every}.jsonl")
+        n = convert_longmemeval_m(os.path.join(root, "raw", "longmemeval", "longmemeval_m_cleaned.json"), out, args.lme_m_every)
+        print(f"wrote {n} units to {out}")
+        return
     raw = os.path.join(root, "raw")
     src = {
         "longmemeval_s": os.path.join(raw, "longmemeval", "longmemeval_s_cleaned.json"),
