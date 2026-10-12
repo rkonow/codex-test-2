@@ -220,8 +220,12 @@ impl SegmentFile {
     /// are advised.
     pub fn advise_random_sections(&self) {
         let base = self.bytes.as_ptr() as usize;
+        // HNSW computes its traversal distances on the SQ8 codes, so in a
+        // segment with a graph the codes are read at random positions too.
+        let graph = self.sections.keys().any(|n| n.contains(".hnsw"));
         for (name, &(o, l)) in &self.sections {
-            if !random_access(name) || l < PAGE {
+            let random = random_access(name) || (graph && name.ends_with(".sq8"));
+            if !random || l < PAGE {
                 continue;
             }
             let start = (base + o).next_multiple_of(PAGE);
