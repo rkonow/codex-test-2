@@ -1,0 +1,351 @@
+//! The memory table in a Strata file: appends, hybrid search, SQL.
+
+use std::collections::HashMap;
+use std::path::Path;
+use std::sync::atomic::{AtomicI64, Ordering};
+use std::sync::{Arc, Mutex};
+
+use serde::Serialize;
+use strata::db::Db;
+use strata::query::exec::ResultSet;
+use strata::query::Params;
+use strata::storage::{DbOptions, MergePolicy};
+use strata::{Value, VectorIndexKind};
+
+use crate::embed::Embedder;
+use crate::record::{schema, Draft, Kind, Record, COLUMNS};
+use crate::{err, Result};
+
+/// One search result with its component scores.
+#[derive(Clone, Debug, Serialize)]
+pub struct Hit {
+    pub record: Record,
+    /// Raw BM25 score (None if not in the BM25 list).
+    pub bm25: Option<f64>,
+    /// Cosine similarity (None if not in the vector list).
+    pub cos: Option<f64>,
+    /// Final ranking score.
+    pub score: f64,
+}
+
+/// What a search may return.
+#[derive(Clone, Debug, Default)]
+pub struct Filter {
+    /// Exclude records of this session with `seq >= window_start` (the live window).
+    pub exclude_window: Option<(String, i64)>,
+    /// Only these kinds (empty: any).
+    pub kinds: Vec<Kind>,
+    /// Only records at or after this time.
+    pub since_ts: Option<i64>,
+    /// Only records before this time.
+    pub until_ts: Option<i64>,
+    /// Only this session.
+    pub session: Option<String>,
+}
+
+impl Filter {
+    fn sql(&self) -> String {
+        let mut parts = Vec::new();
+        if let Some((s, w)) = &self.exclude_window {
+            parts.push(format!("NOT (session = '{}' AND seq >= {w})", quote(s)));
+        }
+        if !self.kinds.is_empty() {
+            let ks: Vec<String> = self.kinds.iter().map(|k| format!("'{}'", k.as_str())).collect();
+            parts.push(format!("kind IN ({})", ks.join(", ")));
+        }
+        if let Some(t) = self.since_ts {
+            parts.push(format!("ts >= {t}"));
+        }
+        if let Some(t) = self.until_ts {
+            parts.push(format!("ts < {t}"));
+        }
+        if let Some(s) = &self.session {
+            parts.push(format!("session = '{}'", quote(s)));
+        }
+        if parts.is_empty() {
+            String::new()
+        } else {
+            format!("WHERE {}", parts.join(" AND "))
+        }
+    }
+}
+
+fn quote(s: &str) -> String {
+    s.replace('\'', "''")
+}
+
+#[derive(Clone, Debug)]
+pub struct StoreOptions {
+    pub vector_index: VectorIndexKind,
+    /// Flush the memtable to a segment past this many records.
+    pub flush_docs: usize,
+    /// fsync every commit.
+    pub sync: bool,
+}
+
+impl Default for StoreOptions {
+    fn default() -> Self {
+        StoreOptions { vector_index: VectorIndexKind::Hnsw { m: 16, ef_construction: 100 }, flush_docs: 4096, sync: true }
+    }
+}
+
+pub struct Store {
+    pub db: Db,
+    pub embedder: Arc<dyn Embedder>,
+    next_seq: AtomicI64,
+    /// Strata takes one writer at a time and fails the others; this queues them.
+    write: Mutex<()>,
+    opts: StoreOptions,
+    df: Mutex<(u64, HashMap<String, u64>)>,
+}
+
+impl Store {
+    /// Opens the store at `path`, creating it if needed.
+    pub fn open(path: &Path, embedder: Arc<dyn Embedder>, opts: StoreOptions) -> Result<Store> {
+        let mut dbo = DbOptions::default();
+        dbo.sync = opts.sync;
+        dbo.memtable_max_docs = opts.flush_docs * 4;
+        let db = if path.exists() {
+            Db::open(path, dbo)?
+        } else {
+            if let Some(dir) = path.parent() {
+                std::fs::create_dir_all(dir)?;
+            }
+            Db::create(path, schema(embedder.dim(), opts.vector_index.clone())?, dbo)?
+        };
+        let want = embedder.dim();
+        if let Some(strata::FieldType::Vector { dim, .. }) = db.schema().field("emb").map(|f| f.ty.clone()) {
+            if dim != want {
+                return Err(err(format!("{} holds {dim}-dimension vectors; the embedder {} makes {want}", path.display(), embedder.name())));
+            }
+        }
+        let store = Store { db, embedder, next_seq: AtomicI64::new(0), write: Mutex::new(()), opts, df: Mutex::new((u64::MAX, HashMap::new())) };
+        let last = store.query("SELECT seq FROM memory ORDER BY seq DESC LIMIT 1")?;
+        let next = last.rows.first().and_then(|r| r[0].as_i64()).map_or(1, |s| s + 1);
+        store.next_seq.store(next, Ordering::SeqCst);
+        Ok(store)
+    }
+
+    /// Reserves `n` consecutive sequence numbers.
+    pub fn reserve(&self, n: usize) -> i64 {
+        self.next_seq.fetch_add(n as i64, Ordering::SeqCst)
+    }
+
+    pub fn last_seq(&self) -> i64 {
+        self.next_seq.load(Ordering::SeqCst) - 1
+    }
+
+    pub fn len(&self) -> u64 {
+        self.db.snapshot().n_live_docs()
+    }
+
+    /// Embeds and stores records whose sequence numbers are already assigned.
+    pub fn insert(&self, records: &[Record]) -> Result<()> {
+        if records.is_empty() {
+            return Ok(());
+        }
+        let texts: Vec<String> = records.iter().map(|r| r.embed_text()).collect();
+        let refs: Vec<&str> = texts.iter().map(|s| s.as_str()).collect();
+        let embs = self.embedder.embed(&refs);
+        self.insert_embedded(records, embs)
+    }
+
+    /// Stores records with precomputed embeddings.
+    pub fn insert_embedded(&self, records: &[Record], embs: Vec<Vec<f32>>) -> Result<()> {
+        let schema = self.db.schema().clone();
+        let _w = self.write.lock().unwrap();
+        let mut txn = self.db.storage().begin()?;
+        for (r, e) in records.iter().zip(embs) {
+            let mut doc = r.to_doc(e);
+            schema.fill_generated(&mut doc);
+            txn.upsert(doc)?;
+        }
+        txn.commit()?;
+        drop(_w);
+        self.maintain()?;
+        Ok(())
+    }
+
+    /// Bulk-loads records (for benchmarks and transcript back-fill).
+    pub fn bulk_insert(&self, records: &[Record], embs: Vec<Vec<f32>>) -> Result<()> {
+        let schema = self.db.schema().clone();
+        let _w = self.write.lock().unwrap();
+        let docs: Vec<Vec<Value>> = records
+            .iter()
+            .zip(embs)
+            .map(|(r, e)| {
+                let mut d = r.to_doc(e);
+                schema.fill_generated(&mut d);
+                d
+            })
+            .collect();
+        self.db.storage().bulk_load(docs)?;
+        Ok(())
+    }
+
+    /// Assigns sequence numbers and stores drafts for one session and turn.
+    pub fn append(&self, session: &str, turn: i64, ts: i64, drafts: Vec<Draft>) -> Result<Vec<Record>> {
+        let first = self.reserve(drafts.len());
+        let records: Vec<Record> = drafts.into_iter().enumerate().map(|(i, d)| Record::from_draft(d, session, turn, first + i as i64, ts)).collect();
+        self.insert(&records)?;
+        Ok(records)
+    }
+
+    /// Flushes the memtable when it is large, then merges small segments.
+    pub fn maintain(&self) -> Result<()> {
+        let stats = self.db.storage().file_stats();
+        if stats.memtable_docs >= self.opts.flush_docs {
+            let _w = self.write.lock().unwrap();
+            self.db.storage().flush()?;
+            self.db.storage().merge(&MergePolicy::default())?;
+        }
+        Ok(())
+    }
+
+    /// Writes everything to segments (on shutdown).
+    pub fn flush(&self) -> Result<()> {
+        let _w = self.write.lock().unwrap();
+        self.db.storage().flush()?;
+        Ok(())
+    }
+
+    /// Deletes a record.
+    pub fn delete(&self, id: &str) -> Result<bool> {
+        let _w = self.write.lock().unwrap();
+        let mut txn = self.db.storage().begin()?;
+        let found = txn.delete(&Value::Str(id.to_string()))?;
+        txn.commit()?;
+        Ok(found)
+    }
+
+    /// Runs SQL against the memory table.
+    pub fn query(&self, sql: &str) -> Result<ResultSet> {
+        Ok(self.db.query(sql, &Params::new())?)
+    }
+
+    pub fn query_with(&self, sql: &str, params: &Params) -> Result<ResultSet> {
+        Ok(self.db.query(sql, params)?)
+    }
+
+    /// Records by id (any order).
+    pub fn get(&self, ids: &[String]) -> Result<Vec<Record>> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let list: Vec<String> = ids.iter().map(|i| format!("'{}'", quote(i))).collect();
+        let rs = self.query(&format!("SELECT {COLUMNS} FROM memory WHERE id IN ({}) LIMIT {}", list.join(", "), ids.len()))?;
+        Ok(rs.rows.iter().filter_map(|r| row_record(r)).collect())
+    }
+
+    /// The records of `session` with `seq` in `[lo, hi]`, in order.
+    pub fn range(&self, session: &str, lo: i64, hi: i64) -> Result<Vec<Record>> {
+        let rs = self.query(&format!(
+            "SELECT {COLUMNS} FROM memory WHERE session = '{}' AND seq BETWEEN {lo} AND {hi} ORDER BY seq ASC LIMIT {}",
+            quote(session),
+            (hi - lo + 1).max(1)
+        ))?;
+        Ok(rs.rows.iter().filter_map(|r| row_record(r)).collect())
+    }
+
+    /// The newest records of the given kinds.
+    pub fn latest(&self, kinds: &[Kind], limit: usize, filter: &Filter) -> Result<Vec<Record>> {
+        let mut f = filter.clone();
+        f.kinds = kinds.to_vec();
+        let rs = self.query(&format!("SELECT {COLUMNS} FROM memory {} ORDER BY seq DESC LIMIT {limit}", f.sql()))?;
+        Ok(rs.rows.iter().filter_map(|r| row_record(r)).collect())
+    }
+
+    /// The top `n` by BM25 over `body`, with raw scores.
+    pub fn bm25_top(&self, query: &str, n: usize, filter: &Filter) -> Result<Vec<(Record, f64)>> {
+        let sql = format!("SELECT {COLUMNS}, score() FROM memory {} ORDER BY bm25(body, :q) DESC LIMIT {n}", filter.sql());
+        let rs = self.query_with(&sql, &Params::new().set("q", Value::Str(query.to_string())))?;
+        Ok(rs.rows.iter().filter_map(|r| Some((row_record(r)?, r.last()?.as_f64()?))).collect())
+    }
+
+    /// The top `n` by cosine similarity to `v`.
+    pub fn vector_top(&self, v: &[f32], n: usize, filter: &Filter) -> Result<Vec<(Record, f64)>> {
+        let sql = format!("SELECT {COLUMNS}, score() FROM memory {} ORDER BY similarity(emb, :v) DESC LIMIT {n}", filter.sql());
+        let rs = self.query_with(&sql, &Params::new().set("v", Value::Vector(v.to_vec().into())))?;
+        Ok(rs.rows.iter().filter_map(|r| Some((row_record(r)?, r.last()?.as_f64()?))).collect())
+    }
+
+    /// Inverse document frequency of each analysed query term over `body`.
+    pub fn idf(&self, terms: &[String]) -> Result<Vec<f64>> {
+        let n = self.len().max(1);
+        let mut cache = self.df.lock().unwrap();
+        if cache.0 != n {
+            *cache = (n, HashMap::new());
+        }
+        let mut out = Vec::with_capacity(terms.len());
+        for t in terms {
+            let df = match cache.1.get(t) {
+                Some(&d) => d,
+                None => {
+                    let rs = self.query(&format!("SELECT COUNT(*) FROM memory WHERE MATCH(body, '{}')", quote(&t.replace(['"', '*', '(', ')', '-'], ""))));
+                    let d = rs.ok().and_then(|r| r.rows.first().and_then(|x| x[0].as_i64())).unwrap_or(0).max(0) as u64;
+                    cache.1.insert(t.clone(), d);
+                    d
+                }
+            };
+            out.push((1.0 + (n as f64 - df as f64 + 0.5) / (df as f64 + 0.5)).ln());
+        }
+        Ok(out)
+    }
+}
+
+/// A row projected with [`COLUMNS`] as a record.
+pub fn row_record(r: &[Value]) -> Option<Record> {
+    let s = |i: usize| r.get(i).and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let n = |i: usize| r.get(i).and_then(|v| v.as_i64()).unwrap_or(0);
+    Some(Record {
+        id: s(0),
+        session: s(1),
+        kind: Kind::parse(r.get(2)?.as_str()?)?,
+        tag: s(3),
+        turn: n(4),
+        seq: n(5),
+        ts: n(6),
+        importance: r.get(7).and_then(|v| v.as_f64()).unwrap_or(0.0),
+        files: s(8),
+        text: s(9),
+        ctx: s(10),
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::embed::HashEmbedder;
+
+    fn store(dir: &Path) -> Store {
+        Store::open(&dir.join("m.strata"), Arc::new(HashEmbedder { dim: 64 }), StoreOptions { sync: false, ..Default::default() }).unwrap()
+    }
+
+    #[test]
+    fn append_search_and_reopen() {
+        let dir = tempfile::tempdir().unwrap();
+        let s = store(dir.path());
+        s.append("sess-a", 1, 100, vec![Draft::new(Kind::Prompt, "Use BM25 with k1 1.2 for the ranking")]).unwrap();
+        s.append("sess-a", 1, 101, vec![Draft::new(Kind::Answer, "The planner probes local selectivity").ctx("about the planner")]).unwrap();
+        s.append("sess-b", 1, 200, vec![Draft::new(Kind::Decision, "We decided the vector index is HNSW")]).unwrap();
+        assert_eq!(s.len(), 3);
+        let hits = s.bm25_top("ranking bm25", 10, &Filter::default()).unwrap();
+        assert_eq!(hits[0].0.kind, Kind::Prompt);
+        // Context is searchable.
+        assert_eq!(s.bm25_top("planner", 10, &Filter::default()).unwrap().len(), 1);
+        // The live window of sess-a (seq >= 2) is excluded.
+        let f = Filter { exclude_window: Some(("sess-a".into(), 2)), ..Default::default() };
+        assert!(s.bm25_top("planner", 10, &f).unwrap().is_empty());
+        let v = s.embedder.embed_query("vector index HNSW");
+        assert_eq!(s.vector_top(&v, 1, &Filter::default()).unwrap()[0].0.kind, Kind::Decision);
+        let idf = s.idf(&["planner".into(), "zzz".into()]).unwrap();
+        assert!(idf[1] > idf[0]);
+        drop(s);
+        let s = store(dir.path());
+        assert_eq!(s.last_seq(), 3);
+        assert_eq!(s.range("sess-a", 1, 2).unwrap().len(), 2);
+        assert_eq!(s.latest(&[Kind::Decision], 5, &Filter::default()).unwrap().len(), 1);
+        assert!(s.delete("sessb:3").unwrap());
+        assert_eq!(s.len(), 2);
+    }
+}

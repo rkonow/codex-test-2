@@ -1,0 +1,220 @@
+# Engram: automatic long-term context for coding agents, on Strata
+
+Engram gives a coding agent (Claude Code first) a memory that outlives its
+context window. It records every prompt, answer, tool call and compaction
+summary of a project into one Strata file. It brings the relevant pieces
+back at the moments they matter, without the model having to ask, and gives
+the model tools to search its own history when it decides to.
+
+## 1. The problem
+
+A long session on a complex project outgrows any context window. Claude
+Code then *compacts*: it replaces the history with a summary of about
+15,000 characters. Summaries keep the plan and lose the particulars:
+- exact numbers, error messages and file paths;
+- the reason an approach was rejected;
+- a preference the user stated once, three hours earlier.
+
+A new session starts with only `CLAUDE.md` and the auto-memory index. The
+session that built Strata ran for 32 hours and wrote 43.7 MB of transcript
+across two compactions; its summaries hold under 0.1% of that text.
+
+Three requirements follow:
+
+1. **Store without being asked.** Capture must not depend on the model
+   remembering to save. Every event is stored, losslessly and cheaply.
+2. **Load without being asked, but only when it helps.** Injected context
+   costs tokens and attention, and irrelevant context hurts accuracy ("lost
+   in the middle", context rot). Injection must be gated, budgeted and must
+   skip what the model can already see.
+3. **Let the model ask precisely.** When the model knows it needs history
+   ("what did we decide about X?", "which commit broke Y?"), it gets search,
+   timeline and SQL tools over the same store.
+
+## 2. Architecture
+
+```
+ Claude Code ──hooks──▶ engram hook <event>  ─┐  (thin client, ~2 ms)
+     │                                         │ unix socket, JSON lines
+     └──MCP (stdio)──▶ engram mcp ────────────┤
+                                               ▼
+                         engram serve (one daemon per project)
+                         ├─ capture: payload → records (chunk, redact, salience)
+                         ├─ embedder (static Model2Vec, or BGE-small)
+                         ├─ recall: hybrid search → priors → gate → pack
+                         ├─ session state: live window, injected ids
+                         └─ Strata file: memory.strata (+ WAL)
+```
+
+Strata holds an exclusive lock on its file, and hooks are short-lived
+processes that run concurrently with the MCP server. So one daemon per
+project owns the database. Hooks and the MCP server are clients over a Unix
+socket.
+- **Lazy start.** The first client to find no socket spawns the daemon under
+  a spawn lock, and the daemon exits after 30 idle minutes.
+- **Warm state.** The embedder, segment readers and the memtable stay in
+  memory between hooks.
+- **Never in the way.** A client that cannot reach the daemon within its
+  deadline prints nothing and exits 0. A memory failure never blocks a
+  prompt or a tool call.
+
+The store lives outside the repository, in
+`${ENGRAM_HOME:-~/.local/share/engram}/<project-slug>/`, because
+transcripts can contain secrets. A redaction pass removes common key and
+token formats before anything is stored.
+
+## 3. Data model
+
+One Strata table, `memory`:
+
+| field | type | meaning |
+|---|---|---|
+| `id` | KEYWORD, primary key | `<session-prefix>:<seq>` |
+| `session` | KEYWORD | Claude Code session id |
+| `kind` | KEYWORD | `prompt`, `answer`, `tool_call`, `tool_result`, `error`, `episode`, `summary`, `decision`, `preference`, `fact`, `todo`, `note` |
+| `tag` | KEYWORD | tool name, summary section, or `-` |
+| `turn` | INT | user turn within the session |
+| `seq` | INT | project-wide sequence number (order of events) |
+| `ts` | INT | Unix seconds |
+| `importance` | FLOAT | salience prior in [0, 1] |
+| `files` | TEXT | paths the record touches (path components are terms) |
+| `text` | TEXT, stored, positions | the content (one chunk, at most about 1,500 characters) |
+| `emb` | VECTOR(d), HNSW | embedding of `text` |
+
+Records come in three levels:
+
+- **L0, events.** User prompts, assistant answers, tool calls and results.
+  Long results are chunked, and large ones keep only their head and tail.
+  `Read` results are stored as stubs, since the file is on disk and may
+  have changed. Edits keep the new text, because the history of a file's
+  changes is the valuable part.
+- **L1, episodes.** One card per user turn, built at `Stop` with no model
+  call: the prompt, files touched, commands run, errors seen, and the head
+  of the final answer.
+- **L2, knowledge.** Durable statements:
+  - decisions and facts the model saves with `memory_remember`;
+  - preferences extracted from user prompts by cue phrases ("always",
+    "never", "don't", "from now on", "make sure", "remember");
+  - Claude Code's own compaction summaries, split by section.
+
+The kind sets the salience prior \(\iota\): preference 1.0, decision 0.9,
+summary 0.8, prompt 0.7, error and episode 0.6, answer 0.5, tool call and
+result 0.3.
+
+## 4. When to store
+
+Always. Storage is cheap (text compresses, a commit costs 0.3 ms), and a
+missed record cannot be recovered later. Each hook's payload is the source:
+
+| hook | stored |
+|---|---|
+| `SessionStart` | session registered; live window opened |
+| `UserPromptSubmit` | `prompt`, plus `preference` records for cue sentences |
+| `PostToolUse` | `tool_call` and `tool_result` (or `error`), asynchronously |
+| `Stop` | `answer` (from `last_assistant_message`) and the turn's `episode` |
+| `PostCompact` | `summary` sections; the live window restarts here |
+| `SessionEnd` | flush |
+
+`engram ingest-transcript` back-fills from Claude Code's JSONL transcripts
+on a best-effort basis; the format is internal and versioned.
+
+## 5. When to load
+
+Records still inside the model's context are never injected. For each
+session the daemon keeps the window start \(w_s\): the sequence number at
+session start or at the last compaction. Every query excludes
+
+\[ \{\, r : r.\text{session} = s \;\wedge\; r.\text{seq} \ge w_s \,\} \;\cup\; \text{injected}_s, \]
+
+where \(\text{injected}_s\) is the set of records already injected since \(w_s\).
+
+There are three push points and one pull path:
+
+1. **`SessionStart`: briefing, always, at most 2,500 characters.** Pinned
+   preferences and decisions, the open tasks from the latest compaction
+   summary, and where the previous session left off. After a compaction
+   (`source = compact`), the briefing also recalls the records most relevant
+   to the last two prompts, which the summary just squeezed out.
+2. **`UserPromptSubmit`: gated recall.** Search with the prompt, then
+   apply a three-way gate:
+   - strong evidence: inject the top records, at most 4,000 characters;
+   - weak evidence: inject the top two records, at most 1,200 characters,
+     marked as a weak match;
+   - otherwise: nothing.
+3. **`PreToolUse` on `Edit`/`Write`: file notes.** Inject up to two older
+   records anchored to that path (errors, decisions, preferences), once per
+   file per window.
+4. **Pull: MCP tools.**
+   - `memory_search(query, kinds, limit)`;
+   - `memory_timeline(id, before, after)`, the neighbourhood of a hit;
+   - `memory_sql(select)`: read-only SQL over `memory`, so the model can
+     ask questions like "the last five errors in `exec.rs`";
+   - `memory_remember(kind, text, files)` and `memory_forget(id)`.
+
+   Tool descriptions and a short `CLAUDE.md` note say when to use each,
+   phrased as facts.
+
+### Ranking
+
+BM25 and vector search each return their top \(n = 50\) under the exclusion
+filter (two Strata queries). Their scores are min-max normalised over the
+union \(C\), with a missing score counting as 0:
+
+\[ \mathrm{rel}(r) = w\,\widehat{\mathrm{bm25}}(r) + (1 - w)\,\widehat{\cos}(r). \]
+
+Priors then break near-ties without overriding relevance:
+
+\[ S(r) = \mathrm{rel}(r)\,\bigl(1 + \lambda_\iota\,\iota(r)\bigr) + \lambda_t\, e^{-(\mathrm{seq}_{\max} - \mathrm{seq}(r))/\tau}. \]
+
+Packing is greedy by \(S\). At most two chunks are taken per episode, so
+that more distinct pieces of evidence fit. Each record is trimmed to the
+window of at most 600 characters with the most query terms. Each injected
+line carries its provenance: kind, session, turn, relative time and id.
+
+### The gate
+
+Min-max scores cannot gate, since the best candidate always scores 1. The
+gate uses absolute evidence from the best candidate \(r^*\):
+
+\[ G = a\,\cos(q, r^*) + b\,\mathrm{cov}(q, r^*) + c\,\mathbb{1}[\text{past-reference cue}], \qquad \mathrm{cov}(q, r) = \frac{\sum_{t \in q \cap r} \mathrm{idf}(t)}{\sum_{t \in q} \mathrm{idf}(t)}. \]
+
+Past-reference cues include "earlier", "we decided", "last time", "again"
+and "remember". The full budget is injected when \(G \ge \theta_{\text{hi}}\),
+and two records when \(\theta_{\text{lo}} \le G < \theta_{\text{hi}}\). The
+thresholds are fitted on held-out questions:
+- **positives:** questions whose evidence is in the store;
+- **negatives:** questions asked against another conversation's store,
+  with nothing relevant to find.
+
+The fit maximises evidence coverage at an injection precision of 0.8.
+
+## 6. Costs and latency targets
+
+| path | target |
+|---|---|
+| `PostToolUse`, `Stop` client | < 10 ms (queued, embedded and committed in the background) |
+| `UserPromptSubmit` | < 100 ms p99 at 1M records |
+| `SessionStart` | < 150 ms (daemon already up), < 1 s with daemon spawn |
+| ingest | > 1,000 records per second with the static embedder |
+
+The default embedder is static (Model2Vec potion-retrieval-32M: token
+lookup and mean, 512 dimensions, microseconds per record). BGE-small (384
+dimensions) is optional and roughly 50 ms per record on this CPU; it suits
+a background re-embedding pass, not the hook path.
+
+## 7. Evaluation plan
+
+1. **Retrieval quality** on LongMemEval-S and LoCoMo: evidence recall@k and
+   NDCG@10 for BM25, dense, hybrid, and hybrid with priors, at turn and
+   round granularity, with both embedders.
+2. **Context-loss probes** on this repository's 32-hour session transcript:
+   questions whose answers were settled before a compaction. Compare what
+   the compaction summary still contains against what Engram injects
+   within a budget.
+3. **Gate:** injection precision against evidence coverage across
+   thresholds, and injected tokens per prompt.
+4. **Systems:** hook latency by store size, ingest rate, bytes per record,
+   daemon cold start.
+5. **Live run:** headless `claude -p` sessions in a scratch project with
+   Engram installed. A fact established in one session must be recalled in
+   a fresh one, and after a compaction.
