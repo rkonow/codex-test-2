@@ -72,14 +72,14 @@ page 2..    extents: segment data, manifests, delete sets, freelists
 Pages are 4 KiB. An extent is a run of pages. Segments are written once,
 never modified, and freed only when no snapshot references them.
 
-The file is read through one `mmap`. Sections that are read at random
-positions (the HNSW graph and, in segments that have one, the SQ8 codes its
-traversal scores, float32 vectors used for re-ranking, dictionaries, the doc
-store and the key index) are advised
-`MADV_RANDOM`, so a cold page fault reads one page rather than the kernel's
-default read-around of up to 32; sections read a run at a time (postings,
-SQ8 codes, columns, IVF clusters) keep read-ahead. Readers open lazily per
-field, so a query touches only the headers of the fields it uses.
+The file is read through one `mmap`. Sections read at random positions are
+advised `MADV_RANDOM`, so a cold page fault there reads one page rather than
+the kernel's default read-around of up to 32: the HNSW graph and, in
+segments that have one, the SQ8 codes its traversal scores; float32 vectors
+used for re-ranking; dictionaries; the doc store; the key index. Sections
+read a run at a time keep read-ahead: postings, document lengths, columns,
+IVF clusters. Readers open lazily per field, so a query touches only the
+headers of the fields it uses.
 
 ### 3.3 Commit protocol (shadow paging)
 
