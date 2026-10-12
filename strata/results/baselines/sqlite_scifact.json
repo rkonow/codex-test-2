@@ -1,0 +1,1182 @@
+{
+  "build": {
+    "bytes": 37773312,
+    "components": [
+      [
+        "docs",
+        31408128
+      ],
+      [
+        "fts_data",
+        2899968
+      ],
+      [
+        "sqlite_autoindex_docs_1",
+        94208
+      ],
+      [
+        "docs_rating",
+        90112
+      ],
+      [
+        "fts_docsize",
+        65536
+      ],
+      [
+        "docs_topic",
+        61440
+      ],
+      [
+        "docs_category",
+        61440
+      ],
+      [
+        "docs_year",
+        57344
+      ],
+      [
+        "fts_idx",
+        16384
+      ],
+      [
+        "sqlite_stat4",
+        12288
+      ],
+      [
+        "sqlite_stat1",
+        4096
+      ],
+      [
+        "sqlite_schema",
+        4096
+      ],
+      [
+        "fts_config",
+        4096
+      ],
+      [
+        "emb_bytes_within_docs",
+        21229568
+      ]
+    ],
+    "phases": [
+      [
+        "insert",
+        0.43323071
+      ],
+      [
+        "indexes",
+        0.053059909
+      ],
+      [
+        "fts_optimize",
+        0.052475094
+      ],
+      [
+        "commit",
+        0.193831424
+      ],
+      [
+        "analyze",
+        0.019381517
+      ],
+      [
+        "checkpoint",
+        0.040006228
+      ]
+    ],
+    "seconds": 0.791991198
+  },
+  "collection": "scifact",
+  "config": {
+    "bm25": "FTS5 bm25(), k1 = 1.2, b = 0.75; OR of quoted query terms (workload::query_terms: stopwords removed)",
+    "fts": "fts5(body, content='', contentless_delete=1, tokenize='porter unicode61'), optimized to one segment",
+    "fts5_enabled": true,
+    "hybrid": "application-side RRF (k = 60) of BM25 and vector top-100",
+    "load": "one transaction: inserts, CREATE INDEX, FTS5 optimize; then ANALYZE, wal_checkpoint(TRUNCATE)",
+    "pragmas": "page_size 4096, cache_size -2000 (2000 KiB), mmap_size 0, journal_mode WAL, synchronous FULL (defaults except WAL)",
+    "schema": "docs(id TEXT PRIMARY KEY, title, text, year INTEGER, category TEXT, rating REAL, topic TEXT, emb BLOB float32 LE) + indexes on year, category, rating, topic",
+    "vectors": "brute force: ORDER BY vdot(emb, ?) DESC LIMIT k, vdot a Rust scalar function"
+  },
+  "extra": {
+    "plans": {
+      "and2": [
+        {
+          "plan": [
+            "SCAN fts VIRTUAL TABLE INDEX 0:M1"
+          ],
+          "sql": "SELECT count(*) FROM fts WHERE fts MATCH ?"
+        },
+        {
+          "plan": [
+            "CO-ROUTINE m",
+            "SCAN fts VIRTUAL TABLE INDEX 64:M1",
+            "SCAN m",
+            "SEARCH docs USING INTEGER PRIMARY KEY (rowid=?)"
+          ],
+          "sql": "SELECT docs.id FROM (SELECT rowid AS r FROM fts WHERE fts MATCH ? ORDER BY rowid LIMIT 10) AS m JOIN docs ON docs.rowid = m.r ORDER BY m.r"
+        }
+      ],
+      "and3": [
+        {
+          "plan": [
+            "SCAN fts VIRTUAL TABLE INDEX 0:M1"
+          ],
+          "sql": "SELECT count(*) FROM fts WHERE fts MATCH ?"
+        },
+        {
+          "plan": [
+            "CO-ROUTINE m",
+            "SCAN fts VIRTUAL TABLE INDEX 64:M1",
+            "SCAN m",
+            "SEARCH docs USING INTEGER PRIMARY KEY (rowid=?)"
+          ],
+          "sql": "SELECT docs.id FROM (SELECT rowid AS r FROM fts WHERE fts MATCH ? ORDER BY rowid LIMIT 10) AS m JOIN docs ON docs.rowid = m.r ORDER BY m.r"
+        }
+      ],
+      "bm25": [
+        {
+          "plan": [
+            "CO-ROUTINE m",
+            "SCAN fts VIRTUAL TABLE INDEX 32:M1",
+            "SCAN m",
+            "SEARCH docs USING INTEGER PRIMARY KEY (rowid=?)"
+          ],
+          "sql": "SELECT docs.id FROM (SELECT rowid AS r, rank AS s FROM fts WHERE fts MATCH ? ORDER BY rank LIMIT 10) AS m JOIN docs ON docs.rowid = m.r ORDER BY m.s"
+        }
+      ],
+      "facet": [
+        {
+          "plan": [
+            "SCAN fts VIRTUAL TABLE INDEX 0:M1",
+            "SEARCH docs USING INTEGER PRIMARY KEY (rowid=?)",
+            "USE TEMP B-TREE FOR GROUP BY",
+            "USE TEMP B-TREE FOR ORDER BY"
+          ],
+          "sql": "SELECT docs.category, count(*) FROM fts JOIN docs ON docs.rowid = fts.rowid WHERE fts MATCH ? GROUP BY docs.category ORDER BY 2 DESC, 1 LIMIT 5"
+        }
+      ],
+      "filter/category": [
+        {
+          "plan": [
+            "SEARCH docs USING COVERING INDEX docs_category (category=?)"
+          ],
+          "sql": "SELECT count(*) FROM docs WHERE docs.category IN (?, ?, ?)"
+        },
+        {
+          "plan": [
+            "SEARCH docs USING INDEX docs_category (category=?)",
+            "USE TEMP B-TREE FOR ORDER BY"
+          ],
+          "sql": "SELECT id FROM docs WHERE docs.category IN (?, ?, ?) ORDER BY rating DESC, id LIMIT 10"
+        }
+      ],
+      "filter/rating": [
+        {
+          "plan": [
+            "SEARCH docs USING COVERING INDEX docs_rating (rating>? AND rating<?)"
+          ],
+          "sql": "SELECT count(*) FROM docs WHERE docs.rating BETWEEN ? AND ?"
+        },
+        {
+          "plan": [
+            "SEARCH docs USING INDEX docs_rating (rating>? AND rating<?)",
+            "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+          ],
+          "sql": "SELECT id FROM docs WHERE docs.rating BETWEEN ? AND ? ORDER BY rating DESC, id LIMIT 10"
+        }
+      ],
+      "filter/rating_category": [
+        {
+          "plan": [
+            "SEARCH docs USING INDEX docs_category (category=?)"
+          ],
+          "sql": "SELECT count(*) FROM docs WHERE docs.rating BETWEEN ? AND ? AND docs.category IN (?, ?, ?, ?)"
+        },
+        {
+          "plan": [
+            "SEARCH docs USING INDEX docs_category (category=?)",
+            "USE TEMP B-TREE FOR ORDER BY"
+          ],
+          "sql": "SELECT id FROM docs WHERE docs.rating BETWEEN ? AND ? AND docs.category IN (?, ?, ?, ?) ORDER BY rating DESC, id LIMIT 10"
+        }
+      ],
+      "filter/year": [
+        {
+          "plan": [
+            "SEARCH docs USING COVERING INDEX docs_year (year>? AND year<?)"
+          ],
+          "sql": "SELECT count(*) FROM docs WHERE docs.year BETWEEN ? AND ?"
+        },
+        {
+          "plan": [
+            "SEARCH docs USING INDEX docs_year (year>? AND year<?)",
+            "USE TEMP B-TREE FOR ORDER BY"
+          ],
+          "sql": "SELECT id FROM docs WHERE docs.year BETWEEN ? AND ? ORDER BY rating DESC, id LIMIT 10"
+        }
+      ],
+      "filter/year_category": [
+        {
+          "plan": [
+            "SEARCH docs USING INDEX docs_year (year>? AND year<?)"
+          ],
+          "sql": "SELECT count(*) FROM docs WHERE docs.year BETWEEN ? AND ? AND docs.category IN (?, ?)"
+        },
+        {
+          "plan": [
+            "SEARCH docs USING INDEX docs_year (year>? AND year<?)",
+            "USE TEMP B-TREE FOR ORDER BY"
+          ],
+          "sql": "SELECT id FROM docs WHERE docs.year BETWEEN ? AND ? AND docs.category IN (?, ?) ORDER BY rating DESC, id LIMIT 10"
+        }
+      ],
+      "filter/year_rating": [
+        {
+          "plan": [
+            "SEARCH docs USING INDEX docs_year (year>? AND year<?)"
+          ],
+          "sql": "SELECT count(*) FROM docs WHERE docs.year BETWEEN ? AND ? AND docs.rating BETWEEN ? AND ?"
+        },
+        {
+          "plan": [
+            "SEARCH docs USING INDEX docs_year (year>? AND year<?)",
+            "USE TEMP B-TREE FOR ORDER BY"
+          ],
+          "sql": "SELECT id FROM docs WHERE docs.year BETWEEN ? AND ? AND docs.rating BETWEEN ? AND ? ORDER BY rating DESC, id LIMIT 10"
+        }
+      ],
+      "filtered_bm25/category": [
+        {
+          "plan": [
+            "SCAN fts VIRTUAL TABLE INDEX 32:M1",
+            "SEARCH docs USING INTEGER PRIMARY KEY (rowid=?)"
+          ],
+          "sql": "SELECT docs.id FROM fts JOIN docs ON docs.rowid = fts.rowid WHERE fts MATCH ? AND docs.category IN (?, ?, ?) ORDER BY fts.rank LIMIT 10"
+        }
+      ],
+      "filtered_bm25/rating": [
+        {
+          "plan": [
+            "SCAN fts VIRTUAL TABLE INDEX 32:M1",
+            "SEARCH docs USING INTEGER PRIMARY KEY (rowid=?)"
+          ],
+          "sql": "SELECT docs.id FROM fts JOIN docs ON docs.rowid = fts.rowid WHERE fts MATCH ? AND docs.rating BETWEEN ? AND ? ORDER BY fts.rank LIMIT 10"
+        }
+      ],
+      "filtered_bm25/rating_category": [
+        {
+          "plan": [
+            "SCAN fts VIRTUAL TABLE INDEX 32:M1",
+            "SEARCH docs USING INTEGER PRIMARY KEY (rowid=?)"
+          ],
+          "sql": "SELECT docs.id FROM fts JOIN docs ON docs.rowid = fts.rowid WHERE fts MATCH ? AND docs.rating BETWEEN ? AND ? AND docs.category IN (?, ?, ?, ?) ORDER BY fts.rank LIMIT 10"
+        }
+      ],
+      "filtered_bm25/year": [
+        {
+          "plan": [
+            "SCAN fts VIRTUAL TABLE INDEX 32:M1",
+            "SEARCH docs USING INTEGER PRIMARY KEY (rowid=?)"
+          ],
+          "sql": "SELECT docs.id FROM fts JOIN docs ON docs.rowid = fts.rowid WHERE fts MATCH ? AND docs.year BETWEEN ? AND ? ORDER BY fts.rank LIMIT 10"
+        }
+      ],
+      "filtered_bm25/year_category": [
+        {
+          "plan": [
+            "SCAN fts VIRTUAL TABLE INDEX 32:M1",
+            "SEARCH docs USING INTEGER PRIMARY KEY (rowid=?)"
+          ],
+          "sql": "SELECT docs.id FROM fts JOIN docs ON docs.rowid = fts.rowid WHERE fts MATCH ? AND docs.year BETWEEN ? AND ? AND docs.category IN (?, ?, ?) ORDER BY fts.rank LIMIT 10"
+        }
+      ],
+      "filtered_bm25/year_rating": [
+        {
+          "plan": [
+            "SCAN fts VIRTUAL TABLE INDEX 32:M1",
+            "SEARCH docs USING INTEGER PRIMARY KEY (rowid=?)"
+          ],
+          "sql": "SELECT docs.id FROM fts JOIN docs ON docs.rowid = fts.rowid WHERE fts MATCH ? AND docs.year BETWEEN ? AND ? AND docs.rating BETWEEN ? AND ? ORDER BY fts.rank LIMIT 10"
+        }
+      ],
+      "filtered_hybrid/category": [
+        {
+          "plan": [
+            "SCAN fts VIRTUAL TABLE INDEX 32:M1",
+            "SEARCH docs USING INTEGER PRIMARY KEY (rowid=?)"
+          ],
+          "sql": "SELECT docs.id FROM fts JOIN docs ON docs.rowid = fts.rowid WHERE fts MATCH ? AND docs.category IN (?, ?, ?) ORDER BY fts.rank LIMIT 100"
+        },
+        {
+          "plan": [
+            "SEARCH docs USING INDEX docs_category (category=?)",
+            "USE TEMP B-TREE FOR ORDER BY"
+          ],
+          "sql": "SELECT id FROM docs WHERE docs.category IN (?, ?, ?) ORDER BY vdot(emb, ?) DESC LIMIT 100"
+        }
+      ],
+      "filtered_hybrid/rating": [
+        {
+          "plan": [
+            "SCAN fts VIRTUAL TABLE INDEX 32:M1",
+            "SEARCH docs USING INTEGER PRIMARY KEY (rowid=?)"
+          ],
+          "sql": "SELECT docs.id FROM fts JOIN docs ON docs.rowid = fts.rowid WHERE fts MATCH ? AND docs.rating BETWEEN ? AND ? ORDER BY fts.rank LIMIT 100"
+        },
+        {
+          "plan": [
+            "SEARCH docs USING INDEX docs_rating (rating>? AND rating<?)",
+            "USE TEMP B-TREE FOR ORDER BY"
+          ],
+          "sql": "SELECT id FROM docs WHERE docs.rating BETWEEN ? AND ? ORDER BY vdot(emb, ?) DESC LIMIT 100"
+        }
+      ],
+      "filtered_hybrid/rating_category": [
+        {
+          "plan": [
+            "SCAN fts VIRTUAL TABLE INDEX 32:M1",
+            "SEARCH docs USING INTEGER PRIMARY KEY (rowid=?)"
+          ],
+          "sql": "SELECT docs.id FROM fts JOIN docs ON docs.rowid = fts.rowid WHERE fts MATCH ? AND docs.rating BETWEEN ? AND ? AND docs.category IN (?, ?, ?, ?, ?, ?) ORDER BY fts.rank LIMIT 100"
+        },
+        {
+          "plan": [
+            "SEARCH docs USING INDEX docs_rating (rating>? AND rating<?)",
+            "USE TEMP B-TREE FOR ORDER BY"
+          ],
+          "sql": "SELECT id FROM docs WHERE docs.rating BETWEEN ? AND ? AND docs.category IN (?, ?, ?, ?, ?, ?) ORDER BY vdot(emb, ?) DESC LIMIT 100"
+        }
+      ],
+      "filtered_hybrid/topic_far": [
+        {
+          "plan": [
+            "SCAN fts VIRTUAL TABLE INDEX 32:M1",
+            "SEARCH docs USING INTEGER PRIMARY KEY (rowid=?)"
+          ],
+          "sql": "SELECT docs.id FROM fts JOIN docs ON docs.rowid = fts.rowid WHERE fts MATCH ? AND docs.rating BETWEEN ? AND ? AND docs.topic = ? ORDER BY fts.rank LIMIT 100"
+        },
+        {
+          "plan": [
+            "SEARCH docs USING INDEX docs_topic (topic=?)",
+            "USE TEMP B-TREE FOR ORDER BY"
+          ],
+          "sql": "SELECT id FROM docs WHERE docs.rating BETWEEN ? AND ? AND docs.topic = ? ORDER BY vdot(emb, ?) DESC LIMIT 100"
+        }
+      ],
+      "filtered_hybrid/topic_near": [
+        {
+          "plan": [
+            "SCAN fts VIRTUAL TABLE INDEX 32:M1",
+            "SEARCH docs USING INTEGER PRIMARY KEY (rowid=?)"
+          ],
+          "sql": "SELECT docs.id FROM fts JOIN docs ON docs.rowid = fts.rowid WHERE fts MATCH ? AND docs.rating BETWEEN ? AND ? AND docs.topic = ? ORDER BY fts.rank LIMIT 100"
+        },
+        {
+          "plan": [
+            "SEARCH docs USING INDEX docs_topic (topic=?)",
+            "USE TEMP B-TREE FOR ORDER BY"
+          ],
+          "sql": "SELECT id FROM docs WHERE docs.rating BETWEEN ? AND ? AND docs.topic = ? ORDER BY vdot(emb, ?) DESC LIMIT 100"
+        }
+      ],
+      "filtered_hybrid/year": [
+        {
+          "plan": [
+            "SCAN fts VIRTUAL TABLE INDEX 32:M1",
+            "SEARCH docs USING INTEGER PRIMARY KEY (rowid=?)"
+          ],
+          "sql": "SELECT docs.id FROM fts JOIN docs ON docs.rowid = fts.rowid WHERE fts MATCH ? AND docs.year BETWEEN ? AND ? ORDER BY fts.rank LIMIT 100"
+        },
+        {
+          "plan": [
+            "SEARCH docs USING INDEX docs_year (year>? AND year<?)",
+            "USE TEMP B-TREE FOR ORDER BY"
+          ],
+          "sql": "SELECT id FROM docs WHERE docs.year BETWEEN ? AND ? ORDER BY vdot(emb, ?) DESC LIMIT 100"
+        }
+      ],
+      "filtered_hybrid/year_category": [
+        {
+          "plan": [
+            "SCAN fts VIRTUAL TABLE INDEX 32:M1",
+            "SEARCH docs USING INTEGER PRIMARY KEY (rowid=?)"
+          ],
+          "sql": "SELECT docs.id FROM fts JOIN docs ON docs.rowid = fts.rowid WHERE fts MATCH ? AND docs.year BETWEEN ? AND ? AND docs.category IN (?, ?, ?, ?, ?) ORDER BY fts.rank LIMIT 100"
+        },
+        {
+          "plan": [
+            "SEARCH docs USING INDEX docs_year (year>? AND year<?)",
+            "USE TEMP B-TREE FOR ORDER BY"
+          ],
+          "sql": "SELECT id FROM docs WHERE docs.year BETWEEN ? AND ? AND docs.category IN (?, ?, ?, ?, ?) ORDER BY vdot(emb, ?) DESC LIMIT 100"
+        }
+      ],
+      "filtered_hybrid/year_rating": [
+        {
+          "plan": [
+            "SCAN fts VIRTUAL TABLE INDEX 32:M1",
+            "SEARCH docs USING INTEGER PRIMARY KEY (rowid=?)"
+          ],
+          "sql": "SELECT docs.id FROM fts JOIN docs ON docs.rowid = fts.rowid WHERE fts MATCH ? AND docs.year BETWEEN ? AND ? AND docs.rating BETWEEN ? AND ? ORDER BY fts.rank LIMIT 100"
+        },
+        {
+          "plan": [
+            "SEARCH docs USING INDEX docs_year (year>? AND year<?)",
+            "USE TEMP B-TREE FOR ORDER BY"
+          ],
+          "sql": "SELECT id FROM docs WHERE docs.year BETWEEN ? AND ? AND docs.rating BETWEEN ? AND ? ORDER BY vdot(emb, ?) DESC LIMIT 100"
+        }
+      ],
+      "filtered_vector/category": [
+        {
+          "plan": [
+            "SEARCH docs USING INDEX docs_category (category=?)",
+            "USE TEMP B-TREE FOR ORDER BY"
+          ],
+          "sql": "SELECT id FROM docs WHERE docs.category IN (?, ?) ORDER BY vdot(emb, ?) DESC LIMIT 10"
+        }
+      ],
+      "filtered_vector/rating": [
+        {
+          "plan": [
+            "SEARCH docs USING INDEX docs_rating (rating>? AND rating<?)",
+            "USE TEMP B-TREE FOR ORDER BY"
+          ],
+          "sql": "SELECT id FROM docs WHERE docs.rating BETWEEN ? AND ? ORDER BY vdot(emb, ?) DESC LIMIT 10"
+        }
+      ],
+      "filtered_vector/rating_category": [
+        {
+          "plan": [
+            "SEARCH docs USING INDEX docs_category (category=?)",
+            "USE TEMP B-TREE FOR ORDER BY"
+          ],
+          "sql": "SELECT id FROM docs WHERE docs.rating BETWEEN ? AND ? AND docs.category IN (?, ?, ?, ?, ?) ORDER BY vdot(emb, ?) DESC LIMIT 10"
+        }
+      ],
+      "filtered_vector/topic_far": [
+        {
+          "plan": [
+            "SEARCH docs USING INDEX docs_topic (topic=?)",
+            "USE TEMP B-TREE FOR ORDER BY"
+          ],
+          "sql": "SELECT id FROM docs WHERE docs.rating BETWEEN ? AND ? AND docs.topic = ? ORDER BY vdot(emb, ?) DESC LIMIT 10"
+        }
+      ],
+      "filtered_vector/topic_near": [
+        {
+          "plan": [
+            "SEARCH docs USING INDEX docs_rating (rating>? AND rating<?)",
+            "USE TEMP B-TREE FOR ORDER BY"
+          ],
+          "sql": "SELECT id FROM docs WHERE docs.rating BETWEEN ? AND ? AND docs.topic = ? ORDER BY vdot(emb, ?) DESC LIMIT 10"
+        }
+      ],
+      "filtered_vector/year": [
+        {
+          "plan": [
+            "SEARCH docs USING INDEX docs_year (year>? AND year<?)",
+            "USE TEMP B-TREE FOR ORDER BY"
+          ],
+          "sql": "SELECT id FROM docs WHERE docs.year BETWEEN ? AND ? ORDER BY vdot(emb, ?) DESC LIMIT 10"
+        }
+      ],
+      "filtered_vector/year_category": [
+        {
+          "plan": [
+            "SEARCH docs USING INDEX docs_year (year>? AND year<?)",
+            "USE TEMP B-TREE FOR ORDER BY"
+          ],
+          "sql": "SELECT id FROM docs WHERE docs.year BETWEEN ? AND ? AND docs.category IN (?, ?, ?) ORDER BY vdot(emb, ?) DESC LIMIT 10"
+        }
+      ],
+      "filtered_vector/year_rating": [
+        {
+          "plan": [
+            "SEARCH docs USING INDEX docs_year (year>? AND year<?)",
+            "USE TEMP B-TREE FOR ORDER BY"
+          ],
+          "sql": "SELECT id FROM docs WHERE docs.year BETWEEN ? AND ? AND docs.rating BETWEEN ? AND ? ORDER BY vdot(emb, ?) DESC LIMIT 10"
+        }
+      ],
+      "hybrid": [
+        {
+          "plan": [
+            "CO-ROUTINE m",
+            "SCAN fts VIRTUAL TABLE INDEX 32:M1",
+            "SCAN m",
+            "SEARCH docs USING INTEGER PRIMARY KEY (rowid=?)"
+          ],
+          "sql": "SELECT docs.id FROM (SELECT rowid AS r, rank AS s FROM fts WHERE fts MATCH ? ORDER BY rank LIMIT 100) AS m JOIN docs ON docs.rowid = m.r ORDER BY m.s"
+        },
+        {
+          "plan": [
+            "SCAN docs",
+            "USE TEMP B-TREE FOR ORDER BY"
+          ],
+          "sql": "SELECT id FROM docs ORDER BY vdot(emb, ?) DESC LIMIT 100"
+        }
+      ],
+      "or3": [
+        {
+          "plan": [
+            "SCAN fts VIRTUAL TABLE INDEX 0:M1"
+          ],
+          "sql": "SELECT count(*) FROM fts WHERE fts MATCH ?"
+        },
+        {
+          "plan": [
+            "CO-ROUTINE m",
+            "SCAN fts VIRTUAL TABLE INDEX 64:M1",
+            "SCAN m",
+            "SEARCH docs USING INTEGER PRIMARY KEY (rowid=?)"
+          ],
+          "sql": "SELECT docs.id FROM (SELECT rowid AS r FROM fts WHERE fts MATCH ? ORDER BY rowid LIMIT 10) AS m JOIN docs ON docs.rowid = m.r ORDER BY m.r"
+        }
+      ],
+      "vector": [
+        {
+          "plan": [
+            "SCAN docs",
+            "USE TEMP B-TREE FOR ORDER BY"
+          ],
+          "sql": "SELECT id FROM docs ORDER BY vdot(emb, ?) DESC LIMIT 10"
+        }
+      ]
+    }
+  },
+  "kinds": [
+    {
+      "cold": {
+        "mean_ms": 10.961836810000001,
+        "n": 100,
+        "p50_ms": 11.132219000000001,
+        "p99_ms": 21.308733999999998
+      },
+      "cold_pages": {
+        "max": 118.0,
+        "mean": 73.4,
+        "p50": 73.0,
+        "p99": 105.0
+      },
+      "kind": "bm25",
+      "mean_results": 10.0,
+      "ndcg10": 0.6842355568468876,
+      "open_pages": {
+        "max": 25.0,
+        "mean": 25.0,
+        "p50": 25.0,
+        "p99": 25.0
+      },
+      "queries": 300,
+      "reps": 3,
+      "warm": {
+        "mean_ms": 3.7322477233333347,
+        "n": 300,
+        "p50_ms": 3.38241,
+        "p99_ms": 9.869674999999999
+      }
+    },
+    {
+      "cold": {
+        "mean_ms": 2.0321294200000004,
+        "n": 100,
+        "p50_ms": 1.097598,
+        "p99_ms": 8.523004
+      },
+      "cold_pages": {
+        "max": 71.0,
+        "mean": 34.54,
+        "p50": 34.0,
+        "p99": 67.0
+      },
+      "kind": "and2",
+      "mean_results": 6.63,
+      "open_pages": {
+        "max": 25.0,
+        "mean": 25.0,
+        "p50": 25.0,
+        "p99": 25.0
+      },
+      "queries": 300,
+      "reps": 3,
+      "warm": {
+        "mean_ms": 0.15793742000000013,
+        "n": 300,
+        "p50_ms": 0.128908,
+        "p99_ms": 0.388427
+      }
+    },
+    {
+      "cold": {
+        "mean_ms": 1.2173178400000004,
+        "n": 100,
+        "p50_ms": 0.953905,
+        "p99_ms": 6.910699999999999
+      },
+      "cold_pages": {
+        "max": 52.0,
+        "mean": 32.36,
+        "p50": 31.0,
+        "p99": 52.0
+      },
+      "kind": "and3",
+      "mean_results": 3.220735785953177,
+      "open_pages": {
+        "max": 25.0,
+        "mean": 25.0,
+        "p50": 25.0,
+        "p99": 25.0
+      },
+      "queries": 299,
+      "reps": 3,
+      "warm": {
+        "mean_ms": 0.11031249163879596,
+        "n": 299,
+        "p50_ms": 0.104466,
+        "p99_ms": 0.201625
+      }
+    },
+    {
+      "cold": {
+        "mean_ms": 1.2801669900000006,
+        "n": 100,
+        "p50_ms": 1.064211,
+        "p99_ms": 5.016512
+      },
+      "cold_pages": {
+        "max": 71.0,
+        "mean": 43.29,
+        "p50": 36.0,
+        "p99": 70.0
+      },
+      "kind": "or3",
+      "mean_results": 10.0,
+      "open_pages": {
+        "max": 25.0,
+        "mean": 25.0,
+        "p50": 25.0,
+        "p99": 25.0
+      },
+      "queries": 299,
+      "reps": 3,
+      "warm": {
+        "mean_ms": 0.13389051170568564,
+        "n": 299,
+        "p50_ms": 0.123795,
+        "p99_ms": 0.26053
+      }
+    },
+    {
+      "by_shape": {
+        "category": {
+          "mean_ms": 1.9841078666666665,
+          "n": 15,
+          "p50_ms": 0.709934,
+          "p99_ms": 7.112579
+        },
+        "rating": {
+          "mean_ms": 0.06807005263157895,
+          "n": 19,
+          "p50_ms": 0.055912,
+          "p99_ms": 0.15407800000000002
+        },
+        "rating_category": {
+          "mean_ms": 2.1489944000000003,
+          "n": 20,
+          "p50_ms": 2.042236,
+          "p99_ms": 4.622849
+        },
+        "year": {
+          "mean_ms": 2.5039670999999997,
+          "n": 10,
+          "p50_ms": 3.863709,
+          "p99_ms": 5.155621
+        },
+        "year_category": {
+          "mean_ms": 3.2100216,
+          "n": 20,
+          "p50_ms": 3.71595,
+          "p99_ms": 10.550165
+        },
+        "year_rating": {
+          "mean_ms": 2.1398883499999997,
+          "n": 20,
+          "p50_ms": 2.713971,
+          "p99_ms": 4.6655940000000005
+        }
+      },
+      "by_target": {
+        "0.001": {
+          "mean_ms": 0.2309456842105263,
+          "n": 19,
+          "p50_ms": 0.24734099999999998,
+          "p99_ms": 0.449337
+        },
+        "0.01": {
+          "mean_ms": 0.81863968,
+          "n": 25,
+          "p50_ms": 0.844915,
+          "p99_ms": 3.1211640000000003
+        },
+        "0.1": {
+          "mean_ms": 2.3146096333333332,
+          "n": 30,
+          "p50_ms": 2.042236,
+          "p99_ms": 10.550165
+        },
+        "0.5": {
+          "mean_ms": 3.7260152666666664,
+          "n": 30,
+          "p50_ms": 4.399057,
+          "p99_ms": 7.112579
+        }
+      },
+      "cold": {
+        "mean_ms": 34.06863326,
+        "n": 100,
+        "p50_ms": 24.306327999999997,
+        "p99_ms": 101.712312
+      },
+      "cold_pages": {
+        "max": 5038.0,
+        "mean": 1247.82,
+        "p50": 528.0,
+        "p99": 5038.0
+      },
+      "kind": "filter",
+      "mean_results": 9.14423076923077,
+      "open_pages": {
+        "max": 25.0,
+        "mean": 25.0,
+        "p50": 25.0,
+        "p99": 25.0
+      },
+      "queries": 104,
+      "reps": 3,
+      "warm": {
+        "mean_ms": 1.9814683365384613,
+        "n": 104,
+        "p50_ms": 0.869291,
+        "p99_ms": 7.112579
+      }
+    },
+    {
+      "by_shape": {
+        "category": {
+          "mean_ms": 5.616293428571429,
+          "n": 14,
+          "p50_ms": 6.518274999999999,
+          "p99_ms": 8.799648
+        },
+        "rating": {
+          "mean_ms": 4.260068833333333,
+          "n": 24,
+          "p50_ms": 3.490227,
+          "p99_ms": 11.188071
+        },
+        "rating_category": {
+          "mean_ms": 5.742399714285715,
+          "n": 28,
+          "p50_ms": 4.393635,
+          "p99_ms": 15.893684000000002
+        },
+        "year": {
+          "mean_ms": 2.6763297,
+          "n": 10,
+          "p50_ms": 2.834186,
+          "p99_ms": 5.7362899999999994
+        },
+        "year_category": {
+          "mean_ms": 5.667060894736842,
+          "n": 19,
+          "p50_ms": 4.9139040000000005,
+          "p99_ms": 10.509376000000001
+        },
+        "year_rating": {
+          "mean_ms": 6.38971196,
+          "n": 25,
+          "p50_ms": 5.268513,
+          "p99_ms": 14.642176999999998
+        }
+      },
+      "by_target": {
+        "0.001": {
+          "mean_ms": 7.135552666666667,
+          "n": 30,
+          "p50_ms": 6.649597999999999,
+          "p99_ms": 15.893684000000002
+        },
+        "0.01": {
+          "mean_ms": 6.366378766666667,
+          "n": 30,
+          "p50_ms": 6.040961,
+          "p99_ms": 14.101448000000001
+        },
+        "0.1": {
+          "mean_ms": 3.7121267,
+          "n": 30,
+          "p50_ms": 2.9794370000000003,
+          "p99_ms": 10.529558
+        },
+        "0.5": {
+          "mean_ms": 3.9805153666666664,
+          "n": 30,
+          "p50_ms": 3.62656,
+          "p99_ms": 10.949520000000001
+        }
+      },
+      "cold": {
+        "mean_ms": 32.586391739999996,
+        "n": 100,
+        "p50_ms": 19.88056,
+        "p99_ms": 106.504322
+      },
+      "cold_pages": {
+        "max": 2405.0,
+        "mean": 692.55,
+        "p50": 221.0,
+        "p99": 2343.0
+      },
+      "kind": "filtered_bm25",
+      "mean_results": 7.95,
+      "open_pages": {
+        "max": 25.0,
+        "mean": 25.0,
+        "p50": 25.0,
+        "p99": 25.0
+      },
+      "queries": 120,
+      "reps": 3,
+      "warm": {
+        "mean_ms": 5.298643375000001,
+        "n": 120,
+        "p50_ms": 4.192167,
+        "p99_ms": 15.014425
+      }
+    },
+    {
+      "cold": {
+        "mean_ms": 32.97541137,
+        "n": 100,
+        "p50_ms": 31.797172999999997,
+        "p99_ms": 52.720463
+      },
+      "cold_pages": {
+        "max": 7864.0,
+        "mean": 7864.0,
+        "p50": 7864.0,
+        "p99": 7864.0
+      },
+      "kind": "vector",
+      "mean_results": 10.0,
+      "ndcg10": 0.7180585235230005,
+      "open_pages": {
+        "max": 25.0,
+        "mean": 25.0,
+        "p50": 25.0,
+        "p99": 25.0
+      },
+      "queries": 300,
+      "reps": 3,
+      "warm": {
+        "mean_ms": 13.279210173333327,
+        "n": 300,
+        "p50_ms": 13.855267,
+        "p99_ms": 17.232435000000002
+      }
+    },
+    {
+      "by_shape": {
+        "category": {
+          "mean_ms": 2.8456022666666665,
+          "n": 15,
+          "p50_ms": 1.5828769999999999,
+          "p99_ms": 8.193293
+        },
+        "rating": {
+          "mean_ms": 1.5719800000000002,
+          "n": 15,
+          "p50_ms": 0.217819,
+          "p99_ms": 9.063255
+        },
+        "rating_category": {
+          "mean_ms": 3.7382209999999993,
+          "n": 24,
+          "p50_ms": 3.125911,
+          "p99_ms": 10.956884
+        },
+        "topic_far": {
+          "mean_ms": 2.3875744666666674,
+          "n": 120,
+          "p50_ms": 1.4254499999999999,
+          "p99_ms": 8.898461
+        },
+        "topic_near": {
+          "mean_ms": 2.552602625,
+          "n": 120,
+          "p50_ms": 1.423916,
+          "p99_ms": 10.254539
+        },
+        "year": {
+          "mean_ms": 4.4493686666666665,
+          "n": 12,
+          "p50_ms": 6.953352000000001,
+          "p99_ms": 8.110935
+        },
+        "year_category": {
+          "mean_ms": 2.8922221,
+          "n": 30,
+          "p50_ms": 2.788455,
+          "p99_ms": 10.081949
+        },
+        "year_rating": {
+          "mean_ms": 2.4156611666666667,
+          "n": 24,
+          "p50_ms": 0.672179,
+          "p99_ms": 9.877146
+        }
+      },
+      "by_target": {
+        "0.001": {
+          "mean_ms": 0.17054114444444446,
+          "n": 90,
+          "p50_ms": 0.16803200000000001,
+          "p99_ms": 0.434097
+        },
+        "0.01": {
+          "mean_ms": 0.33019906666666676,
+          "n": 90,
+          "p50_ms": 0.267513,
+          "p99_ms": 0.8000569999999999
+        },
+        "0.1": {
+          "mean_ms": 2.046970655555555,
+          "n": 90,
+          "p50_ms": 1.689239,
+          "p99_ms": 5.760076000000001
+        },
+        "0.5": {
+          "mean_ms": 7.973814066666669,
+          "n": 90,
+          "p50_ms": 7.592831,
+          "p99_ms": 10.956884
+        }
+      },
+      "cold": {
+        "mean_ms": 56.054684500000015,
+        "n": 100,
+        "p50_ms": 34.436553,
+        "p99_ms": 202.738109
+      },
+      "cold_pages": {
+        "max": 7716.0,
+        "mean": 2485.71,
+        "p50": 1581.0,
+        "p99": 7624.0
+      },
+      "kind": "filtered_vector",
+      "mean_results": 8.772222222222222,
+      "open_pages": {
+        "max": 25.0,
+        "mean": 25.0,
+        "p50": 25.0,
+        "p99": 25.0
+      },
+      "queries": 360,
+      "reps": 3,
+      "warm": {
+        "mean_ms": 2.6303812333333343,
+        "n": 360,
+        "p50_ms": 1.310571,
+        "p99_ms": 10.242282
+      }
+    },
+    {
+      "cold": {
+        "mean_ms": 38.912459840000004,
+        "n": 100,
+        "p50_ms": 38.388752,
+        "p99_ms": 52.897625
+      },
+      "cold_pages": {
+        "max": 7915.0,
+        "mean": 7877.26,
+        "p50": 7876.0,
+        "p99": 7906.0
+      },
+      "kind": "hybrid",
+      "mean_results": 10.0,
+      "ndcg10": 0.7331671758086654,
+      "open_pages": {
+        "max": 25.0,
+        "mean": 25.0,
+        "p50": 25.0,
+        "p99": 25.0
+      },
+      "queries": 300,
+      "reps": 3,
+      "warm": {
+        "mean_ms": 16.977950776666663,
+        "n": 300,
+        "p50_ms": 16.808681,
+        "p99_ms": 24.921312
+      }
+    },
+    {
+      "by_shape": {
+        "category": {
+          "mean_ms": 9.207028333333334,
+          "n": 15,
+          "p50_ms": 8.758553000000001,
+          "p99_ms": 15.212091000000001
+        },
+        "rating": {
+          "mean_ms": 7.436520965517241,
+          "n": 29,
+          "p50_ms": 6.51633,
+          "p99_ms": 17.202068
+        },
+        "rating_category": {
+          "mean_ms": 7.897771000000001,
+          "n": 21,
+          "p50_ms": 7.679390000000001,
+          "p99_ms": 13.666474
+        },
+        "topic_far": {
+          "mean_ms": 8.454903066666668,
+          "n": 120,
+          "p50_ms": 8.299331,
+          "p99_ms": 17.083356000000002
+        },
+        "topic_near": {
+          "mean_ms": 8.229661283333328,
+          "n": 120,
+          "p50_ms": 8.080327,
+          "p99_ms": 15.01576
+        },
+        "year": {
+          "mean_ms": 9.471271625000002,
+          "n": 8,
+          "p50_ms": 10.826175000000001,
+          "p99_ms": 13.486851
+        },
+        "year_category": {
+          "mean_ms": 8.380114291666667,
+          "n": 24,
+          "p50_ms": 8.988575,
+          "p99_ms": 12.49505
+        },
+        "year_rating": {
+          "mean_ms": 9.348016695652172,
+          "n": 23,
+          "p50_ms": 8.745815,
+          "p99_ms": 16.287398000000003
+        }
+      },
+      "by_target": {
+        "0.001": {
+          "mean_ms": 7.414738333333333,
+          "n": 90,
+          "p50_ms": 7.525882,
+          "p99_ms": 15.01576
+        },
+        "0.01": {
+          "mean_ms": 7.05205972222222,
+          "n": 90,
+          "p50_ms": 7.362381,
+          "p99_ms": 13.25875
+        },
+        "0.1": {
+          "mean_ms": 6.565171011111113,
+          "n": 90,
+          "p50_ms": 6.440887,
+          "p99_ms": 11.097915
+        },
+        "0.5": {
+          "mean_ms": 12.453172555555554,
+          "n": 90,
+          "p50_ms": 12.321268,
+          "p99_ms": 17.202068
+        }
+      },
+      "cold": {
+        "mean_ms": 86.95536971000001,
+        "n": 100,
+        "p50_ms": 84.41888999999999,
+        "p99_ms": 158.779839
+      },
+      "cold_pages": {
+        "max": 7672.0,
+        "mean": 3472.15,
+        "p50": 2415.0,
+        "p99": 7632.0
+      },
+      "kind": "filtered_hybrid",
+      "mean_results": 8.78888888888889,
+      "open_pages": {
+        "max": 25.0,
+        "mean": 25.0,
+        "p50": 25.0,
+        "p99": 25.0
+      },
+      "queries": 360,
+      "reps": 3,
+      "warm": {
+        "mean_ms": 8.371285405555557,
+        "n": 360,
+        "p50_ms": 8.365054,
+        "p99_ms": 16.287398000000003
+      }
+    },
+    {
+      "cold": {
+        "mean_ms": 20.706073789999994,
+        "n": 100,
+        "p50_ms": 5.007751000000001,
+        "p99_ms": 96.21065800000001
+      },
+      "cold_pages": {
+        "max": 3534.0,
+        "mean": 495.28,
+        "p50": 73.0,
+        "p99": 3534.0
+      },
+      "kind": "facet",
+      "mean_results": 0.0,
+      "open_pages": {
+        "max": 25.0,
+        "mean": 25.0,
+        "p50": 25.0,
+        "p99": 25.0
+      },
+      "queries": 300,
+      "reps": 3,
+      "warm": {
+        "mean_ms": 0.42252775666666653,
+        "n": 300,
+        "p50_ms": 0.13233599999999998,
+        "p99_ms": 2.905313
+      }
+    }
+  ],
+  "limit": null,
+  "n_docs": 5183,
+  "run": {
+    "options": {
+      "cold_budget_secs": 60.0,
+      "cold_sample": 100,
+      "max_per_kind": null,
+      "max_vector": null,
+      "reps": 3,
+      "warm_budget_secs": 60.0
+    },
+    "peak_rss_mib": 92.0078125,
+    "unix_time": 1791772415
+  },
+  "system": "sqlite",
+  "unsupported": [],
+  "version": "SQLite 3.53.2 (rusqlite, bundled)",
+  "workload": "results/workloads/scifact.json"
+}

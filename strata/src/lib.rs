@@ -13,7 +13,12 @@
 //! * [`query`]: SQL front end, planner and executor.
 //! * [`data`], [`metrics`]: BEIR loaders and retrieval metrics for the
 //!   evaluation.
+//! * [`workload`]: the query workloads shared with the baselines, and the
+//!   measurement harness; [`baselines`] (feature `baselines`): SQLite and
+//!   Tantivy behind the same interface.
 
+#[cfg(feature = "baselines")]
+pub mod baselines;
 pub mod data;
 pub mod error;
 pub mod forward;
@@ -26,6 +31,7 @@ pub mod storage;
 pub mod text;
 pub mod value;
 pub mod vector;
+pub mod workload;
 
 pub use error::{Error, Result};
 pub use schema::{Field, FieldType, Schema, VectorIndexKind};
