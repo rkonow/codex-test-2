@@ -508,12 +508,14 @@ mod tests {
     fn entities_link_records_across_sessions() {
         let dir = tempfile::tempdir().unwrap();
         let s = store(dir.path());
-        s.append("sess-a", 1, 100, vec![Draft::new(Kind::Prompt, "Build the count sheet in walking order")]).unwrap();
-        s.append("sess-a", 1, 101, vec![Draft::new(Kind::Todo, "The count sheet is sorted by bin location").entities(vec!["Count sheet".into(), "bins".into()]).link("from", "sessa:1")]).unwrap();
-        s.append("sess-b", 1, 200, vec![Draft::new(Kind::Fact, "The auditor wants a blind count sheet").entities(vec!["count sheets".into(), "auditor".into()])]).unwrap();
-        s.append("sess-c", 1, 300, vec![Draft::new(Kind::Fact, "Prices are stored in integer cents").entities(vec!["prices".into()])]).unwrap();
-        // Two notes, one prompt and three entities; the plural meets the singular.
-        assert_eq!(s.len(), 7);
+        let id = |v: Vec<Record>| v[0].id.clone();
+        let prompt = id(s.append("sess-a", 1, 100, vec![Draft::new(Kind::Prompt, "Build the count sheet in walking order")]).unwrap());
+        let todo = id(s.append("sess-a", 1, 101, vec![Draft::new(Kind::Todo, "The count sheet is sorted by bin location").entities(vec!["Count sheet".into(), "bins".into()]).link("from", prompt.clone())]).unwrap());
+        let fact_b = id(s.append("sess-b", 1, 200, vec![Draft::new(Kind::Fact, "The auditor wants a blind count sheet").entities(vec!["count sheets".into(), "auditor".into()])]).unwrap());
+        let fact_c = id(s.append("sess-c", 1, 300, vec![Draft::new(Kind::Fact, "Prices are stored in integer cents").entities(vec!["prices".into()])]).unwrap());
+        // One prompt, three notes and four entities (count sheet, bin,
+        // auditor, price): the plural meets the singular.
+        assert_eq!(s.len(), 8);
         assert_eq!(s.get(&["e:count sheet".into()]).unwrap()[0].text, "Count sheet");
         // Entities are not search results.
         assert!(s.bm25_top("count sheet", 10, &Filter::default()).unwrap().iter().all(|(r, _)| r.kind != Kind::Entity));
@@ -521,12 +523,12 @@ mod tests {
         // shared entity, the other session's note (2 hops); not the prices.
         let v = s.embedder.embed_query("count sheet");
         let r = Reach { hops: 2, through: crate::recall::THROUGH.to_vec(), max_nodes: 100 };
-        let got: Vec<String> = s.reach(&["sessa:2".into()], &v, 10, &Filter::default(), &r).unwrap().into_iter().map(|(r, _)| r.id).collect();
-        assert!(got.contains(&"sessa:1".to_string()) && got.contains(&"sessb:3".to_string()), "{got:?}");
-        assert!(!got.iter().any(|i| i.starts_with("e:") || i == "sessc:4" || i == "sessa:2"), "{got:?}");
+        let got: Vec<String> = s.reach(&[todo.clone()], &v, 10, &Filter::default(), &r).unwrap().into_iter().map(|(r, _)| r.id).collect();
+        assert!(got.contains(&prompt) && got.contains(&fact_b), "{got:?}");
+        assert!(!got.iter().any(|i| i.starts_with("e:") || *i == fact_c || *i == todo), "{got:?}");
         // A retag keeps the links.
-        s.retag("sessa:2", "done").unwrap();
-        assert_eq!(s.get(&["sessa:2".into()]).unwrap()[0].links.len(), 3);
+        s.retag(&todo, "done").unwrap();
+        assert_eq!(s.get(&[todo]).unwrap()[0].links.len(), 3);
     }
 
     #[test]
