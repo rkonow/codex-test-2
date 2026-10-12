@@ -108,7 +108,7 @@ type Deferred = Box<dyn FnOnce() + Send>;
 impl Daemon {
     pub fn open(dir: &Path, project: &str) -> Result<Daemon> {
         let paths = StorePaths::new(dir);
-        std::fs::create_dir_all(dir)?;
+        crate::paths::create_private_dir(dir)?;
         let cfg = Config::load(&paths.config);
         let embedder: Arc<dyn embed::Embedder> = Arc::from(embed::open(&cfg.embedder)?);
         let store = Arc::new(Store::open(&paths.db, embedder, StoreOptions { sync: cfg.sync, ..Default::default() })?);
@@ -606,7 +606,7 @@ fn filter_sql(f: &Filter) -> Vec<String> {
 /// Runs the daemon in this process until it is idle or shut down.
 pub fn serve(dir: &Path, project: &str) -> Result<()> {
     let paths = StorePaths::new(dir);
-    std::fs::create_dir_all(dir)?;
+    crate::paths::create_private_dir(dir)?;
     if UnixStream::connect(&paths.socket).is_ok() {
         return Err(err(format!("a daemon already listens on {}", paths.socket.display())));
     }
@@ -686,7 +686,7 @@ pub fn request(dir: &Path, project: &str, req: &Json, timeout: Duration) -> Resu
 
 /// Starts `engram serve` in the background unless one is starting already.
 fn spawn(paths: &StorePaths, project: &str) -> Result<()> {
-    std::fs::create_dir_all(&paths.dir)?;
+    crate::paths::create_private_dir(&paths.dir)?;
     let lock = std::fs::OpenOptions::new().create(true).write(true).mode(0o600).open(&paths.spawn_lock)?;
     use std::os::unix::io::AsRawFd;
     // SAFETY: flock on an open descriptor.

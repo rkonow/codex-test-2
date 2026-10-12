@@ -98,8 +98,10 @@ pub enum Decision {
 }
 
 impl Gate {
+    /// Logistic fit on every fifth LongMemEval-S haystack with BGE-small
+    /// vectors (scripts/fit_gate.py); hi holds precision 0.9, lo 0.7.
     pub fn bert() -> Gate {
-        Gate::default()
+        Gate { a: 3.803, b: 4.311, c: 0.326, d: 1.583, e: 2.778, f: 0.617, hi: 9.711, lo: 6.374 }
     }
 
     pub fn score(&self, e: &Evidence) -> f64 {

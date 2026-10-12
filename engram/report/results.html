@@ -5,12 +5,12 @@
     <li><b>LongMemEval-S:</b> 500 questions, each over its own history of about 115,000 tokens; the 470 with evidence are scored.</li>
     <li><b>LoCoMo:</b> 10 conversations of about 600 turns and 1,536 answerable questions.</li>
   </ul>
-  <p>On LongMemEval-S, hybrid search with priors puts the evidence in the top 10 for 90% of questions, against 88% for BM25 and for static vectors alone. The default 4,000-character injection contains it for 87%. LoCoMo's short turns between two people favour exact words: BM25 alone reaches 0.651 at rank 5 and static vectors only 0.382, so the static hybrid (0.607) falls below BM25. BGE vectors reverse that, 0.548 alone and 0.678 in the hybrid, above BM25.<!--BGE-LME--></p>
+  <p>On LongMemEval-S, hybrid search with priors puts the evidence in the top 10 for 90% of questions, against 88% for BM25 and for static vectors alone. The default 4,000-character injection contains it for 87%. LoCoMo's short turns between two people favour exact words: BM25 alone reaches 0.651 at rank 5 and static vectors only 0.382, so the static hybrid (0.607) falls below BM25. BGE vectors reverse that, 0.548 alone and 0.678 in the hybrid, above BM25. On LongMemEval, BGE does not help: on every fifth history (94 questions) its vectors alone score 0.691 against 0.745 for the static model, and the hybrid 0.798 against 0.809. Its strength is paraphrase, which the session probes below show; its cost is a few hundred times the static model's time per record.</p>
 </div>
 <figure class="wide">
   <div class="frame">
     <p class="chart-title">Does the evidence come back?</p>
-    <p class="chart-sub">Turn-level recall of the annotated evidence, and whether the default 4,000-character injection contains it · one store per conversation · BGE ran on every fifth LongMemEval haystack</p>
+    <p class="chart-sub">Turn-level recall of the annotated evidence, and whether the default 4,000-character injection contains it · one store per conversation · BGE ran on every fifth LongMemEval history (94 questions), compared with the static model on the same subset</p>
     <div class="chart" id="retrieval-chart"></div>
   </div>
 </figure>
@@ -44,6 +44,7 @@
 <div class="col">
   <p>After a compaction, the summary held none of the lost details, and the live window still held 17% of them. Of the 15 the model no longer had, automatic injection brought back 13, and one <code>memory_search</code> 14. Asked vaguely, injection recovered 8 of 10. Recurring facts were mostly still in context (84%), so Engram had little to add there: 2 of the 5 missing ones came back automatically, and all 5 by search.</p>
   <p>A new session is where memory matters most, because it starts with nothing. There, the gated injection alone answered 83% of the lost-detail probes, 58% of their vague versions and 54% of the recurring facts; search raised these to 94%, 67% and 78%. Most answers that search found but injection missed came through the weak-evidence tier. It injects two records of at most 500 characters, and the answer ranked first to eighth but fell outside those records or their snippets. The injected record ids are what the timeline tool is for.</p>
+  <p>With BGE vectors, raw retrieval improves where the words differ. In a new session, full injection would contain 28 of the 37 recurring-fact answers, against 23 with the static model, and search would find 31, against 29. The BGE gate costs more than it gains, though. Fitted on fewer questions, it rarely reaches full injection, so its gated injection recovered only 4 of the 10 vague lost details, against 8 with the static default. The static embedder with its gate stays the default.</p>
 </div>
 <div class="wide" id="probe-table"></div>
 
@@ -56,7 +57,7 @@
     <li><b>Coverage:</b> questions whose evidence reaches the model fall from 87% to 67%.</li>
     <li><b>LoCoMo:</b> on this held-out benchmark it saves the same tokens but loses precision, because its foreign questions share too much vocabulary with the stores they are asked against.</li>
   </ul>
-  <p>In practice, the gate mostly limits cost. The features it has, similarity and term coverage, cannot tell "related" from "relevant" well. A cross-encoder reranker on the top candidates is the obvious next step; in this design its cost would fall only on prompts that pass the cheap gate.</p>
+  <p>With BGE vectors the same fit fares worse: its full-injection threshold is reached by about 1% of questions, so nearly everything goes through the brief tier. In practice, the gate mostly limits cost. The features it has, similarity and term coverage, cannot tell "related" from "relevant" well. A cross-encoder reranker on the top candidates is the obvious next step; in this design its cost would fall only on prompts that pass the cheap gate.</p>
 </div>
 <div class="wide" id="gate-table"></div>
 
@@ -72,9 +73,9 @@
 </div>
 <div class="wide" id="scale-table"></div>
 <div class="col">
-  <p>The costs grow slowly. A recall query takes 3–4 ms up to 100,000 records and 12 ms at a million. Appends with <code>fsync</code> stay under a millisecond at the median. The occasional stall at a million records (p99 119 ms) is most likely <code>fsync</code> waiting behind the kernel's writeback of the 3.5 GB just bulk-loaded. Each record takes about 3.4 KB on disk, mostly its 512-dimension vector, and the static embedder processes 9,000–10,000 records a second. The first hook of a session pays for starting the daemon: 0.3–0.4 s, mostly loading the embedding model.</p>
+  <p>The costs grow slowly. A recall query takes 3–4 ms up to 100,000 records and 11.5 ms at a million (p99 39 ms). A full hook, counting process start, the socket round trip and gated recall, takes 9–10 ms at the median up to 100,000 records and 17 ms at a million (p99 68 ms). Appends with <code>fsync</code> stay under 1.5 ms even at p99. Each record takes about 3.5 KB on disk, mostly its 512-dimension vector, and the static embedder processes 9,500–11,000 records a second. The first hook of a session pays for starting the daemon: 0.3 s, mostly loading the embedding model.</p>
   <p>Quality is what degrades. The share of needles found in the top 10 falls from 0.78 at 10,000 records to 0.52 at 100,000 and 0.45 at a million. The filler here is chat on every subject, and real project history is more homogeneous, so this is a stress test, not a forecast. For large stores, Strata's filters keep the candidate set small: by session, time, file and kind. <code>memory_sql</code> gives the model those filters directly.</p>
-  <p>When prompts arrive back to back, each query waits for the previous write's in-memory segment rebuild, and the hook takes 44–53 ms. In a real session, prompts arrive seconds apart.</p>
+  <p>The hooks here arrive 200 ms apart. Back to back, each query waits for the previous write's in-memory segment rebuild, and a hook takes 44–53 ms. In a real session, prompts arrive seconds apart.</p>
 </div>
 
 <div class="col">

@@ -83,3 +83,15 @@ fn socket_path(dir: &Path) -> PathBuf {
     }
     base.join(format!("engram-{:016x}.sock", crate::embed::fnv(&dir.to_string_lossy())))
 }
+
+/// Creates a store directory readable only by its owner: it holds
+/// transcripts, which can contain anything the session saw.
+pub fn create_private_dir(dir: &Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(dir)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700))?;
+    }
+    Ok(())
+}

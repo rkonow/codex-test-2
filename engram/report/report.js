@@ -259,9 +259,10 @@
         add("BM25", R.lme_static, "bm25");
         add("vectors, static", R.lme_static, "dense");
         add("hybrid + priors, static", R.lme_static, "hybrid_0.5_priors");
-        add("vectors, BGE (100 q)", R.lme_bge_sub, "dense");
-        add("hybrid + priors, BGE (100 q)", R.lme_bge_sub, "hybrid_0.5_priors");
-        add("hybrid, static (same 100 q)", R.lme_static_sub, "hybrid_0.5_priors");
+        add("vectors, static (subset)", R.lme_static_sub, "dense");
+        add("vectors, BGE (subset)", R.lme_bge_sub, "dense");
+        add("hybrid + priors, static (subset)", R.lme_static_sub, "hybrid_0.5_priors");
+        add("hybrid + priors, BGE (subset)", R.lme_bge_sub, "hybrid_0.5_priors");
       } else {
         add("BM25", R.locomo_static, "bm25");
         add("vectors, static", R.locomo_static, "dense");
@@ -370,7 +371,7 @@
       r.records.toLocaleString("en-US"),
       fmt(r.embed_records_per_s / 1000, 1) + "k",
       fmt(r.bulk_load_s, 1),
-      fmt(r.bytes_per_record / 1024, 2),
+      fmt(r.bytes_per_record / 1000, 2),
       ms(r.append_ms_p50),
       ms(r.query_ms_p50) + " / " + ms(r.query_ms_p99),
       ms(r.hook_ms_p50) + " / " + ms(r.hook_ms_p99),
@@ -378,7 +379,7 @@
       num(r.recall10, 2),
       num(r.pack4k, 2),
     ]);
-    table(el, ["records", "embedded per s", "bulk load s", "KiB per record", "append ms (fsync)", "recall query ms p50 / p99", "hook ms p50 / p99 (process + daemon)", "first hook ms (daemon start)", "needle R@10", "needle in injection"], rows, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    table(el, ["records", "embedded per s", "bulk load s", "KB per record", "append ms (fsync)", "recall query ms p50 / p99", "hook ms p50 / p99 (process + daemon)", "first hook ms (daemon start)", "needle R@10", "needle in injection"], rows, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
   }
 
   function live() {
