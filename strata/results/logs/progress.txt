@@ -1,3 +1,5 @@
 == strata_small 03:46:22: target/release/strata-eval --collections scifact,fiqa,trec-covid
    strata_small ok after 286 s
 == strata_quora 03:51:08: target/release/strata-eval --collections quora
+   strata_quora ok after 528 s
+== strata_ivf 03:59:56: target/release/strata-eval --collections trec-covid,quora --index ivf --studies workload,planner --kinds vector,filtered_vector,hybrid,filtered_hybrid

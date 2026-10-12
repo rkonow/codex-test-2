@@ -1,0 +1,84 @@
+<div class="col">
+  <h3 id="r-build">Build time and size</h3>
+  <!--NARR-BUILD-->
+</div>
+<div class="wide" id="build-table"></div>
+<div class="col">
+  <!--NARR-SIZE-->
+</div>
+<div class="wide" id="size-table"></div>
+
+<div class="col">
+  <h3 id="r-latency">Query latency</h3>
+  <!--NARR-LATENCY-->
+</div>
+<figure class="wide">
+  <div class="frame">
+    <p class="chart-title">Median latency by query kind</p>
+    <p class="chart-sub">The same workload in each system · Tantivy has no vector search · SQLite answers vectors by a brute-force scan</p>
+    <div class="chart" id="latency-chart"></div>
+  </div>
+</figure>
+<div class="col">
+  <!--NARR-SPEEDUP-->
+</div>
+<div class="wide" id="speedup-table"></div>
+
+<div class="col">
+  <h3 id="r-quality">Ranking quality</h3>
+  <!--NARR-QUALITY-->
+</div>
+<div class="wide" id="quality-table"></div>
+<figure class="narrow">
+  <div class="frame">
+    <p class="chart-title">Weighted hybrid ranking: nDCG@10 by BM25 weight</p>
+    <p class="chart-sub">Scores min-max normalised over the union of each input's top 100 · 0 = vectors only, 1 = BM25 only</p>
+    <div class="chart" id="hybrid-sweep"></div>
+  </div>
+</figure>
+<div class="col">
+  <!--NARR-HYBRID-->
+</div>
+
+<div class="col">
+  <h3 id="r-vectors">Vector indexes</h3>
+  <!--NARR-VECTORS-->
+</div>
+<figure class="narrow">
+  <div class="frame">
+    <p class="chart-title">Recall@10 against latency</p>
+    <p class="chart-sub">Warm cache · each point is one setting of ef, nprobe or re-rank depth</p>
+    <div class="chart" id="vector-curves"></div>
+  </div>
+</figure>
+
+<div class="col">
+  <h3 id="r-planner">Filtered vector search and the planner</h3>
+  <!--NARR-FILTERED-->
+</div>
+<figure class="narrow">
+  <div class="frame">
+    <p class="chart-title">Filtered vector search: time by strategy and selectivity</p>
+    <p class="chart-sub">Mean over the workload's filters at each selectivity (random and topic filters, near and far from the query)</p>
+    <div class="chart" id="filtered-chart"></div>
+  </div>
+</figure>
+<div class="col">
+  <!--NARR-PLANNER-->
+</div>
+<div class="wide" id="planner-table"></div>
+
+<div class="col">
+  <h3 id="r-storage">Transactions and storage</h3>
+  <!--NARR-STORAGE-->
+</div>
+<figure class="narrow">
+  <div class="frame">
+    <p class="chart-title">Write throughput through the WAL</p>
+    <p class="chart-sub">FiQA documents, one writer · each transaction commits</p>
+    <div class="chart" id="wal-chart"></div>
+  </div>
+</figure>
+<div class="col">
+  <!--NARR-STORAGE2-->
+</div>

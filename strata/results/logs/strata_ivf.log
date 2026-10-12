@@ -1,0 +1,6 @@
+== trec-covid
+   built in 30.1s (30.1s here), 1179.1 MiB
+   vector          warm p50 0.307 ms, cold p50 15.28 ms
+   filtered_vector warm p50 0.409 ms, cold p50 27.92 ms
+   hybrid          warm p50 2.054 ms, cold p50 24.95 ms
+   filtered_hybrid warm p50 1.092 ms, cold p50 38.55 ms

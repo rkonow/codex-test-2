@@ -650,7 +650,8 @@ impl<'a> Executor<'a> {
     }
 
     /// The fraction of the query's nearest neighbours that pass the filter,
-    /// from a cheap unfiltered index search (32 results). A filter correlated
+    /// from a cheap unfiltered index search (32 results, 160 when the first
+    /// sample holds at most one match). A filter correlated
     /// with the query, or anti-correlated, has a local selectivity far from
     /// its global one, and the local one decides how far an index search
     /// must go to collect k matches. Only measured when the global
@@ -664,14 +665,25 @@ impl<'a> Executor<'a> {
             self.planner(&est).estimate(p).probeable
         };
         let f = self.seg_filter(s, p, if probeable { FilterMode::Probe } else { FilterMode::Materialize })?;
-        let mut sp = base.clone();
-        sp.strategy = to_vector_strategy(VectorStrategy::InIndex, vr.index_kind(), false);
-        sp.ef = 32;
-        sp.rerank = 0;
-        sp.nprobe = sp.nprobe.min(4);
-        let out = vr.search(q, 32, &sp, None);
-        let pass = out.hits.iter().filter(|h| f.as_dyn().is_none_or(|f| f.contains(h.doc))).count();
-        Ok(Some((pass as f64 + 0.5) / (out.hits.len() as f64 + 1.0)))
+        let sample = |m: usize| {
+            let mut sp = base.clone();
+            sp.strategy = to_vector_strategy(VectorStrategy::InIndex, vr.index_kind(), false);
+            sp.ef = m;
+            sp.rerank = 0;
+            sp.nprobe = sp.nprobe.min(if m > 32 { 8 } else { 4 });
+            let out = vr.search(q, m, &sp, None);
+            let pass = out.hits.iter().filter(|h| f.as_dyn().is_none_or(|f| f.contains(h.doc))).count();
+            (pass, out.hits.len())
+        };
+        // 32 neighbours resolve selectivities down to a few per cent. When
+        // they hold almost no matches, a 160-neighbour sample tells a filter
+        // that is merely selective from one whose members lie far from the
+        // query, where an index search would wander for tens of ms.
+        let (mut pass, mut m) = sample(32);
+        if pass <= 1 && global > 0.02 {
+            (pass, m) = sample(160);
+        }
+        Ok(Some((pass as f64 + 0.5) / (m as f64 + 1.0)))
     }
 
     /// Weighted fusion: the union of each input's top candidates, re-scored
