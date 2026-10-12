@@ -53,7 +53,15 @@ def slim_text(d):
     if not d:
         return None
     keep = {k: d.get(k) for k in ("documents", "postings", "positions", "terms", "ndcg@10")}
-    keep["formats"] = [{k: f.get(k) for k in ("format", "sizes", "warm", "cold", "build_secs")} for f in d.get("formats", [])]
+    keep["formats"] = [
+        {
+            "format": f.get("format"),
+            "build_secs": f.get("build_secs"),
+            "sizes": {"bits_per_posting": f["sizes"]["bits_per_posting"], "bits_per_position": f["sizes"].get("bits_per_position")},
+            "warm": {"boolean": f["warm"].get("boolean"), "bm25": [{k: b.get(k) for k in ("algo", "filter", "mean_us", "p50_us", "p99_us")} for b in f["warm"].get("bm25", [])]},
+        }
+        for f in d.get("formats", [])
+    ]
     return keep
 
 

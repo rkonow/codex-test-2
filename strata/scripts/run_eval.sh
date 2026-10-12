@@ -10,8 +10,8 @@ log=results/logs
 mkdir -p "$log"
 
 declare -A STEPS=(
-  [strata_small]="$B/strata-eval --collections scifact,fiqa,trec-covid"
-  [strata_quora]="$B/strata-eval --collections quora"
+  [strata_small]="$B/strata-eval --collections scifact,fiqa,trec-covid --keep"
+  [strata_quora]="$B/strata-eval --collections quora --keep"
   [strata_ivf]="$B/strata-eval --collections trec-covid,quora --index ivf --studies workload,planner --kinds vector,filtered_vector,hybrid,filtered_hybrid"
   [baselines_small]="$B/strata-baselines --collections scifact,fiqa,trec-covid"
   [baselines_quora]="$B/strata-baselines --collections quora --max-vector 300"
@@ -22,8 +22,13 @@ declare -A STEPS=(
   [forward_trec]="$B/strata-forward-bench --collection trec-covid"
   [forward_quora]="$B/strata-forward-bench --collection quora"
   [storage]="$B/strata-storage-bench --dataset fiqa --reps 5"
+  # Cold-cache ablation on the databases kept above: read-ahead on every
+  # section, and read-ahead off everywhere (the default advises only the
+  # random-access sections MADV_RANDOM).
+  [ablation_readahead]="$B/strata-eval --collections trec-covid,quora --reuse --keep --no-random-hints --studies workload"
+  [ablation_noreadahead]="$B/strata-eval --collections trec-covid,quora --reuse --keep --no-read-ahead --studies workload"
 )
-ORDER=(strata_small strata_quora strata_ivf baselines_small baselines_quora vector_fiqa vector_trec vector_quora text forward_trec forward_quora storage)
+ORDER=(strata_small strata_quora strata_ivf ablation_readahead ablation_noreadahead baselines_small baselines_quora vector_fiqa vector_trec vector_quora text forward_trec forward_quora storage)
 
 for step in "${@:-${ORDER[@]}}"; do
   echo "== $step $(date +%T): ${STEPS[$step]}" | tee -a "$log/progress.txt"

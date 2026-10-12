@@ -383,7 +383,26 @@
     window.addEventListener("resize", draw);
   }
 
+  function textTable() {
+    const el = $("#text-table");
+    if (!el) return;
+    const rows = [];
+    ["fiqa", "trec-covid", "quora"].forEach((c) => {
+      const t = C(c).text;
+      if (!t) return;
+      t.formats.forEach((f, i) => {
+        const w = f.warm;
+        const bool = (op) => (w.boolean || []).find((b) => b.op === op);
+        const bm = (algo) => (w.bm25 || []).find((b) => b.algo === algo && b.filter == null);
+        const us = (x) => (x ? num(x.mean_us, x.mean_us < 100 ? 1 : 0) : "—");
+        rows.push([i === 0 ? NAME[c] : "", { v: f.format === "loom" ? "Loom (default)" : "BP128 blocks", cls: "sys" }, num(f.sizes.bits_per_posting.postings_section, 2), us(bool("and")), us(bool("or")), us(bm("maxscore")), us(bm("bmw")), us(bm("exhaustive"))]);
+      });
+    });
+    table(el, ["collection", "posting format", "bits / posting", "AND µs", "OR µs", "BM25 MaxScore µs", "BM25 Block-Max WAND µs", "BM25 exhaustive µs"], rows, [2, 3, 4, 5, 6, 7]);
+  }
+
   meta();
+  textTable();
   buildTable();
   sizeTable();
   latency();
