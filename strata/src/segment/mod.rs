@@ -87,14 +87,43 @@ impl SegmentWriter {
 
     /// The segment image; its start must be placed at a page-aligned offset.
     pub fn finish(self) -> Vec<u8> {
+        let (_, _, total) = self.layout();
+        let mut out = Vec::with_capacity(total);
+        self.write_to(&mut out).expect("writing to a Vec cannot fail");
+        out
+    }
+
+    /// Streams the image [`finish`](Self::finish) would return to `w`,
+    /// releasing each section once written, so a segment never needs memory
+    /// for two copies of itself. Returns the image length.
+    pub fn write_to(self, w: &mut impl std::io::Write) -> std::io::Result<usize> {
+        let (header_len, dir, total) = self.layout();
+        let json = serde_json::to_vec(&dir).unwrap();
+        let mut header = vec![0u8; header_len];
+        header[..8].copy_from_slice(MAGIC);
+        header[8..16].copy_from_slice(&self.n_docs.to_le_bytes());
+        header[16..24].copy_from_slice(&(json.len() as u64).to_le_bytes());
+        header[24..24 + json.len()].copy_from_slice(&json);
+        w.write_all(&header)?;
+        let mut pos = header_len;
+        for ((_, data), e) in self.sections.into_iter().zip(&dir) {
+            w.write_all(&vec![0u8; e.offset as usize - pos])?;
+            w.write_all(&data)?;
+            pos = (e.offset + e.len) as usize;
+        }
+        debug_assert_eq!(pos, total);
+        Ok(total)
+    }
+
+    /// Header length, directory and total length of the image.
+    fn layout(&self) -> (usize, Vec<DirEntry>, usize) {
         let align = |len: usize| if len >= PAGE { PAGE } else { 64 };
         // Directory offsets depend on the directory's own length; iterate
         // until the layout is stable (twice in practice).
         let mut header_len = 0usize;
-        let mut dir: Vec<DirEntry>;
         loop {
             let mut off = header_len;
-            dir = Vec::with_capacity(self.sections.len());
+            let mut dir = Vec::with_capacity(self.sections.len());
             for (name, data) in &self.sections {
                 off = off.next_multiple_of(align(data.len()));
                 dir.push(DirEntry { name: name.clone(), offset: off as u64, len: data.len() as u64 });
@@ -103,21 +132,11 @@ impl SegmentWriter {
             let json = serde_json::to_vec(&dir).unwrap();
             let need = (24 + json.len()).next_multiple_of(64);
             if need == header_len {
-                break;
+                let total = dir.last().map_or(header_len, |e| (e.offset + e.len) as usize);
+                return (header_len, dir, total);
             }
             header_len = need;
         }
-        let json = serde_json::to_vec(&dir).unwrap();
-        let total = dir.last().map_or(header_len, |e| (e.offset + e.len) as usize);
-        let mut out = vec![0u8; total];
-        out[..8].copy_from_slice(MAGIC);
-        out[8..16].copy_from_slice(&self.n_docs.to_le_bytes());
-        out[16..24].copy_from_slice(&(json.len() as u64).to_le_bytes());
-        out[24..24 + json.len()].copy_from_slice(&json);
-        for ((_, data), e) in self.sections.iter().zip(&dir) {
-            out[e.offset as usize..e.offset as usize + data.len()].copy_from_slice(data);
-        }
-        out
     }
 }
 
@@ -200,5 +219,19 @@ mod tests {
         assert_eq!(seg.section_range("a").unwrap().start % 64, 0);
         assert!(seg.require("c").unwrap().is_empty());
         assert!(seg.section("missing").is_none());
+    }
+
+    #[test]
+    fn streamed_image_equals_finished_image() {
+        let make = || {
+            let mut w = SegmentWriter::new(2);
+            w.put("x", vec![9u8; 100]);
+            w.put("y", vec![3u8; 9000]);
+            w
+        };
+        let mut streamed = Vec::new();
+        let len = make().write_to(&mut streamed).unwrap();
+        assert_eq!(len, streamed.len());
+        assert_eq!(streamed, make().finish());
     }
 }

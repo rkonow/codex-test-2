@@ -11,6 +11,11 @@ pub trait DocFilter: Send + Sync {
     fn contains(&self, doc: DocId) -> bool;
     /// Number of members (exact or estimated; used for planning).
     fn cardinality(&self) -> usize;
+    /// The filter as a materialised set, if it is one, so that operators can
+    /// enumerate or intersect its members instead of probing every document.
+    fn as_doc_set(&self) -> Option<&DocSet> {
+        None
+    }
 }
 
 /// A materialised set of docIDs in `0..n`, sorted array when sparse and
@@ -187,6 +192,9 @@ impl DocFilter for DocSet {
     }
     fn cardinality(&self) -> usize {
         self.len()
+    }
+    fn as_doc_set(&self) -> Option<&DocSet> {
+        Some(self)
     }
 }
 
