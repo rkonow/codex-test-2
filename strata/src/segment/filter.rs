@@ -16,6 +16,12 @@ pub trait DocFilter: Send + Sync {
     fn as_doc_set(&self) -> Option<&DocSet> {
         None
     }
+    /// The members in increasing order, if the filter holds them (a
+    /// materialised set); `None` for probe-only filters. Lets a selective
+    /// filter drive a search instead of being probed per candidate.
+    fn members(&self) -> Option<Box<dyn Iterator<Item = DocId> + '_>> {
+        self.as_doc_set().map(|s| s.iter())
+    }
 }
 
 /// A materialised set of docIDs in `0..n`, sorted array when sparse and

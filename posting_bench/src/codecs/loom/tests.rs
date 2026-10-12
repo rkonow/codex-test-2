@@ -350,3 +350,92 @@ fn space_close_to_pef() {
         assert!(ratio < 1.02, "{name}: Loom / PEF = {ratio:.4}");
     }
 }
+
+/// A list read back from its bytes is a zero-copy view that decodes,
+/// seeks, ranks and combines exactly as the built list.
+#[test]
+fn bytes_roundtrip_zero_copy() {
+    use crate::bytes::{ByteReader, ByteWriter, OwnedBytes};
+    let lists = conformance::sample_lists();
+    // Several lists in one buffer, as an index stores them.
+    let built: Vec<Loom> = lists.iter().map(|(d, u)| Loom::build(d, *u)).collect();
+    let mut w = ByteWriter::new();
+    for l in &built {
+        l.write_to(&mut w);
+    }
+    let mut r = ByteReader::new(OwnedBytes::new(w.finish()));
+    let views: Vec<Loom> = built.iter().map(|_| Loom::read_from(&mut r).unwrap()).collect();
+    for ((docs, _), (b, v)) in lists.iter().zip(built.iter().zip(&views)) {
+        assert!(v.is_shared() && !b.is_shared());
+        assert_eq!((v.len(), v.size_bits(), v.num_partitions()), (b.len(), b.size_bits(), b.num_partitions()));
+        let mut out = Vec::new();
+        v.decode_into(&mut out);
+        assert!(out == *docs, "decode of a view");
+        let mut c = v.cursor();
+        for (i, &d) in docs.iter().enumerate().step_by(5) {
+            assert_eq!(c.next_geq(d), d);
+            assert_eq!(c.rank(), i);
+        }
+    }
+    // Set operations mixing built lists and views.
+    for (lists, u) in conformance::sample_groups() {
+        let built: Vec<Loom> = lists.iter().map(|l| Loom::build(l, u)).collect();
+        let views: Vec<Loom> = built.iter().map(|l| Loom::from_bytes(OwnedBytes::new(l.to_bytes())).unwrap()).collect();
+        for k in 1..=lists.len().min(4) {
+            let refs: Vec<&Vec<u32>> = lists[..k].iter().collect();
+            let mixed: Vec<&Loom> = (0..k).map(|i| if i % 2 == 0 { &views[i] } else { &built[i] }).collect();
+            let mut out = Vec::new();
+            Loom::intersect(&mixed, &mut out);
+            assert!(out == reference_and(&refs), "AND of views");
+            out.clear();
+            Loom::union(&mixed, &mut out);
+            assert!(out == reference_or(&refs), "OR of views");
+        }
+    }
+    // Truncated or inconsistent bytes are rejected.
+    let good = built.iter().find(|l| l.len() > 1000).unwrap().to_bytes();
+    assert!(Loom::from_bytes(OwnedBytes::new(good[..good.len() - 8].to_vec())).is_err());
+    let mut bad = good.clone();
+    bad[0] ^= 1; // n no longer matches the ranks
+    assert!(Loom::from_bytes(OwnedBytes::new(bad)).is_err());
+}
+
+/// `rank` is the posting's index after any mix of `next` and `next_geq`,
+/// in every partition kind, for borrowed and owning cursors.
+#[test]
+fn rank_matches_index() {
+    let mut rng = StdRng::seed_from_u64(91);
+    let mut lists: Vec<Vec<u32>> = conformance::sample_lists().into_iter().map(|(d, _)| d).collect();
+    // Long bitvector partitions (ranks counted over many words).
+    lists.push((0..400_000u32).filter(|_| rng.gen_bool(0.3)).collect());
+    for params in [Params::DEFAULT, Params { chunk: 8, lambda: (2, 1) }] {
+        for docs in lists.iter().filter(|d| !d.is_empty()) {
+            let l = Loom::build_with(docs, params);
+            let mut c = l.cursor();
+            for (i, &d) in docs.iter().enumerate() {
+                assert_eq!((c.docid(), c.rank()), (d, i));
+                c.next();
+            }
+            assert_eq!((c.docid(), c.rank()), (END, docs.len()));
+            let gap = (*docs.last().unwrap() / docs.len() as u32).saturating_mul(4).max(1);
+            for _ in 0..3 {
+                let mut c = l.clone().into_cursor();
+                loop {
+                    if rng.gen_bool(0.3) {
+                        c.next();
+                    } else {
+                        c.next_geq(c.docid().saturating_add(rng.gen_range(1..=gap)));
+                    }
+                    let d = c.docid();
+                    if d == END {
+                        assert_eq!(c.rank(), docs.len());
+                        break;
+                    }
+                    if rng.gen_bool(0.7) {
+                        assert_eq!(c.rank(), docs.partition_point(|&x| x < d), "docID {d}");
+                    }
+                }
+            }
+        }
+    }
+}

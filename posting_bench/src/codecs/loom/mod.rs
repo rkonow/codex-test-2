@@ -46,14 +46,26 @@
 //!   bitvector words, fills its runs and sets its (SIMD-decoded) EF
 //!   postings, then the window is extracted (`vpcompressd`) and cleared.
 //! * [`Loom::and_count`] / [`Loom::or_count`] return cardinalities only.
+//!
+//! **Storage.** The arrays are [`Slice`]s: owned when built, zero-copy views
+//! when read back with [`Loom::from_bytes`] from what [`Loom::write_to`]
+//! wrote (e.g. a memory-mapped index file), so every algorithm runs on
+//! either. Besides the upper level, a list keeps the rank of every
+//! partition's first posting (32 bits per partition, not part of
+//! [`PostingList::size_bits`], which stays comparable with the other codecs)
+//! so that [`LoomCursor::rank`] can index arrays aligned with the postings,
+//! such as term frequencies.
 
 mod and;
 mod ef;
 mod or;
 mod simd;
 
+use std::borrow::Borrow;
+
 use super::uncompressed::gallop_geq;
 use super::{Cursor, CursorList, PostingList, SetOps};
+use crate::bytes::{ByteReader, ByteWriter, OwnedBytes, Pod, Slice};
 use crate::END;
 
 /// Partition encodings.
@@ -101,12 +113,14 @@ const L_SHIFT: u32 = 48;
 pub struct Loom {
     n: usize,
     /// Last docID of every partition.
-    ends: Vec<u32>,
+    ends: Slice<u32>,
     /// Descriptor of every partition: payload word offset (bits 0..32),
     /// encoding (32..34), `n - 1` (34..47), EF low bits (48..54).
-    desc: Vec<u64>,
+    desc: Slice<u64>,
+    /// Postings before every partition.
+    ranks: Slice<u32>,
     /// All payloads, then [`PAD_WORDS`] zero words.
-    words: Vec<u64>,
+    words: Slice<u64>,
     size_bits: u64,
 }
 
@@ -170,14 +184,16 @@ fn partition(docs: &[u32], params: Params) -> Vec<usize> {
 impl Loom {
     /// Build with explicit parameters.
     pub fn build_with(docs: &[u32], params: Params) -> Self {
-        let mut list = Loom { n: docs.len(), ..Self::default() };
+        let mut words: Vec<u64> = Vec::new();
         if docs.is_empty() {
-            list.words.extend([0; PAD_WORDS]);
-            return list;
+            words.extend([0; PAD_WORDS]);
+            return Loom { words: words.into(), ..Self::default() };
         }
+        assert!(docs.len() <= u32::MAX as usize, "list too long");
         let cuts = partition(docs, params);
-        list.ends.reserve_exact(cuts.len());
-        list.desc.reserve_exact(cuts.len());
+        let mut ends = Vec::with_capacity(cuts.len());
+        let mut desc = Vec::with_capacity(cuts.len());
+        let mut ranks = Vec::with_capacity(cuts.len());
         let (mut start, mut base) = (0usize, 0u32);
         let mut bits = 0u64;
         for end in cuts {
@@ -185,38 +201,104 @@ impl Loom {
             let m = part.len();
             let last = part[m - 1];
             let (kind, real) = choose(base as u64, last as u64 + 1, m as u64, params.lambda.0, params.lambda.1);
-            let off = list.words.len();
+            let off = words.len();
             let mut l = 0u32;
             match kind {
                 RUN => {}
                 BV => {
                     let abase = base & !63;
-                    list.words.resize(off + ((last - abase) / 64 + 1) as usize, 0);
+                    words.resize(off + ((last - abase) / 64 + 1) as usize, 0);
                     for &d in part {
                         let r = (d - abase) as usize;
-                        list.words[off + r / 64] |= 1u64 << (r % 64);
+                        words[off + r / 64] |= 1u64 << (r % 64);
                     }
                 }
                 _ => {
                     let span = (last - base) as u64 + 1;
-                    let b = ef::encode(part, base, span, &mut list.words);
+                    let b = ef::encode(part, base, span, &mut words);
                     debug_assert_eq!(b + EF_SIZE_BITS, real);
                     l = ef::lower_bits(span, m as u64);
                 }
             }
             assert!(off < 1 << 32, "list payload too large");
-            list.desc.push(off as u64 | (kind as u64) << KIND_SHIFT | ((m - 1) as u64) << N_SHIFT | (l as u64) << L_SHIFT);
-            list.ends.push(last);
+            desc.push(off as u64 | (kind as u64) << KIND_SHIFT | ((m - 1) as u64) << N_SHIFT | (l as u64) << L_SHIFT);
+            ends.push(last);
+            ranks.push(start as u32);
             bits += FIXED_COST + real;
             start = end;
             base = last + 1;
         }
         // Padding for unaligned low-bit reads (up to 64 bytes for the SIMD
         // decoder) and look-ahead word loads.
-        list.words.extend([0; PAD_WORDS]);
-        list.words.shrink_to_fit();
-        list.size_bits = bits;
-        list
+        words.extend([0; PAD_WORDS]);
+        words.shrink_to_fit();
+        Loom { n: docs.len(), ends: ends.into(), desc: desc.into(), ranks: ranks.into(), words: words.into(), size_bits: bits }
+    }
+
+    /// Appends the list to `w`; [`Loom::read_from`] views it in place.
+    ///
+    /// Layout (every array 8-byte aligned, see [`ByteWriter::array`]):
+    /// `n`, `size_bits`, partition ends, descriptors, ranks, payload words
+    /// (with their zero padding).
+    pub fn write_to(&self, w: &mut ByteWriter) {
+        w.u64(self.n as u64);
+        w.u64(self.size_bits);
+        w.array(&self.ends);
+        w.array(&self.desc);
+        w.array(&self.ranks);
+        w.array(&self.words);
+    }
+
+    /// The serialised list (see [`Loom::write_to`]).
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut w = ByteWriter::new();
+        self.write_to(&mut w);
+        w.finish()
+    }
+
+    /// Views a list written by [`Loom::write_to`] without copying: every
+    /// array is a [`Slice::Shared`] into `bytes`, which must be 8-byte
+    /// aligned. Checks the structure (array lengths, padding) but trusts the
+    /// partition descriptors, as the codec trusts its own build; data from
+    /// untrusted storage must be checksummed by the caller.
+    pub fn from_bytes(bytes: OwnedBytes) -> Result<Self, String> {
+        Self::read_from(&mut ByteReader::new(bytes))
+    }
+
+    /// Reads one list at the reader's position (see [`Loom::from_bytes`]).
+    pub fn read_from(r: &mut ByteReader) -> Result<Self, String> {
+        let n = r.u64()? as usize;
+        let size_bits = r.u64()?;
+        let ends: Slice<u32> = r.array()?;
+        let desc: Slice<u64> = r.array()?;
+        let ranks: Slice<u32> = r.array()?;
+        let words: Slice<u64> = r.array()?;
+        let p = ends.len();
+        if desc.len() != p || ranks.len() != p || words.len() < PAD_WORDS || (n == 0) != (p == 0) || n > u32::MAX as usize {
+            return Err(format!("inconsistent Loom list: {n} postings, {p} partitions, {} words", words.len()));
+        }
+        if p > 0 {
+            let d = desc[p - 1];
+            let last_n = ((d >> N_SHIFT) & 0x1fff) as usize + 1;
+            if ranks[p - 1] as usize + last_n != n || (d & OFF_MASK) as usize >= words.len() {
+                return Err("Loom list ranks or offsets out of range".into());
+            }
+        }
+        Ok(Loom { n, ends, desc, ranks, words, size_bits })
+    }
+
+    /// Whether every array is a zero-copy view (as after [`Loom::from_bytes`]).
+    pub fn is_shared(&self) -> bool {
+        fn shared<T: Pod>(s: &Slice<T>) -> bool {
+            matches!(s, Slice::Shared { .. })
+        }
+        shared(&self.ends) && shared(&self.desc) && shared(&self.ranks) && shared(&self.words)
+    }
+
+    /// A cursor that owns the list (a view is cheap to move), for callers
+    /// that keep cursors beyond the scope of a borrowed list.
+    pub fn into_cursor(self) -> LoomCursor<Loom> {
+        LoomCursor::new(self)
     }
 
     /// Number of partitions.
@@ -396,24 +478,76 @@ fn find_partition(ends: &[u32], from: usize, target: u32) -> usize {
     gallop_geq(ends, from, target)
 }
 
-/// Cursor over a [`Loom`] list.
-pub struct LoomCursor<'a> {
-    list: &'a Loom,
+/// Cursor over a [`Loom`] list, holding it as `L`: borrowed (`&Loom`, what
+/// [`CursorList::cursor`] returns) or owned (`Loom`, from
+/// [`Loom::into_cursor`]).
+pub struct LoomCursor<L: Borrow<Loom>> {
+    list: L,
     cur: u32,
     p: usize,
     part: Part,
     /// Bitvector scan state: word index of `cur` and the bits after it.
     wi: usize,
     buf: u64,
+    /// Bitvector rank state, valid for partition `rank_p`: the set bits in
+    /// the words before word `rank_wi` (see [`LoomCursor::rank`]).
+    rank_p: usize,
+    rank_wi: usize,
+    rank_acc: usize,
 }
 
-impl<'a> LoomCursor<'a> {
-    fn new(list: &'a Loom) -> Self {
-        let mut c = LoomCursor { list, cur: END, p: 0, part: Part::empty(), wi: 0, buf: 0 };
-        if list.n > 0 {
+impl<L: Borrow<Loom>> LoomCursor<L> {
+    fn new(list: L) -> Self {
+        let n = list.borrow().n;
+        let mut c =
+            LoomCursor { list, cur: END, p: 0, part: Part::empty(), wi: 0, buf: 0, rank_p: usize::MAX, rank_wi: 0, rank_acc: 0 };
+        if n > 0 {
             c.enter(0, 0);
         }
         c
+    }
+
+    #[inline(always)]
+    fn list(&self) -> &Loom {
+        self.list.borrow()
+    }
+
+    /// Rank of the current posting (the number of postings before it), or
+    /// the list length once exhausted.
+    ///
+    /// Constant time for run and EF partitions. In a bitvector partition it
+    /// counts the set bits of the words before the current one, resuming
+    /// from where the previous call in the same partition stopped, so a
+    /// pass that asks for every rank costs one popcount per word.
+    #[inline]
+    pub fn rank(&mut self) -> usize {
+        if self.cur == END {
+            return self.list().n;
+        }
+        // SAFETY: p < num_partitions while the cursor is on a posting.
+        let first = unsafe { *self.list().ranks.get_unchecked(self.p) } as usize;
+        let part = &self.part;
+        first
+            + match part.kind {
+                RUN => (self.cur - part.base) as usize,
+                BV => {
+                    if self.rank_p != self.p {
+                        (self.rank_p, self.rank_wi, self.rank_acc) = (self.p, 0, 0);
+                    }
+                    // SAFETY: words up to `wi` (the current posting's) are
+                    // inside the partition.
+                    unsafe {
+                        while self.rank_wi < self.wi {
+                            self.rank_acc += (*part.bits.add(self.rank_wi)).count_ones() as usize;
+                            self.rank_wi += 1;
+                        }
+                        let w = *part.bits.add(self.wi);
+                        // Bits of the word below `cur`: all but `cur` and those after it.
+                        self.rank_acc + (w.count_ones() - self.buf.count_ones() - 1) as usize
+                    }
+                }
+                _ => part.ef.idx,
+            }
     }
 
     /// Load partition `p` and move to its first posting `>= target`
@@ -421,7 +555,7 @@ impl<'a> LoomCursor<'a> {
     #[inline(never)]
     fn enter(&mut self, p: usize, target: u32) -> u32 {
         self.p = p;
-        self.part = Part::load(self.list, p);
+        self.part = Part::load(self.list.borrow(), p);
         let t = target.max(self.part.base);
         self.seek_in(t)
     }
@@ -458,12 +592,12 @@ impl<'a> LoomCursor<'a> {
         self.cur = END;
         self.part.last = END;
         self.part.kind = RUN;
-        self.p = self.list.ends.len();
+        self.p = self.list().ends.len();
         END
     }
 }
 
-impl Cursor for LoomCursor<'_> {
+impl<L: Borrow<Loom>> Cursor for LoomCursor<L> {
     #[inline]
     fn docid(&self) -> u32 {
         self.cur
@@ -472,7 +606,7 @@ impl Cursor for LoomCursor<'_> {
     #[inline(always)]
     fn next(&mut self) -> u32 {
         if self.cur >= self.part.last {
-            if self.cur == END || self.p + 1 >= self.list.ends.len() {
+            if self.cur == END || self.p + 1 >= self.list().ends.len() {
                 return self.exhaust();
             }
             return self.enter(self.p + 1, 0);
@@ -504,8 +638,9 @@ impl Cursor for LoomCursor<'_> {
             return self.cur;
         }
         if target > self.part.last {
-            let p = find_partition(&self.list.ends, self.p + 1, target);
-            if p >= self.list.ends.len() {
+            let ends = &self.list().ends;
+            let p = find_partition(ends, self.p + 1, target);
+            if p >= ends.len() {
                 return self.exhaust();
             }
             return self.enter(p, target);
@@ -514,15 +649,15 @@ impl Cursor for LoomCursor<'_> {
     }
 
     fn size(&self) -> usize {
-        self.list.n
+        self.list().n
     }
 }
 
 impl CursorList for Loom {
-    type Cursor<'a> = LoomCursor<'a>;
+    type Cursor<'a> = LoomCursor<&'a Loom>;
 
     #[inline]
-    fn cursor(&self) -> LoomCursor<'_> {
+    fn cursor(&self) -> LoomCursor<&Loom> {
         LoomCursor::new(self)
     }
 }

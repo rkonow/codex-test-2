@@ -1136,6 +1136,7 @@ dependencies = [
  "posting_bench",
  "rand",
  "rusqlite",
+ "rust-stemmers",
  "serde",
  "serde_json",
  "sqlparser",
