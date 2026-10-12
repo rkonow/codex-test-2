@@ -339,6 +339,20 @@ fn integer_keys_unstored_edges_and_errors() {
     db.storage().merge(&MergePolicy { merge_factor: 2, floor_docs: 100, ..MergePolicy::default() }).unwrap();
     assert_eq!(col("SELECT id FROM g WHERE PATH(next, 9, 6) ORDER BY hops() LIMIT 20"), vec![9, 0, 5, 6]);
 
+    // Ties on hops() are broken by the key over all tied rows, not the
+    // first k found: a star whose leaves sit in several segments.
+    let star = Schema::new("s", vec![Field::new("id", FieldType::Int), Field::new("e", FieldType::Edges)], Some("id")).unwrap();
+    let sdb = Db::create(&dir.path().join("s.strata"), star, DbOptions { segment_max_docs: 7, sync: false, ..DbOptions::default() }).unwrap();
+    let mut leaves: Vec<i64> = (1..=40).collect();
+    leaves.reverse();
+    let mut rows = vec![vec![Value::Int(0), edges_value(&leaves.iter().map(|&l| Edge::to(Value::Int(l))).collect::<Vec<_>>())]];
+    rows.extend(leaves.iter().map(|&l| vec![Value::Int(l), Value::Null]));
+    sdb.load(rows).unwrap();
+    let got: Vec<i64> = sdb.query("SELECT id FROM s WHERE REACHABLE(e, 0) ORDER BY hops(), id LIMIT 5", &Params::new()).unwrap().rows.iter().map(|r| r[0].as_i64().unwrap()).collect();
+    assert_eq!(got, vec![1, 2, 3, 4, 5]);
+    let got: Vec<i64> = sdb.query("SELECT id FROM s WHERE REACHABLE(e, 0) ORDER BY hops(), id DESC LIMIT 3", &Params::new()).unwrap().rows.iter().map(|r| r[0].as_i64().unwrap()).collect();
+    assert_eq!(got, vec![40, 39, 38]);
+
     for bad in [
         "SELECT id FROM g WHERE REACHABLE(id, 0)",
         "SELECT id FROM g WHERE REACHABLE(next, 0, hopz => 2)",

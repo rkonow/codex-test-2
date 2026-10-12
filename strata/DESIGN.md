@@ -250,8 +250,8 @@ needs no graph code: its in-memory segments are built by the same builder.
 Keys instead of docIDs are what let edges survive updates, deletes and
 merges untouched, and they are also the cost: a cross-segment hop is a hash
 probe per segment where an in-memory CSR reads an array. On a million-row
-power-law graph in four segments, personalized PageRank takes 6.1 ms where
-the CSR takes 1.3 ms; on arXiv in two segments, 1.8 ms against 0.7 ms. A
+power-law graph in four segments, personalized PageRank takes 5.8 ms where
+the CSR takes 1.3 ms; on arXiv in two segments, 1.4 ms against 0.5 ms. A
 merge into fewer segments narrows the gap; a snapshot-wide resolved CSR,
 rebuilt when segments change, would close it at the price of memory and
 rebuild time.

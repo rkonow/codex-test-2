@@ -299,19 +299,24 @@ impl<'a> Executor<'a> {
             _ => return Err(err("not a graph score")),
         };
         let out = self.graphs.get(gid).ok_or_else(|| err("graph score without its computation"))?;
-        let mut by_seg: HashMap<usize, Vec<(DocId, f64)>> = HashMap::new();
-        for (n, x) in &out.nodes {
-            let (s, d) = split(*n);
-            by_seg.entry(s).or_default().push((d, value(x)));
-        }
         let mut hits = Vec::new();
+        if *p == Pred::True {
+            // Rows in a graph result are live: no filter to apply.
+            hits.extend(out.nodes.iter().map(|(n, x)| {
+                let (seg, doc) = split(*n);
+                Hit { seg, doc, score: value(x) }
+            }));
+        }
+        let mut by_seg: HashMap<usize, Vec<(DocId, f64)>> = HashMap::new();
+        if *p != Pred::True {
+            for (n, x) in &out.nodes {
+                let (s, d) = split(*n);
+                by_seg.entry(s).or_default().push((d, value(x)));
+            }
+        }
         let segs: Vec<&'a super::Seg> = self.segs.iter().map(|s| unsafe_extend(s)).collect();
         for s in segs {
             let Some(cands) = by_seg.remove(&s.ord) else { continue };
-            if *p == Pred::True {
-                hits.extend(cands.into_iter().map(|(doc, score)| Hit { seg: s.ord, doc, score }));
-                continue;
-            }
             let probeable = {
                 let est = super::SegEst { ex: self, s, params: None, local_sel: None };
                 self.planner(&est).estimate(p).probeable
@@ -322,7 +327,17 @@ impl<'a> Executor<'a> {
         }
         self.stats.scored += hits.len() as u64;
         self.stats.plan.push(format!("graph {gid}: ranked {} rows by {}", hits.len(), if matches!(score, Score::Ppr { .. }) { "ppr" } else { "hops" }));
-        Ok(super::merge_top(hits, k))
+        // Hop counts tie by the hundred: every row tied with the k-th stays,
+        // so that a tie-break (ORDER BY hops(), id) chooses among all of them.
+        // The k-th is found in linear time; only the rows kept are sorted.
+        let better = |a: &Hit, b: &Hit| b.score.total_cmp(&a.score).then((a.seg, a.doc).cmp(&(b.seg, b.doc)));
+        if k > 0 && hits.len() > k {
+            hits.select_nth_unstable_by(k - 1, better);
+            let cut = hits[k - 1].score;
+            hits.retain(|h| h.score >= cut);
+        }
+        hits.sort_by(better);
+        Ok(hits)
     }
 
     /// A graph score of one row (0 for PageRank, very low for hops, when
