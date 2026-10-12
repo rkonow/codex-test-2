@@ -9,7 +9,8 @@
 //! * [`segment`]: the immutable unit of storage, a directory of aligned,
 //!   named sections, and the builder that turns documents into one.
 //! * [`storage`]: the single-file pager, commit protocol, WAL, snapshots.
-//! * [`text`], [`forward`], [`vector`]: the three index families.
+//! * [`text`], [`forward`], [`vector`]: the three index families, and
+//!   [`graph`]: edges between rows, with traversals.
 //! * [`query`]: SQL front end, planner and executor.
 //! * [`data`], [`metrics`]: BEIR loaders and retrieval metrics for the
 //!   evaluation.
@@ -23,6 +24,7 @@ pub mod data;
 pub mod db;
 pub mod error;
 pub mod forward;
+pub mod graph;
 pub mod iostat;
 pub mod metrics;
 pub mod query;

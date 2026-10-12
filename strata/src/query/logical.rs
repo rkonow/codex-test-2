@@ -21,6 +21,59 @@ pub enum Pred {
     And(Vec<Pred>),
     Or(Vec<Pred>),
     Not(Box<Pred>),
+    /// Membership in the result of `Select::graphs[id]` (`REACHABLE`,
+    /// `PATH`), computed before the rest of the query.
+    Graph { id: usize },
+}
+
+/// Which way edges are followed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Direction {
+    /// From a row to the targets of its edges.
+    Out,
+    /// From a row to the rows whose edges point at it.
+    In,
+    Both,
+}
+
+/// Where a traversal starts.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Seeds {
+    /// Primary keys.
+    Keys(Vec<Value>),
+    /// The rows of a subquery over the same table (with their scores, which
+    /// `ppr(..., weighted => 1)` uses as restart weights).
+    Query(Box<Select>),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum GraphKind {
+    /// Rows within `min_hops..=max_hops` of a seed.
+    Reach { min_hops: u32, max_hops: u32 },
+    /// The rows of one shortest path from a seed to one of `to`.
+    Path { to: Seeds, max_hops: u32 },
+    /// Personalized PageRank from the seeds (forward push).
+    Ppr { alpha: f64, eps: f64, max_pushes: u64, weighted: bool },
+}
+
+/// A graph computation over one EDGES field, or over a VECTOR field whose
+/// `k` most similar rows count as a row's neighbours.
+#[derive(Clone, Debug, PartialEq)]
+pub struct GraphQuery {
+    pub field: usize,
+    pub seeds: Seeds,
+    pub kind: GraphKind,
+    pub dir: Direction,
+    /// Only edges with one of these labels (empty: any).
+    pub labels: Vec<String>,
+    /// Traversals continue only through rows satisfying this (seeds and
+    /// end points are exempt).
+    pub through: Option<Pred>,
+    /// Stop after meeting this many rows.
+    pub max_nodes: usize,
+    /// VECTOR fields: neighbours per row, and the least similarity.
+    pub k: usize,
+    pub min_sim: f64,
 }
 
 impl Pred {
@@ -88,6 +141,11 @@ pub enum Score {
     Weighted(Vec<(f64, Score)>),
     /// A numeric column's value.
     Column { field: usize },
+    /// Personalized PageRank of `Select::graphs[graph]`.
+    Ppr { graph: usize },
+    /// Hop distance in `Select::graphs[graph]`, nearest first (as
+    /// `-hops`) or farthest first.
+    Hops { graph: usize, far_first: bool },
 }
 
 impl Score {
@@ -125,6 +183,8 @@ pub enum Projection {
     Score,
     /// `COUNT(*)`: of the whole result, or per group.
     Count,
+    /// `hops()`: the row's hop distance in `Select::graphs[id]`.
+    Hops(usize),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -139,6 +199,9 @@ pub struct Select {
     pub tiebreak: Option<Tiebreak>,
     pub limit: Option<usize>,
     pub offset: usize,
+    /// Graph computations that `Pred::Graph`, `Score::Ppr`, `Score::Hops`
+    /// and `Projection::Hops` refer to by index.
+    pub graphs: Vec<GraphQuery>,
 }
 
 /// A secondary ORDER BY key (`ORDER BY rating DESC, id`; `ORDER BY 2 DESC, 1`).

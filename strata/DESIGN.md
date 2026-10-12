@@ -28,6 +28,11 @@ This document is the design. `report/` holds the evaluation of the prototype.
   deserialisation. Layout keeps the I/O of a query proportional to the work it
   does, and sequential where possible.
 
+* **Graphs over the same rows.** A row can hold typed, weighted edges to
+  other rows. Queries traverse them (reachability, shortest paths,
+  personalized PageRank) and combine the result with text, structured and
+  vector search in one statement (§5.4, §6.1).
+
 Non-goals for the prototype: joins, multi-process writers (the file lock and
 `-shm` reader table of SQLite are designed but not built), distribution.
 
@@ -199,6 +204,67 @@ reader (sections to a zero-copy view). Global docIDs are
   the index and skip non-matching documents during traversal or probing) and
   *post-filter* (search with a larger k and drop non-matching results).
 
+### 5.4 Graphs
+
+Graph databases keep nodes and edges in their own stores. Strata keeps its
+one table: a row is a node, and an `EDGES` field holds its outgoing edges as
+a JSON array of targets, each a primary key of the same table, optionally
+with a label and a positive weight:
+
+```text
+["p2", ["cites", "p7"], ["extends", "p9", 0.5], {"to": "p11", "label": "refutes"}]
+```
+
+Edges are part of their source row, so they are written, updated, deleted,
+logged, merged and snapshotted with it: an update to a row's edges is an
+update to the row, and nothing else changes. Because targets are keys and
+not docIDs, an edge never needs rewriting when its target moves to another
+segment in a merge, is updated (a new version in a newer segment) or is
+deleted (the edge then dangles and traversals skip it, as a foreign key
+without a constraint).
+
+* **Out-edges.** Per segment, a CSR over local docIDs: offsets `[u64; n+1]`,
+  then per edge its source docID, its target key (`i64`, or offsets and
+  bytes for KEYWORD keys), a label code (`u16`, when any edge has a label)
+  and a weight (`f32`, when any differs from 1).
+* **Reverse index.** Edges grouped by target key, the groups ordered by the
+  key's 64-bit hash under the radix directory of the primary-key index, with
+  each edge's source docID stored in group order: "which rows point at key
+  k" is one directory read, one stored-key comparison per group (colliding
+  keys form separate groups; integer hashes are a bijection and need none),
+  and a sequential read of the sources.
+* **Same-segment hints.** Per edge, the docID its target had in this
+  segment at build time, if any. A key has at most one live row in a
+  snapshot, so a hinted row that is still live is the target.
+* **Resolution.** Otherwise a hop from row `u` to its edges' targets looks
+  each target key up in the snapshot's primary-key indexes (the lookup of
+  `WHERE id = ...`) and keeps the live row, remembering the answer for the
+  rest of the query. A hop against the edges looks `u`'s own key up in every
+  segment's reverse index and keeps the live sources. Sections are read in
+  place through `mmap`, advised `MADV_RANDOM`.
+
+The graph costs about 27 bytes per edge with integer keys (1.15M arXiv
+citations: 31 MB, next to 453 MB of vectors for the same rows). The memtable
+needs no graph code: its in-memory segments are built by the same builder.
+
+Keys instead of docIDs are what let edges survive updates, deletes and
+merges untouched, and they are also the cost: a cross-segment hop is a hash
+probe per segment where an in-memory CSR reads an array. On a million-row
+power-law graph in four segments, personalized PageRank takes 6.1 ms where
+the CSR takes 1.3 ms; on arXiv in two segments, 1.8 ms against 0.7 ms. A
+merge into fewer segments narrows the gap; a snapshot-wide resolved CSR,
+rebuilt when segments change, would close it at the price of memory and
+rebuild time.
+
+**Vector graph nodes.** Rows carry vectors as well as edges, so a traversal
+can start from a vector search (seeds from a subquery, §6.1) and its result
+can be ranked by similarity, fused with BM25, or filtered. A VECTOR field
+can also be traversed as if it were an edge field: a row's neighbours are
+its `k` most similar rows (one ANN search per expanded row). This
+similarity graph is implicit, needs no storage and is always current, but it
+carries no information the vector search does not already have; §8.9
+measures both.
+
 ## 6. Query language
 
 Standard SQL `SELECT` over one table, with search functions:
@@ -243,6 +309,46 @@ GROUP BY category ORDER BY 2 DESC LIMIT 5;
 * Options as named arguments, e.g. `similarity(emb, :q, nprobe => 32)`,
   `bm25(body, :t, k1 => 0.9, stopwords => 0)`.
 
+### 6.1 Graph queries
+
+```sql
+-- papers within two citations of p1, nearest first
+SELECT id, title, hops() FROM papers
+WHERE REACHABLE(cites, 'p1', hops => 2, dir => 'both') ORDER BY hops() LIMIT 20;
+
+-- one shortest path, through surveys only
+SELECT id, hops() FROM papers
+WHERE PATH(cites, 'p1', 'p9', max_hops => 6, through => kind = 'survey') ORDER BY hops();
+
+-- vector search as the entry point, the citation neighbourhood ranked by similarity
+SELECT id FROM papers
+WHERE REACHABLE(cites, (SELECT id FROM papers ORDER BY similarity(emb, :q) DESC LIMIT 5))
+ORDER BY similarity(emb, :q) DESC LIMIT 20;
+
+-- personalized PageRank from the same seeds, fused with BM25
+SELECT id FROM papers
+ORDER BY rrf(bm25(body, :t), ppr(cites, (SELECT id FROM papers ORDER BY similarity(emb, :q) DESC LIMIT 5))) DESC LIMIT 20;
+```
+
+* `REACHABLE(field, seeds, hops => 1, min_hops => 1, dir => 'out', label =>
+  'a,b', through => <predicate>, max_nodes => 100000)`: rows within
+  `min_hops..hops` of a seed. `dir` is `out` (along edges), `in` (against
+  them) or `both`. `through` restricts the rows a traversal may pass
+  through (seeds and end points are exempt); end points are filtered by the
+  rest of `WHERE`. `hops => 0, min_hops => 0` is the seed set itself.
+* `PATH(field, from, to, max_hops => 6, ...)`: the rows of one shortest
+  path (unweighted), by bidirectional breadth-first search.
+* `hops()`: a row's distance from the seeds (or position on the path), in
+  `SELECT` and `ORDER BY` (nearest first; `DESC` for farthest first).
+* `ppr(field, seeds, alpha => 0.15, eps => 1e-4, dir => 'both', label =>
+  .., weighted => 0)`: personalized PageRank, usable wherever a score is,
+  including `rrf` and weighted sums. `weighted => 1` uses the seed rows'
+  scores from a subquery as restart weights.
+* Seeds are a key, a parameter, a tuple of keys `('a', 'b')` or a subquery
+  over the same table, whose ranking and filters are those of any query.
+* With a VECTOR field as the first argument, `REACHABLE` and `PATH` follow
+  similarity edges: `k => 10` neighbours per row, `min_sim => ..`.
+
 ## 7. Planning and execution
 
 The binder turns the `WHERE` clause into a predicate tree over three kinds of
@@ -279,6 +385,30 @@ filter correlates with the query's topic. When the global estimate picks an
 index strategy, the planner checks it with a 32-result unfiltered search:
 the fraction of those results that pass the filter (smoothed) replaces `s`
 for in-index search, and bounds it from above for post-filtering.
+
+**Graphs.** Graph predicates and scores are computed before planning,
+across segments, because a traversal does not respect segment boundaries:
+seeds are resolved (a seed subquery runs as its own query on the same
+snapshot), the traversal runs, and its result becomes per segment a
+materialised document set with exact cardinality, plus hop distances and
+PageRank scores by row. The planner then treats `REACHABLE` like any other
+leaf, only with an exact estimate: a vector search over a reachable set of a
+few hundred rows is a pre-filtered exact scan, and a text filter on a large
+neighbourhood is probed per row. The traversals:
+
+* breadth-first search, frontier by frontier, stopping at `max_nodes`;
+* shortest paths by bidirectional search, expanding the smaller frontier;
+* personalized PageRank by forward push (Andersen, Chung and Lang 2006).
+  Each row has an estimate \(p\) and a residual \(r\), initially the restart
+  distribution over the seeds. Pushing \(u\) moves \(\alpha\,r(u)\) into
+  \(p(u)\) and spreads \((1-\alpha)\,r(u)\) over its neighbours in proportion
+  to edge weight; rows are pushed while \(r(u) \ge \varepsilon\,\deg(u)\), so
+  each estimate is within \(\varepsilon\,\deg(u)\) of the exact value and
+  the work is independent of the graph's size (at most
+  \(1/(\alpha\varepsilon)\) pushes). A row is queued only once its residual
+  reaches \(\varepsilon\), the least any threshold can be, so rows that
+  merely received a little mass never have their neighbours resolved.
+  Neighbour lists are resolved once per query and reused.
 
 **Facets.** `GROUP BY` a keyword over a result set either reads the
 dictionary codes of the result's documents (small results) or intersects the
@@ -317,3 +447,10 @@ documents and queries, relevance judgments, and synthetic structured fields
    best plan in hindsight) over a randomised query workload.
 8. **Transactions**: insert throughput with commits, crash recovery, reads
    during writes.
+9. **Graphs**: ogbn-arxiv (169,343 papers with titles, abstracts and 1.17M
+   citations; vectors from a static embedder) and a power-law graph of a
+   million rows: graph index size and build time; k-hop, path and PageRank
+   latency against an in-memory CSR and SQLite recursive CTEs; and whether
+   the graph helps search: finding a held-out paper's references from its
+   text with BM25, vectors and hybrid search, alone and with graph
+   expansion or PageRank from vector seeds (`strata-graph-bench`).

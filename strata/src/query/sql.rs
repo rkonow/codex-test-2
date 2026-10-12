@@ -7,7 +7,13 @@
 //! comparisons, `BETWEEN`, `IN` with AND/OR/NOT, and scores are `bm25`,
 //! `similarity`, `distance`, `rrf`, weighted sums of those, or a column.
 //! Parameters (`:name`) are bound from [`Params`].
+//!
+//! Graph queries over EDGES fields (DESIGN.md §6.1): the predicates
+//! `REACHABLE(field, seeds, ...)` and `PATH(field, from, to, ...)`, the score
+//! `ppr(field, seeds, ...)` and the column `hops()`. Seeds are a key, a
+//! parameter, a tuple of keys or a subquery over the same table.
 
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -16,7 +22,7 @@ use sqlparser::dialect::GenericDialect;
 use sqlparser::parser::Parser;
 
 use crate::error::{Error, Result};
-use crate::query::logical::{OrderBy, Opts, Pred, Projection, Score, Select, Tiebreak};
+use crate::query::logical::{Direction, GraphKind, GraphQuery, OrderBy, Opts, Pred, Projection, Score, Seeds, Select, Tiebreak};
 use crate::schema::{FieldType, Schema};
 use crate::value::Value;
 
@@ -47,15 +53,21 @@ pub fn bind(sql_text: &str, schema: &Schema, params: &Params) -> Result<Select> 
     let stmts = Parser::parse_sql(&GenericDialect {}, sql_text).map_err(|e| err(e.to_string()))?;
     let [stmt] = stmts.as_slice() else { return Err(err("expected exactly one statement")) };
     let sql::Statement::Query(q) = stmt else { return Err(err("only SELECT is supported")) };
-    Binder { schema, params }.query(q)
+    Binder::new(schema, params).query(q)
 }
 
 struct Binder<'a> {
     schema: &'a Schema,
     params: &'a Params,
+    /// Graph computations bound so far (`Select::graphs`).
+    graphs: RefCell<Vec<GraphQuery>>,
 }
 
-impl Binder<'_> {
+impl<'a> Binder<'a> {
+    fn new(schema: &'a Schema, params: &'a Params) -> Self {
+        Binder { schema, params, graphs: RefCell::new(Vec::new()) }
+    }
+
     fn query(&self, q: &sql::Query) -> Result<Select> {
         let sql::SetExpr::Select(s) = q.body.as_ref() else { return Err(err("only simple SELECT is supported")) };
         if s.from.len() != 1 || !s.from[0].joins.is_empty() {
@@ -130,7 +142,140 @@ impl Binder<'_> {
                 (Some(self.usize_lit(limit)?), self.usize_lit(offset)?)
             }
         };
-        Ok(Select { projection, filter, order, group_by, tiebreak, limit, offset })
+        let graphs = self.graphs.take();
+        Ok(Select { projection, filter, order, group_by, tiebreak, limit, offset, graphs })
+    }
+
+    /// The graph predicate `hops()` refers to: the first REACHABLE or PATH.
+    fn hops_graph(&self) -> Result<usize> {
+        self.graphs
+            .borrow()
+            .iter()
+            .position(|g| !matches!(g.kind, GraphKind::Ppr { .. }))
+            .ok_or_else(|| err("hops() needs a REACHABLE or PATH predicate in WHERE"))
+    }
+
+    /// Binds `REACHABLE(field, seeds, ...)`, `PATH(field, from, to, ...)` or
+    /// `ppr(field, seeds, ...)` and returns its index in `Select::graphs`.
+    fn graph(&self, f: &sql::Function, name: &str) -> Result<usize> {
+        let (args, named) = self.args_raw(f)?;
+        let want = if name == "path" { 3 } else { 2 };
+        if args.len() != want {
+            return Err(err(match name {
+                "path" => "PATH(field, from, to, ...)",
+                "ppr" => "ppr(field, seeds, ...)",
+                _ => "REACHABLE(field, seeds, ...)",
+            }));
+        }
+        let field = self.typed_field(args[0], |t| matches!(t, FieldType::Edges | FieldType::Vector { .. }), "EDGES or VECTOR")?;
+        let vector = matches!(self.schema.fields[field].ty, FieldType::Vector { .. });
+        if !vector && !self.schema.fields[field].indexed {
+            return Err(err(format!("{} is not indexed", self.schema.fields[field].name)));
+        }
+        if vector && name == "ppr" {
+            return Err(err("ppr() needs an EDGES field"));
+        }
+        let seeds = self.seeds(args[1])?;
+        let mut opts = Opts::new();
+        let mut through = None;
+        for (k, e) in named {
+            if k == "through" {
+                let p = self.pred(e)?.simplify();
+                if contains_graph(&p) {
+                    return Err(err("a through predicate cannot hold a graph predicate"));
+                }
+                through = Some(p);
+            } else {
+                opts.insert(k, self.literal(e)?);
+            }
+        }
+        let allowed: &[&str] = match name {
+            "path" => &["max_hops", "dir", "label", "labels", "max_nodes", "k", "min_sim"],
+            "ppr" => &["alpha", "eps", "max_pushes", "weighted", "dir", "label", "labels"],
+            _ => &["hops", "min_hops", "dir", "label", "labels", "max_nodes", "k", "min_sim"],
+        };
+        if let Some(k) = opts.keys().find(|k| !allowed.contains(&k.as_str())) {
+            return Err(err(format!("unknown option {k} for {name}")));
+        }
+        if through.is_some() && name == "ppr" {
+            return Err(err("ppr() has no through option"));
+        }
+        let num = |k: &str, d: f64| -> Result<f64> {
+            match opts.get(k) {
+                None => Ok(d),
+                Some(v) => v.as_f64().ok_or_else(|| err(format!("{k} must be a number"))),
+            }
+        };
+        let count = |k: &str, d: f64| -> Result<u32> {
+            let x = num(k, d)?;
+            if x < 0.0 || x.fract() != 0.0 || x > 1e6 {
+                return Err(err(format!("{k} must be a non-negative integer")));
+            }
+            Ok(x as u32)
+        };
+        let dir = match opts.get("dir").map(|v| v.as_str().unwrap_or("")) {
+            None => if name == "ppr" { Direction::Both } else { Direction::Out },
+            Some("out") => Direction::Out,
+            Some("in") => Direction::In,
+            Some("both") => Direction::Both,
+            Some(d) => return Err(err(format!("dir must be 'out', 'in' or 'both', not {d:?}"))),
+        };
+        let labels: Vec<String> = ["label", "labels"]
+            .iter()
+            .filter_map(|k| opts.get(*k))
+            .flat_map(|v| v.as_str().unwrap_or("").split(',').map(|l| l.trim().to_string()).collect::<Vec<_>>())
+            .filter(|l| !l.is_empty())
+            .collect();
+        let kind = match name {
+            "path" => GraphKind::Path { to: self.seeds(args[2])?, max_hops: count("max_hops", 6.0)?.max(1) },
+            "ppr" => {
+                let alpha = num("alpha", 0.15)?;
+                let eps = num("eps", 1e-4)?;
+                if !(alpha > 0.0 && alpha < 1.0) || eps <= 0.0 {
+                    return Err(err("ppr needs 0 < alpha < 1 and eps > 0"));
+                }
+                GraphKind::Ppr { alpha, eps, max_pushes: num("max_pushes", 1e6)? as u64, weighted: num("weighted", 0.0)? != 0.0 }
+            }
+            _ => {
+                let max_hops = count("hops", 1.0)?;
+                let min_hops = count("min_hops", 1.0_f64.min(max_hops as f64))?;
+                if min_hops > max_hops {
+                    return Err(err("min_hops is larger than hops"));
+                }
+                GraphKind::Reach { min_hops, max_hops }
+            }
+        };
+        let g = GraphQuery {
+            field,
+            seeds,
+            kind,
+            dir,
+            labels,
+            through,
+            max_nodes: num("max_nodes", 100_000.0)?.max(1.0) as usize,
+            k: count("k", 10.0)?.max(1) as usize,
+            min_sim: num("min_sim", f64::NEG_INFINITY)?,
+        };
+        let mut gs = self.graphs.borrow_mut();
+        gs.push(g);
+        Ok(gs.len() - 1)
+    }
+
+    /// Seeds: a key, a parameter, a tuple or array of keys, or a subquery.
+    fn seeds(&self, e: &Expr) -> Result<Seeds> {
+        match e {
+            Expr::Subquery(q) => Ok(Seeds::Query(Box::new(Binder::new(self.schema, self.params).query(q)?))),
+            Expr::Nested(inner) => self.seeds(inner),
+            Expr::Tuple(items) => Ok(Seeds::Keys(items.iter().map(|i| self.key_value(i)).collect::<Result<_>>()?)),
+            Expr::Array(a) => Ok(Seeds::Keys(a.elem.iter().map(|i| self.key_value(i)).collect::<Result<_>>()?)),
+            _ => Ok(Seeds::Keys(vec![self.key_value(e)?])),
+        }
+    }
+
+    /// A literal as a primary-key value.
+    fn key_value(&self, e: &Expr) -> Result<Value> {
+        let pk = self.schema.primary_key.ok_or_else(|| err("graph queries need a primary key"))?;
+        self.field_value(pk, e)
     }
 
     /// The second ORDER BY key: the primary key, or the group value of a facet.
@@ -157,6 +302,7 @@ impl Binder<'_> {
             Expr::Function(f) => match fname(f).as_str() {
                 "score" => Ok(Projection::Score),
                 "count" => Ok(Projection::Count),
+                "hops" => Ok(Projection::Hops(self.hops_graph()?)),
                 n => Err(err(format!("unsupported function in SELECT: {n}"))),
             },
             _ => Err(err(format!("unsupported select expression: {e}"))),
@@ -172,7 +318,14 @@ impl Binder<'_> {
                 Projection::Field(f) if Some(*f) == group => Ok(OrderBy::GroupValue { desc }),
                 Projection::Field(f) => Ok(OrderBy::Score { score: Score::Column { field: *f }, desc }),
                 Projection::Score => Err(err("ORDER BY score(): order by the score expression itself")),
+                Projection::Hops(g) => Ok(OrderBy::Score { score: Score::Hops { graph: *g, far_first: desc }, desc: true }),
             };
+        }
+        // `ORDER BY hops()` is nearest first; ranking is always best first.
+        if let Expr::Function(f) = e {
+            if fname(f) == "hops" {
+                return Ok(OrderBy::Score { score: Score::Hops { graph: self.hops_graph()?, far_first: desc }, desc: true });
+            }
         }
         if let Expr::Function(f) = e {
             if fname(f) == "count" {
@@ -236,6 +389,7 @@ impl Binder<'_> {
                         let num = |k: &str, d: f64| opts.get(k).and_then(|v| v.as_f64()).unwrap_or(d);
                         Ok(Score::Rrf { inputs, k: num("k", 60.0), depth: num("depth", 100.0) as usize })
                     }
+                    "ppr" => Ok(Score::Ppr { graph: self.graph(f, "ppr")? }),
                     n => Err(err(format!("unknown score function {n}"))),
                 }
             }
@@ -295,6 +449,7 @@ impl Binder<'_> {
                 let query = self.literal(q)?.as_str().ok_or_else(|| err("MATCH query must be a string"))?.to_string();
                 Pred::Match { field, query }
             }
+            Expr::Function(func) if matches!(fname(func).as_str(), "reachable" | "path") => Pred::Graph { id: self.graph(func, &fname(func))? },
             Expr::Value(v) if matches!(v.value, sql::Value::Boolean(_)) => {
                 if matches!(v.value, sql::Value::Boolean(true)) { Pred::True } else { Pred::False }
             }
@@ -349,21 +504,29 @@ impl Binder<'_> {
 
     /// Positional and named (`name => value`) arguments of a function call.
     fn args<'e>(&self, f: &'e sql::Function) -> Result<(Vec<&'e Expr>, Opts)> {
+        let (pos, named) = self.args_raw(f)?;
+        let mut opts = Opts::new();
+        for (k, e) in named {
+            opts.insert(k, self.literal(e)?);
+        }
+        Ok((pos, opts))
+    }
+
+    /// Positional arguments and unevaluated named ones.
+    fn args_raw<'e>(&self, f: &'e sql::Function) -> Result<(Vec<&'e Expr>, Vec<(String, &'e Expr)>)> {
         let FunctionArguments::List(list) = &f.args else {
-            return Ok((Vec::new(), Opts::new()));
+            return Ok((Vec::new(), Vec::new()));
         };
-        let (mut pos, mut opts) = (Vec::new(), Opts::new());
+        let (mut pos, mut named) = (Vec::new(), Vec::new());
         for a in &list.args {
             match a {
                 FunctionArg::Unnamed(FunctionArgExpr::Expr(e)) => pos.push(e),
                 FunctionArg::Unnamed(FunctionArgExpr::Wildcard) => {}
-                FunctionArg::Named { name, arg: FunctionArgExpr::Expr(e), .. } => {
-                    opts.insert(name.value.to_ascii_lowercase(), self.literal(e)?);
-                }
+                FunctionArg::Named { name, arg: FunctionArgExpr::Expr(e), .. } => named.push((name.value.to_ascii_lowercase(), e)),
                 _ => return Err(err(format!("unsupported argument {a}"))),
             }
         }
-        Ok((pos, opts))
+        Ok((pos, named))
     }
 
     fn field_of(&self, e: &Expr) -> Result<usize> {
@@ -446,6 +609,15 @@ impl Binder<'_> {
             }
             v => Err(err(format!("expected a vector, got {v:?}"))),
         }
+    }
+}
+
+fn contains_graph(p: &Pred) -> bool {
+    match p {
+        Pred::Graph { .. } => true,
+        Pred::And(ps) | Pred::Or(ps) => ps.iter().any(contains_graph),
+        Pred::Not(q) => contains_graph(q),
+        _ => false,
     }
 }
 

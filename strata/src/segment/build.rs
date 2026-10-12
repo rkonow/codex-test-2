@@ -44,6 +44,11 @@ pub fn build_segment(schema: &Schema, docs: &[Document], opts: &BuildOptions) ->
             FieldType::Keyword | FieldType::Int | FieldType::Float => None,
             // Vector fields always store their vectors; `indexed` adds the ANN index.
             FieldType::Vector { .. } => Some(crate::vector::field_builder(f, opts)?),
+            FieldType::Edges if f.indexed => {
+                let keys = schema.primary_key.map_or_else(Vec::new, |pk| docs.iter().map(|d| d[pk].clone()).collect());
+                Some(crate::graph::field_builder(f, schema, keys)?)
+            }
+            FieldType::Edges => None,
         };
         if let Some(b) = b {
             builders.push((i, b));

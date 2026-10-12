@@ -106,6 +106,20 @@ enum Cmd {
         #[arg(long, default_value_t = 0.01)]
         knowledge: f64,
     },
+    /// Embeds a text field of every JSON line of a file into raw float32
+    /// vectors (`<out>`, n × dim, little-endian), for other tools (Strata's
+    /// graph benchmark embeds arXiv papers with it).
+    Embed {
+        #[arg(long)]
+        input: PathBuf,
+        /// Fields joined by a newline to make the text.
+        #[arg(long, value_delimiter = ',', default_value = "title,abstract")]
+        fields: Vec<String>,
+        #[arg(long, default_value = "static")]
+        embedder: String,
+        #[arg(long)]
+        out: PathBuf,
+    },
     /// Prints embeddings (JSON lines) for comparing implementations.
     EmbedCheck {
         #[arg(long)]
@@ -486,6 +500,35 @@ fn run_unit(u: &Unit, foreign: Option<&(Question, HashSet<u64>)>, emb: &Embeds, 
 fn main() {
     let cli = Cli::parse();
     match cli.cmd {
+        Cmd::Embed { input, fields, embedder, out } => {
+            let e = open_embedder(&embedder);
+            let t0 = Instant::now();
+            let text = std::fs::read_to_string(&input).expect("read input");
+            let texts: Vec<String> = text
+                .lines()
+                .filter(|l| !l.trim().is_empty())
+                .map(|l| {
+                    let v: Json = serde_json::from_str(l).expect("JSON line");
+                    fields.iter().filter_map(|f| v.get(f).and_then(|x| x.as_str())).collect::<Vec<_>>().join("\n")
+                })
+                .collect();
+            drop(text);
+            let mut w = std::io::BufWriter::new(std::fs::File::create(&out).expect("create output"));
+            for chunk in texts.chunks(4096) {
+                let refs: Vec<&str> = chunk.iter().map(|s| s.as_str()).collect();
+                let embs: Vec<Vec<f32>> = std::thread::scope(|sc| {
+                    let parts: Vec<&[&str]> = refs.chunks(refs.len().div_ceil(8).max(1)).collect();
+                    let hs: Vec<_> = parts.into_iter().map(|p| { let e = e.clone(); sc.spawn(move || e.embed(p)) }).collect();
+                    hs.into_iter().flat_map(|h| h.join().unwrap()).collect()
+                });
+                for v in embs {
+                    for x in v {
+                        std::io::Write::write_all(&mut w, &x.to_le_bytes()).unwrap();
+                    }
+                }
+            }
+            eprintln!("{} texts, {} dimensions ({}), {:.1} s", texts.len(), e.dim(), e.name(), t0.elapsed().as_secs_f64());
+        }
         Cmd::EmbedCheck { embedder, query, texts } => {
             let e = open_embedder(&embedder);
             let t0 = Instant::now();

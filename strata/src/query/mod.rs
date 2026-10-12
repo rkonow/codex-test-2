@@ -9,5 +9,5 @@ pub mod logical;
 pub mod plan;
 pub mod sql;
 
-pub use logical::{OrderBy, Pred, Projection, Score, Select, Tiebreak};
+pub use logical::{Direction, GraphKind, GraphQuery, OrderBy, Pred, Projection, Score, Seeds, Select, Tiebreak};
 pub use sql::{bind, Params};

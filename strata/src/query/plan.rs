@@ -37,6 +37,11 @@ pub trait Estimator {
     /// Estimated microseconds of a vector search strategy for `k` results,
     /// given the filter's cardinality (`None` = unfiltered).
     fn vector_cost(&self, field: usize, strategy: VectorStrategy, k: usize, filter_card: Option<f64>) -> f64;
+    /// Documents of this segment in the result of graph computation `id`
+    /// (computed before planning, so exact).
+    fn graph_count(&self, _id: usize) -> f64 {
+        self.n_docs()
+    }
 }
 
 /// Unit costs in nanoseconds, calibrated from the component benchmarks.
@@ -143,6 +148,11 @@ impl<E: Estimator> Planner<'_, E> {
                     probe_cost: c.probe_keyword * values.len().min(4) as f64,
                     probeable: true,
                 }
+            }
+            Pred::Graph { id } => {
+                // Already computed: materialising is a copy, probing a lookup.
+                let card = self.est.graph_count(*id).min(n);
+                PredEstimate { card, mat_cost: c.leaf + card * c.emit, probe_cost: c.probe_keyword, probeable: true }
             }
             Pred::Not(inner) => {
                 let e = self.estimate(inner);

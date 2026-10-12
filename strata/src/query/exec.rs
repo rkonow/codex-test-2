@@ -2,6 +2,8 @@
 //! snapshot, segment by segment, following the planner's choices, and
 //! merges the per-segment results.
 
+mod graph;
+
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
 
@@ -9,6 +11,7 @@ use serde::Serialize;
 
 use crate::error::{Error, Result};
 use crate::forward::{self, DocStore, KeywordColumn, NumericColumn, RangeIndex, RangeStrategy};
+use crate::graph::GraphReader;
 use crate::query::fusion::{self, Norm};
 use crate::query::logical::{OrderBy, Opts, Pred, Projection, Score, Select, Tiebreak};
 use crate::query::plan::{CostModel, Estimator, FilterMode, Planner, VectorStrategy};
@@ -34,6 +37,7 @@ pub struct SegmentReaders {
     numeric: Vec<OnceLock<Opened<Numeric>>>,
     keyword: Vec<OnceLock<Opened<KeywordColumn>>>,
     vector: Vec<OnceLock<Opened<VectorReader>>>,
+    graph: Vec<OnceLock<Opened<GraphReader>>>,
     store: OnceLock<Opened<DocStore>>,
 }
 
@@ -82,7 +86,19 @@ impl SegmentReaders {
             numeric: cells(n),
             keyword: cells(n),
             vector: cells(n),
+            graph: cells(n),
             store: OnceLock::new(),
+        })
+    }
+
+    /// The graph index of an indexed EDGES field.
+    pub fn graph(&self, field: usize) -> Result<Option<&GraphReader>> {
+        let f = &self.schema.fields[field];
+        opened(&self.graph[field], || {
+            Ok(match f.ty {
+                FieldType::Edges if f.indexed => GraphReader::open(&self.seg, &f.name)?,
+                _ => None,
+            })
         })
     }
 
@@ -261,6 +277,10 @@ pub struct Executor<'a> {
     stats: ExecStats,
     /// Materialised filters by segment, shared by the operators of a query.
     sets: HashMap<usize, Arc<DocSet>>,
+    /// Results of the query's graph computations (`Select::graphs`).
+    graphs: Vec<graph::GraphOut>,
+    /// Every segment's readers, for subqueries.
+    readers_all: Vec<Arc<SegmentReaders>>,
 }
 
 fn err(m: impl Into<String>) -> Error {
@@ -278,12 +298,12 @@ impl<'a> Executor<'a> {
             .filter(|(_, (v, _))| v.file.n_docs() > 0)
             .map(|(ord, (view, r))| Seg { ord, view, r: r.clone() })
             .collect();
-        Executor { schema: snap.schema(), snap, segs, opts, stats: ExecStats::default(), sets: HashMap::new() }
+        Executor { schema: snap.schema(), snap, segs, opts, stats: ExecStats::default(), sets: HashMap::new(), graphs: Vec::new(), readers_all: readers.to_vec() }
     }
 
     pub fn execute(mut self, q: &Select) -> Result<ResultSet> {
         let columns: Vec<String> = q.projection.iter().map(|(n, _)| n.clone()).collect();
-        let want = q.limit.map(|l| l + q.offset);
+        self.run_graphs(&q.graphs)?;
         if let Some(g) = q.group_by {
             let rows = self.facets(q, g)?;
             return Ok(ResultSet { columns, rows, stats: self.stats });
@@ -297,16 +317,32 @@ impl<'a> Executor<'a> {
             let rows = if q.offset == 0 && q.limit != Some(0) { vec![vec![Value::Int(n); columns.len()]] } else { Vec::new() };
             return Ok(ResultSet { columns, rows, stats: self.stats });
         }
-        let hits = match &q.order {
+        let hits = self.ordered_hits(q)?;
+        let hits: Vec<Hit> = hits.into_iter().skip(q.offset).collect();
+        let rows = self.project(q, &hits)?;
+        Ok(ResultSet { columns, rows, stats: self.stats })
+    }
+
+    /// The rows of a query without facets or counts, in order, before
+    /// OFFSET (graph seeds from a subquery use these).
+    fn select_hits(&mut self, q: &Select) -> Result<Vec<Hit>> {
+        if q.group_by.is_some() || q.projection.iter().any(|(_, p)| *p == Projection::Count) {
+            return Err(err("a seed subquery returns rows, not counts"));
+        }
+        self.run_graphs(&q.graphs)?;
+        let hits = self.ordered_hits(q)?;
+        Ok(hits.into_iter().skip(q.offset).collect())
+    }
+
+    fn ordered_hits(&mut self, q: &Select) -> Result<Vec<Hit>> {
+        let want = q.limit.map(|l| l + q.offset);
+        Ok(match &q.order {
             None => self.unordered(&q.filter, want)?,
             Some(OrderBy::Score { score: Score::Column { field }, desc }) => self.by_column(*field, *desc, &q.filter, want, q.tiebreak.as_ref())?,
             Some(OrderBy::Score { score, desc: true }) => self.ranked(score, &q.filter, want.unwrap_or(DEFAULT_K), q.tiebreak.as_ref())?,
             Some(OrderBy::Score { .. }) => return Err(err("relevance scores can only be ordered DESC")),
             Some(_) => return Err(err("ORDER BY COUNT(*) needs GROUP BY")),
-        };
-        let hits: Vec<Hit> = hits.into_iter().skip(q.offset).collect();
-        let rows = self.project(q, &hits)?;
-        Ok(ResultSet { columns, rows, stats: self.stats })
+        })
     }
 
     // ---- readers ---------------------------------------------------------
@@ -382,6 +418,7 @@ impl<'a> Executor<'a> {
                 forward::eval_range(num.col(), num.index(), *lo, *hi, self.opts.range)
             }
             Pred::In { field, values } => self.materialize_in(s, *field, values)?,
+            Pred::Graph { id } => self.graph_set(*id, s.ord, n),
             Pred::Not(c) => self.materialize(s, c)?.complement(),
             Pred::Or(cs) => {
                 let mut acc = DocSet::empty(n);
@@ -451,6 +488,7 @@ impl<'a> Executor<'a> {
                     ProbeNode::Or(values.iter().filter_map(|v| v.as_f64()).map(|v| ProbeNode::Leaf(Box::new(col.filter(v, v)))).collect())
                 }
             },
+            Pred::Graph { id } => ProbeNode::Leaf(Box::new(self.graph_set(*id, s.ord, s.r.n_docs))),
             Pred::Not(c) => ProbeNode::Not(Box::new(self.compile_probe(s, c)?)),
             Pred::Or(cs) => ProbeNode::Or(cs.iter().map(|c| self.compile_probe(s, c)).collect::<Result<_>>()?),
             Pred::And(cs) => {
@@ -561,7 +599,8 @@ impl<'a> Executor<'a> {
             Score::Bm25 { field, text, opts } => self.bm25_top(*field, text, opts, p, k),
             Score::Similarity { field, vector, opts } => self.vector_top(*field, vector, opts, p, k),
             Score::Column { field } => self.by_column(*field, true, p, Some(k), None),
-            _ => Err(err("fusion inputs must be bm25, similarity or a column")),
+            Score::Ppr { .. } | Score::Hops { .. } => self.graph_top(score, p, k),
+            _ => Err(err("fusion inputs must be bm25, similarity, ppr, hops or a column")),
         }
     }
 
@@ -798,7 +837,12 @@ impl<'a> Executor<'a> {
                     }
                 }
             }
-            _ => return Err(err("weighted inputs must be bm25, similarity or a column")),
+            Score::Ppr { .. } | Score::Hops { .. } => {
+                for (i, c) in cands.iter().enumerate() {
+                    out[i] = self.graph_score(score, c.0, c.1) as f32;
+                }
+            }
+            _ => return Err(err("weighted inputs must be bm25, similarity, ppr, hops or a column")),
         }
         Ok(out)
     }
@@ -890,6 +934,7 @@ impl<'a> Executor<'a> {
                 row.push(match p {
                     Projection::Score => Value::Float(h.score),
                     Projection::Count => Value::Null,
+                    Projection::Hops(g) => self.hops_of(*g, h.seg, h.doc).map_or(Value::Null, |x| Value::Int(x as i64)),
                     Projection::Field(i) if Some(*i) == self.schema.primary_key => self.key(h),
                     Projection::Field(i) => match stored.iter().position(|x| x == i) {
                         Some(j) => fetched.get(j).cloned().unwrap_or(Value::Null),
@@ -908,6 +953,7 @@ impl<'a> Executor<'a> {
             FieldType::Int | FieldType::Float => s.r.numeric(field).ok().flatten().map_or(Value::Null, |n| n.col().get(d)),
             FieldType::Keyword => s.r.keyword(field).ok().flatten().and_then(|k| k.value_of_doc(d)).map_or(Value::Null, |v| Value::Str(v.to_string())),
             FieldType::Text { .. } => Value::Null,
+            FieldType::Edges => s.r.graph(field).ok().flatten().map_or(Value::Null, |g| g.edges_value(d)),
         }
     }
 }
@@ -1005,6 +1051,9 @@ impl Estimator for SegEst<'_, '_> {
             return values.iter().filter_map(|v| v.as_str()).map(|v| kw.count(v) as f64).sum();
         }
         values.iter().filter_map(|v| v.as_f64()).map(|v| self.range_count(field, v, v)).sum()
+    }
+    fn graph_count(&self, id: usize) -> f64 {
+        self.ex.graph_count(id, self.s.ord)
     }
     fn vector_cost(&self, field: usize, s: VectorStrategy, k: usize, card: Option<f64>) -> f64 {
         let Some(vr) = self.s.r.vector(field).ok().flatten() else { return f64::INFINITY };

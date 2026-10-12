@@ -45,6 +45,24 @@ impl Value {
     }
 }
 
+impl From<&str> for Value {
+    fn from(s: &str) -> Value {
+        Value::Str(s.to_string())
+    }
+}
+
+impl From<String> for Value {
+    fn from(s: String) -> Value {
+        Value::Str(s)
+    }
+}
+
+impl From<i64> for Value {
+    fn from(x: i64) -> Value {
+        Value::Int(x)
+    }
+}
+
 /// One row: a value per schema field, in schema order.
 pub type Document = Vec<Value>;
 
@@ -60,6 +78,10 @@ pub fn validate(schema: &Schema, doc: &Document) -> Result<()> {
             (FieldType::Int, Value::Int(_)) => true,
             (FieldType::Float, Value::Float(_) | Value::Int(_)) => true,
             (FieldType::Vector { dim, .. }, Value::Vector(x)) => x.len() == *dim,
+            (FieldType::Edges, Value::Str(_)) => {
+                crate::graph::parse_edges(v, crate::graph::int_keys(schema))?;
+                true
+            }
             _ => false,
         };
         if !ok {
