@@ -17,6 +17,9 @@
 //! `col.year`, `kw.category.post`, `vec.emb.ivf`, `store.data`, `pk`.
 
 pub mod build;
+pub mod filter;
+
+pub use filter::{DocFilter, DocSet};
 
 use std::collections::BTreeMap;
 

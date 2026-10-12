@@ -17,6 +17,7 @@
 pub mod data;
 pub mod error;
 pub mod forward;
+pub mod iostat;
 pub mod metrics;
 pub mod query;
 pub mod schema;
