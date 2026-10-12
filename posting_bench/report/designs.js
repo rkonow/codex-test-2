@@ -16,7 +16,7 @@
     if (!g) return;
     // Chunk strip of 32 blocks (stand-in for 256) with presence / dense marks.
     const kinds = "ssd.dd.s..sdddd.s..s.ds..sddd..s".split("");
-    const x0 = 120, bw = 19;
+    const x0 = 120, bw = 18;
     s("text", { x: 0, y: 30, class: "tl" }, g, "chunk (2¹⁶ docIDs)");
     s("text", { x: 0, y: 46, class: "ts" }, g, "256 blocks of 256");
     kinds.forEach((k, i) => {
@@ -25,11 +25,13 @@
     });
     const mask = (pred) => kinds.map((k) => (pred(k) ? "1" : "0")).join("");
     s("text", { x: 0, y: 80, class: "tl" }, g, "present mask");
-    s("text", { x: x0, y: 80, class: "tm" }, g, mask((k) => k !== "."));
     s("text", { x: 0, y: 104, class: "tl" }, g, "dense mask");
-    s("text", { x: x0, y: 104, class: "tm" }, g, mask((k) => k === "d"));
-    s("text", { x: x0 + 32 * bw + 8, y: 80, class: "ts" }, g, "4 × u64");
-    s("text", { x: x0 + 32 * bw + 8, y: 104, class: "ts" }, g, "4 × u64");
+    // One bit under each block, so the masks line up with the strip above.
+    [[80, mask((k) => k !== ".")], [104, mask((k) => k === "d")]].forEach(([y, bits]) =>
+      bits.split("").forEach((bit, i) =>
+        s("text", { x: x0 + i * bw + (bw - 2) / 2, y, class: "tm", "text-anchor": "middle" }, g, bit)));
+    s("text", { x: 760, y: 80, class: "ts", "text-anchor": "end" }, g, "4 × u64");
+    s("text", { x: 760, y: 104, class: "ts", "text-anchor": "end" }, g, "4 × u64");
     // Leaf pools.
     s("text", { x: 0, y: 150, class: "tl" }, g, "dense pool");
     for (let i = 0; i < 9; i++) {
@@ -122,10 +124,10 @@
   }
 
   function summary(container, run) {
-    const wrap = h("div", { class: "table-wrap" }, container);
+    const wrap = h("div", { class: "table-wrap compact" }, container);
     const t = h("table", {}, wrap);
     const hr = h("tr", {}, h("thead", {}, t));
-    ["codec", "bits/posting", "query lists", "aux MB", "decode ns", "AND ms", "", "OR ms", "", "OR count ms"].forEach((x, i) =>
+    ["codec", "index bits", "query bits", "aux MB", "decode ns", "AND ms", "", "OR ms", "", "OR count"].forEach((x, i) =>
       h("th", { class: [1, 2, 3, 4, 5, 7, 9].includes(i) ? "n" : "" }, hr, x));
     const tb = h("tbody", {}, t);
     const mins = {
@@ -137,7 +139,7 @@
     run.codecs.forEach((c) => {
       const tr = h("tr", {}, tb);
       const a = best(c, "AND"), o = best(c, "OR"), oc = countBest(c, "OR");
-      const td = h("td", { class: NEW.includes(c.codec) ? "strong" : "" }, tr, c.codec);
+      const td = h("td", { class: NEW.includes(c.codec) ? "strong" : "" }, tr, short(c.codec));
       if (NEW.includes(c.codec)) { const i = h("i", {}, null); i.style.cssText = `display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;background:${newColor(c.codec)}`; td.prepend(i); }
       h("td", { class: "n" }, tr, c.bits_per_posting.toFixed(2));
       h("td", { class: "n" + (c.query_bits_per_posting === mins.sp ? " best" : "") }, tr, c.query_bits_per_posting.toFixed(2));

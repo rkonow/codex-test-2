@@ -10,8 +10,10 @@
     <li><b>Flat</b>: the present mask plus all 256 block bitmaps, used for chunks that are dense almost everywhere.</li>
   </ul>
   <p>A block becomes a bitmap when that is no larger than its sparse form: about 9 bits per value (8 for the low byte, about 1 for the directory), so</p>
-  <div class="math">\[ \text{dense}(B) \iff 256 \le 9\,|B| \iff |B| \ge 29, \qquad S_{\text{tiered}} = 96 + 256 + 256\,[d>0] + 256\,d + 8\,c_s + |\text{dir}| \ \text{bits}, \]</div>
-  <p>for \(d\) dense blocks and \(c_s\) sparse values, where 96 bits are the chunk header and counts. Flat is taken whenever \(S_{\text{flat}} < 1.6\,S_{\text{tiered}}\). That bias toward bitmaps costs 0.07–0.23 bits per posting and made unions 14–17% faster in the profiling runs.</p>
+  <div class="math">\[ \text{dense}(B) \iff 256 \le 9\,|B| \iff |B| \ge 29. \]</div>
+  <p>A Tiered chunk then takes</p>
+  <div class="math">\[ S_{\text{tiered}} = 96 + 256 + 256\,[d \gt 0] + 256\,d + 8\,c_s + |\text{dir}| \ \text{bits} \]</div>
+  <p>for \(d\) dense blocks and \(c_s\) sparse values, where 96 bits are the chunk header and counts. Flat is taken whenever \(S_{\text{flat}} \lt 1.6\,S_{\text{tiered}}\). That bias toward bitmaps costs 0.07–0.23 bits per posting and made unions 14–17% faster in the profiling runs.</p>
   <figure>
     <div class="frame">
       <svg class="dg" viewBox="0 0 760 266" role="img" aria-label="A Pyramid chunk: blocks are absent, sparse or dense; present and dense masks select them; dense blocks live in a bitmap pool and sparse values as low bytes in a sparse pool">
@@ -28,17 +30,20 @@
   </ul>
   <p>Masks and directories sit in a sequential metadata arena read in key order and prefetched three chunks ahead; bitmaps and bytes sit in a 64-byte-aligned data arena.</p>
   <h3>Conjunction: driven chunks and block joins</h3>
-  <div class="algo-box"><pre><span class="cm">// lists sorted by cardinality; chunk keys of the smallest are galloped in the others</span>
+  <div class="algo-box"><pre><span class="cm">// the rarest list's chunk keys are galloped in the others</span>
 for each chunk key shared by all lists:
     D ← the chunk with the fewest values
-    if |D| ≤ 64  or  (|D| ≤ 1024 and |D| / blocks(D) ≤ 8):        <span class="cm">// driven chunk</span>
-        for each other list L (rarest first):
-            keep the candidates v of D with probe_L(v)            <span class="cm">// O(1), branch-free, prefetched</span>
-    else:                                                       <span class="cm">// block join</span>
-        for each block b present in every list (AND of present masks):
-            if b is dense everywhere:  emit bits of ⋀ bitmaps_b     <span class="cm">// 4-word AND</span>
-            else:  test ≤ 32 low bytes at once against the others
-                   (vpermb bit lookups, byte compares) and emit survivors with vpcompressd</pre></div>
+    if |D| ≤ 64 or (|D| ≤ 1024 and |D|/blocks(D) ≤ 8):    <span class="cm">// driven chunk</span>
+        for each other list L, rarest first:
+            keep the v ∈ D with probe_L(v)        <span class="cm">// O(1), branch-free</span>
+    else:                                                <span class="cm">// block join</span>
+        for each block b present in every list:   <span class="cm">// AND of present masks</span>
+            if b is dense everywhere:
+                emit the bits of ⋀ bitmaps_b      <span class="cm">// 4-word AND</span>
+            else:
+                test ≤ 32 low bytes at once against the others
+                (vpermb bit lookups, byte compares);
+                emit the survivors with vpcompressd</pre></div>
   <p>Cost is proportional to the smaller side of each chunk or block, and blocks absent from any list are never touched.</p>
   <h3>Union</h3>
   <p>Chunk groups that are dense (96 or more union blocks, or any Flat member) are accumulated in a thread-local 65,536-bit buffer that touches only present blocks. Sparse values are decoded 16 at a time: block ids come from a <code>vpopcntd</code> prefix count over \(U\), then <code>vpermt2d</code>. In sparse groups, runs of blocks owned by a single list are written straight to the output, and shared blocks go through a 256-bit accumulator. Bitmaps are extracted with <code>vpcompressb</code>, or with <code>vpcompressd</code> where VBMI2 is missing. The count-only union skips single-list runs entirely and adds their cardinalities.</p>

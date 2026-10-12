@@ -19,13 +19,19 @@
 .algo-box pre { margin: 0; font: 0.84rem/1.6 var(--mono); color: var(--ink); white-space: pre; }
 .algo-box .cm { color: var(--ink-3); }
 .legend-new i.dot { width: 10px; height: 10px; border-radius: 50%; }
-.verdict { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 14px; margin: 18px 0; }
+.verdict { display: grid; grid-template-columns: 1fr; gap: 12px; margin: 18px 0; }
 .verdict > div { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; min-width: 0; }
 .verdict h4 { margin: 0 0 6px; font: 600 1rem/1.3 var(--body); }
-.verdict p { margin: 0; font-size: 0.9rem; color: var(--ink-2); }
-.ok { color: var(--s6); font-weight: 600; }
+.verdict p { margin: 0; font-size: 0.92rem; color: var(--ink-2); }
+.verdict p + p { margin-top: 6px; }
+:root { --ok: #127a2e; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --ok: #5cc677; } }
+:root[data-theme="dark"] { --ok: #5cc677; }
+.ok { color: var(--ok); font-weight: 600; }
 .dg .gridl { stroke: var(--grid); stroke-width: 1; }
 .no { color: var(--s8); font-weight: 600; }
+.compact th, .compact td { padding: 7px 9px; }
+.compact.wrap-head th { white-space: normal; vertical-align: bottom; }
 </style>
 
 <div class="page">
@@ -54,9 +60,9 @@
     <li><b>Queries are skewed.</b> The shortest list of a query has a median of 1,793 postings (288 on WikiText). The longest is a median 68–147× and a 90th percentile 965–2,705× larger. Conjunction cost is therefore set by probing a few thousand candidates against very long lists. Roaring spends about 10 ns per candidate.</li>
     <li><b>Entropy is left on the table.</b> A per-list zero-order code of each gap's bit width (plus its raw low bits) would need 4.43, 7.41 and 3.95 bits per posting on the three collections. That is 8–17% below the best existing codec (PEF or interpolative coding), and context modelling can go lower still.</li>
   </ol>
-  <div class="table-wrap">
+  <div class="table-wrap compact wrap-head">
     <table>
-      <thead><tr><th>query lists</th><th class="n">EF bound</th><th class="n">gap-width entropy</th><th class="n">best existing</th><th class="n">postings in 32–255 blocks</th><th class="n">blocks with 1 posting</th><th class="n">longest / shortest (p50)</th></tr></thead>
+      <thead><tr><th>query lists</th><th class="n">EF bound</th><th class="n">gap-width H</th><th class="n">best existing</th><th class="n">in 32–255 blocks</th><th class="n">1-posting blocks</th><th class="n">skew</th></tr></thead>
       <tbody>
         <tr><td>clustered</td><td class="n">8.35</td><td class="n">4.43</td><td class="n">4.90</td><td class="n">69.2%</td><td class="n">66.4%</td><td class="n">68×</td></tr>
         <tr><td>uniform</td><td class="n">8.30</td><td class="n">7.41</td><td class="n">8.08</td><td class="n">20.7%</td><td class="n">62.4%</td><td class="n">82×</td></tr>
@@ -64,7 +70,7 @@
       </tbody>
     </table>
   </div>
-  <p>The size figures are bits per posting over the query lists; the existing codecs' sizes come from the first round of measurements. The designs below answer one fact each. Pyramid makes every probe O(1) with bimodal leaves. Loom keeps PEF's partitioning and makes it word-parallel. Entropic codes the gap structure with a context model.</p>
+  <p>The first three columns are bits per posting over the query lists; the best existing size comes from the first round of measurements. The next two give the share of postings in blocks holding 32–255 of them and the share of non-empty blocks holding exactly one. Skew is the median ratio of a query's longest to its shortest list. The designs below answer one fact each. Pyramid makes every probe O(1) with bimodal leaves. Loom keeps PEF's partitioning and makes it word-parallel. Entropic codes the gap structure with a context model.</p>
 </section>
 
 <!--PYRAMID-->
@@ -77,7 +83,7 @@
   <ul>
     <li><b>Word-aligned bitvectors.</b> Bit \(i\) of a bitvector partition with base \(b\) is docID \(64\lfloor b/64\rfloor + i\). The bitvectors of any two lists then share the docID word grid, so they can be ANDed or ORed word by word without shifts. The padding of at most 63 bits is charged to the partition.</li>
     <li><b>Finer partitions with a speed bias.</b> The dynamic program runs on a 16-posting boundary grid (PEF uses 32) and divides bitvector cost by \(\lambda = 5/4\):
-      <div class="math">\[ C(j) = \min_{\substack{i<j\\ j-i \le 4096}} \Bigl[ C(i) + 64 + \min\Bigl\{ \tfrac{1}{\lambda}\,\mathrm{BV}(i,j),\ \mathrm{EF}(i,j) + 12,\ \mathrm{RUN}(i,j) \Bigr\} \Bigr]. \]</div>
+      <div class="math">\[ C(j) = \min_{\substack{i \lt j\\ j-i \le 4096}} \Bigl[ C(i) + 64 + \min\Bigl\{ \tfrac{1}{\lambda}\,\mathrm{BV}(i,j),\ \mathrm{EF}(i,j) + 12,\ \mathrm{RUN}(i,j) \Bigr\} \Bigr]. \]</div>
       The finer grid saves about 1% and the bias spends it again on bitvectors, which probe in O(1) and OR word-wise, so total size stays at or just below PEF's. Each Elias-Fano partition carries 16-bit select samples every 256 zeros (PEF uses 32-bit samples) plus a 12-bit size field.</li>
   </ul>
   <figure>
@@ -132,13 +138,13 @@
   </ul>
   <h3>Queries</h3>
   <p>An AVX-512 gather decoder decodes eight blocks at once for bulk decoding. AND bulk-decodes the shortest list and filters it through lazy, block-caching cursors on the others, with early exit. OR sets bits in a bitmap over \([\min, \max]\) and extracts them with the shared SIMD extractor.</p>
-  <p>The price is build time, about 10–15× the other codecs because of model fitting, and decode tables built from the stored models when an index is loaded. They are not part of the serialized size, as with zstd's FSE tables, but they are reported below as auxiliary memory.</p>
+  <p>The price is build time, 13–19× PEF's because of model fitting, and decode tables built from the stored models when an index is loaded. They are not part of the serialized size, as with zstd's FSE tables, but they are reported below as auxiliary memory.</p>
 </section>
 
 <section id="evaluation">
   <div class="col">
     <h2>Evaluation</h2>
-    <p>Same harness, same machine, same three collections and query generator as the first round. Every new structure passes the shared conformance tests, and every query result of every algorithm is verified against a reference before it is timed. Times are the best of three passes, single-threaded, with docIDs written out. Space is bits per posting over the lists the queries use (whole-index figures are in the tables).</p>
+    <p>Same harness, same machine, same three collections and query generator as the first round. Every new structure passes the shared conformance tests, and every query result of every algorithm is verified against a reference before it is timed. Times are the best of three passes, single-threaded, with docIDs written out. Space is bits per posting over the lists the queries use. In the tables, <em>index bits</em> covers every list, <em>aux MB</em> is memory built at load time, and <em>OR count</em> is the fastest union that returns only the number of results.</p>
   </div>
   <!--RESULTS-->
 </section>
@@ -151,10 +157,11 @@
 <section class="col repro" id="reproduce">
   <h2>Reproduce</h2>
 <pre>cd posting_bench
-cargo test --release                              # every codec, incl. Pyramid, Loom, Entropic
-target/release/posting-bench stats                # structure of the default collection and queries
-scripts/run_designs.sh data/wikitext103.txt       # all experiments on this page
-python3 scripts/build_report.py                   # rebuilds report/report.html and report/designs.html</pre>
+cargo test --release               # all codecs, incl. the new three
+target/release/posting-bench stats
+scripts/prepare_wikitext.sh data   # fetches WikiText-103
+scripts/run_designs.sh data/wikitext103.txt
+python3 scripts/build_report.py    # rebuilds both report pages</pre>
 </section>
 <footer class="col" id="footer"></footer>
 </div>
