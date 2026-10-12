@@ -1,0 +1,4570 @@
+{
+  "build_options": {},
+  "build_secs": {
+    "category": 0.045554022,
+    "id": 0.120280647,
+    "rating": 0.013958388,
+    "seq": 0.013339477,
+    "store": 0.984774278,
+    "tier": 0.031593161,
+    "topic": 0.030883337,
+    "year": 0.014831222
+  },
+  "collection": "trec-covid",
+  "documents": 171332,
+  "facet": [
+    {
+      "auto": {
+        "median_ns": 201.15059523809524,
+        "min_ns": 188.82619047619048
+      },
+      "auto_choice": "Codes",
+      "codes": {
+        "median_ns": 142.11406351263773,
+        "min_ns": 137.94232015554115
+      },
+      "density": 0.0001,
+      "docs": 16,
+      "field": "category",
+      "postings": {
+        "median_ns": 79902.34246575342,
+        "min_ns": 78218.97260273973
+      },
+      "representation": "sorted",
+      "values": 64
+    },
+    {
+      "auto": {
+        "median_ns": 1240.9041297935103,
+        "min_ns": 1180.1371681415928
+      },
+      "auto_choice": "Codes",
+      "codes": {
+        "median_ns": 1129.5330836454432,
+        "min_ns": 1115.887640449438
+      },
+      "density": 0.001,
+      "docs": 158,
+      "field": "category",
+      "postings": {
+        "median_ns": 78657.09322033898,
+        "min_ns": 74936.58474576271
+      },
+      "representation": "sorted",
+      "values": 64
+    },
+    {
+      "auto": {
+        "median_ns": 6411.680722891566,
+        "min_ns": 6178.593373493976
+      },
+      "auto_choice": "Codes",
+      "codes": {
+        "median_ns": 6273.602564102564,
+        "min_ns": 5915.740384615385
+      },
+      "density": 0.005,
+      "docs": 845,
+      "field": "category",
+      "postings": {
+        "median_ns": 76871.41904761904,
+        "min_ns": 75148.75238095238
+      },
+      "representation": "sorted",
+      "values": 64
+    },
+    {
+      "auto": {
+        "median_ns": 13221.88275862069,
+        "min_ns": 12695.686206896551
+      },
+      "auto_choice": "Codes",
+      "codes": {
+        "median_ns": 13669.614213197969,
+        "min_ns": 13366.657360406092
+      },
+      "density": 0.01,
+      "docs": 1797,
+      "field": "category",
+      "postings": {
+        "median_ns": 80898.89361702128,
+        "min_ns": 77957.63829787234
+      },
+      "representation": "sorted",
+      "values": 64
+    },
+    {
+      "auto": {
+        "median_ns": 25404.620300751878,
+        "min_ns": 23644.92105263158
+      },
+      "auto_choice": "Codes",
+      "codes": {
+        "median_ns": 26041.57928802589,
+        "min_ns": 25870.31067961165
+      },
+      "density": 0.02,
+      "docs": 3510,
+      "field": "category",
+      "postings": {
+        "median_ns": 77365.71951219512,
+        "min_ns": 72469.34146341463
+      },
+      "representation": "sorted",
+      "values": 64
+    },
+    {
+      "auto": {
+        "median_ns": 37793.3275862069,
+        "min_ns": 37231.29885057471
+      },
+      "auto_choice": "Codes",
+      "codes": {
+        "median_ns": 38831.50666666667,
+        "min_ns": 36651.46666666667
+      },
+      "density": 0.03,
+      "docs": 5175,
+      "field": "category",
+      "postings": {
+        "median_ns": 82946.67391304347,
+        "min_ns": 73744.65217391304
+      },
+      "representation": "sorted",
+      "values": 64
+    },
+    {
+      "auto": {
+        "median_ns": 52237.48245614035,
+        "min_ns": 48791.42105263158
+      },
+      "auto_choice": "Codes",
+      "codes": {
+        "median_ns": 46045.38356164384,
+        "min_ns": 43830.71232876712
+      },
+      "density": 0.05,
+      "docs": 8641,
+      "field": "category",
+      "postings": {
+        "median_ns": 77035.20652173914,
+        "min_ns": 74429.33695652174
+      },
+      "representation": "bits",
+      "values": 64
+    },
+    {
+      "auto": {
+        "median_ns": 41045.06338028169,
+        "min_ns": 38250.08450704225
+      },
+      "auto_choice": "Codes",
+      "codes": {
+        "median_ns": 38772.817142857144,
+        "min_ns": 36100.37142857143
+      },
+      "density": 0.1,
+      "docs": 17170,
+      "field": "category",
+      "postings": {
+        "median_ns": 86283.61458333333,
+        "min_ns": 77508.44791666667
+      },
+      "representation": "bits",
+      "values": 64
+    },
+    {
+      "auto": {
+        "median_ns": 57792.96323529412,
+        "min_ns": 52379.169117647056
+      },
+      "auto_choice": "Codes",
+      "codes": {
+        "median_ns": 54927.056603773584,
+        "min_ns": 51940.3962264151
+      },
+      "density": 0.2,
+      "docs": 34436,
+      "field": "category",
+      "postings": {
+        "median_ns": 75229.81132075471,
+        "min_ns": 67176.03773584905
+      },
+      "representation": "bits",
+      "values": 64
+    },
+    {
+      "auto": {
+        "median_ns": 74633.5985915493,
+        "min_ns": 71103.24647887323
+      },
+      "auto_choice": "Postings",
+      "codes": {
+        "median_ns": 89942.58974358975,
+        "min_ns": 85284.2435897436
+      },
+      "density": 0.4,
+      "docs": 68406,
+      "field": "category",
+      "postings": {
+        "median_ns": 81923.86956521739,
+        "min_ns": 68078.51086956522
+      },
+      "representation": "bits",
+      "values": 64
+    },
+    {
+      "auto": {
+        "median_ns": 75708.72932330827,
+        "min_ns": 73775.06766917293
+      },
+      "auto_choice": "Postings",
+      "codes": {
+        "median_ns": 129450.65384615384,
+        "min_ns": 122060.78205128205
+      },
+      "density": 0.7,
+      "docs": 119857,
+      "field": "category",
+      "postings": {
+        "median_ns": 75969.24175824175,
+        "min_ns": 74793.53846153847
+      },
+      "representation": "bits",
+      "values": 64
+    },
+    {
+      "auto": {
+        "median_ns": 72175.2463768116,
+        "min_ns": 71224.01449275362
+      },
+      "auto_choice": "Postings",
+      "codes": {
+        "median_ns": 137068.52380952382,
+        "min_ns": 130152.79365079365
+      },
+      "density": 1.0,
+      "docs": 171332,
+      "field": "category",
+      "postings": {
+        "median_ns": 75651.3373493976,
+        "min_ns": 71722.2891566265
+      },
+      "representation": "bits",
+      "values": 64
+    },
+    {
+      "auto": {
+        "median_ns": 189.74227252938616,
+        "min_ns": 183.12451023073575
+      },
+      "auto_choice": "Codes",
+      "codes": {
+        "median_ns": 186.109126984127,
+        "min_ns": 156.59573412698413
+      },
+      "density": 0.0001,
+      "docs": 21,
+      "field": "topic",
+      "postings": {
+        "median_ns": 77384.64705882352,
+        "min_ns": 72076.63235294117
+      },
+      "representation": "sorted",
+      "values": 32
+    },
+    {
+      "auto": {
+        "median_ns": 1259.7226606538895,
+        "min_ns": 1186.7452085682075
+      },
+      "auto_choice": "Codes",
+      "codes": {
+        "median_ns": 1216.5110204081632,
+        "min_ns": 1125.4808163265307
+      },
+      "density": 0.001,
+      "docs": 161,
+      "field": "topic",
+      "postings": {
+        "median_ns": 85268.18681318681,
+        "min_ns": 81518.34065934065
+      },
+      "representation": "sorted",
+      "values": 32
+    },
+    {
+      "auto": {
+        "median_ns": 7060.598233995585,
+        "min_ns": 6585.905077262693
+      },
+      "auto_choice": "Codes",
+      "codes": {
+        "median_ns": 6867.579345088161,
+        "min_ns": 6554.740554156171
+      },
+      "density": 0.005,
+      "docs": 910,
+      "field": "topic",
+      "postings": {
+        "median_ns": 90150.74390243902,
+        "min_ns": 83906.5487804878
+      },
+      "representation": "sorted",
+      "values": 32
+    },
+    {
+      "auto": {
+        "median_ns": 12899.10064935065,
+        "min_ns": 12588.366883116883
+      },
+      "auto_choice": "Codes",
+      "codes": {
+        "median_ns": 15199.937219730942,
+        "min_ns": 14208.399103139014
+      },
+      "density": 0.01,
+      "docs": 1740,
+      "field": "topic",
+      "postings": {
+        "median_ns": 80307.53086419753,
+        "min_ns": 78966.77777777778
+      },
+      "representation": "sorted",
+      "values": 32
+    },
+    {
+      "auto": {
+        "median_ns": 30337.083333333332,
+        "min_ns": 24488.43253968254
+      },
+      "auto_choice": "Codes",
+      "codes": {
+        "median_ns": 26689.643504531723,
+        "min_ns": 26251.586102719033
+      },
+      "density": 0.02,
+      "docs": 3435,
+      "field": "topic",
+      "postings": {
+        "median_ns": 91749.64102564103,
+        "min_ns": 83344.42307692308
+      },
+      "representation": "sorted",
+      "values": 32
+    },
+    {
+      "auto": {
+        "median_ns": 45549.857142857145,
+        "min_ns": 39291.06285714286
+      },
+      "auto_choice": "Codes",
+      "codes": {
+        "median_ns": 52101.3172690763,
+        "min_ns": 37565.22489959839
+      },
+      "density": 0.03,
+      "docs": 5184,
+      "field": "topic",
+      "postings": {
+        "median_ns": 83320.92592592593,
+        "min_ns": 81931.94444444444
+      },
+      "representation": "sorted",
+      "values": 32
+    },
+    {
+      "auto": {
+        "median_ns": 49575.05,
+        "min_ns": 47551.10833333333
+      },
+      "auto_choice": "Codes",
+      "codes": {
+        "median_ns": 78666.90697674418,
+        "min_ns": 50391.91860465116
+      },
+      "density": 0.05,
+      "docs": 8648,
+      "field": "topic",
+      "postings": {
+        "median_ns": 89941.73626373627,
+        "min_ns": 69564.42857142857
+      },
+      "representation": "bits",
+      "values": 32
+    },
+    {
+      "auto": {
+        "median_ns": 61896.33757961784,
+        "min_ns": 33391.95541401274
+      },
+      "auto_choice": "Codes",
+      "codes": {
+        "median_ns": 48745.66371681416,
+        "min_ns": 37108.23008849558
+      },
+      "density": 0.1,
+      "docs": 16983,
+      "field": "topic",
+      "postings": {
+        "median_ns": 106059.85245901639,
+        "min_ns": 71536.85245901639
+      },
+      "representation": "bits",
+      "values": 32
+    },
+    {
+      "auto": {
+        "median_ns": 57178.53086419753,
+        "min_ns": 53404.53703703704
+      },
+      "auto_choice": "Codes",
+      "codes": {
+        "median_ns": 72532.96116504855,
+        "min_ns": 56213.95145631068
+      },
+      "density": 0.2,
+      "docs": 34312,
+      "field": "topic",
+      "postings": {
+        "median_ns": 71634.60563380281,
+        "min_ns": 71008.88732394367
+      },
+      "representation": "bits",
+      "values": 32
+    },
+    {
+      "auto": {
+        "median_ns": 84692.09345794392,
+        "min_ns": 79097.54205607477
+      },
+      "auto_choice": "Codes",
+      "codes": {
+        "median_ns": 87630.84946236559,
+        "min_ns": 83541.37634408602
+      },
+      "density": 0.4,
+      "docs": 68258,
+      "field": "topic",
+      "postings": {
+        "median_ns": 80817.68235294118,
+        "min_ns": 80428.50588235294
+      },
+      "representation": "bits",
+      "values": 32
+    },
+    {
+      "auto": {
+        "median_ns": 78950.60227272728,
+        "min_ns": 72668.10227272728
+      },
+      "auto_choice": "Postings",
+      "codes": {
+        "median_ns": 122369.7625,
+        "min_ns": 114722.125
+      },
+      "density": 0.7,
+      "docs": 119573,
+      "field": "topic",
+      "postings": {
+        "median_ns": 74483.89873417722,
+        "min_ns": 69333.49367088608
+      },
+      "representation": "bits",
+      "values": 32
+    },
+    {
+      "auto": {
+        "median_ns": 93783.19444444444,
+        "min_ns": 92644.03703703704
+      },
+      "auto_choice": "Postings",
+      "codes": {
+        "median_ns": 144460.1923076923,
+        "min_ns": 140872.32692307694
+      },
+      "density": 1.0,
+      "docs": 171332,
+      "field": "topic",
+      "postings": {
+        "median_ns": 81334.5,
+        "min_ns": 78197.55714285714
+      },
+      "representation": "bits",
+      "values": 32
+    },
+    {
+      "auto": {
+        "median_ns": 244.5399643493761,
+        "min_ns": 234.72549019607843
+      },
+      "auto_choice": "Codes",
+      "codes": {
+        "median_ns": 238.15212840195395,
+        "min_ns": 233.5261688764829
+      },
+      "density": 0.0001,
+      "docs": 20,
+      "field": "tier",
+      "postings": {
+        "median_ns": 4690.453333333333,
+        "min_ns": 4615.093333333333
+      },
+      "representation": "sorted",
+      "values": 4
+    },
+    {
+      "auto": {
+        "median_ns": 1198.6983791402397,
+        "min_ns": 1136.8287526427061
+      },
+      "auto_choice": "Codes",
+      "codes": {
+        "median_ns": 1837.3558082859463,
+        "min_ns": 1815.7676685621445
+      },
+      "density": 0.001,
+      "docs": 175,
+      "field": "tier",
+      "postings": {
+        "median_ns": 5033.199329983249,
+        "min_ns": 3981.761306532663
+      },
+      "representation": "sorted",
+      "values": 4
+    },
+    {
+      "auto": {
+        "median_ns": 5360.820306204673,
+        "min_ns": 4201.010475423046
+      },
+      "auto_choice": "Postings",
+      "codes": {
+        "median_ns": 6714.859908883827,
+        "min_ns": 5675.677676537585
+      },
+      "density": 0.005,
+      "docs": 904,
+      "field": "tier",
+      "postings": {
+        "median_ns": 6821.639896373057,
+        "min_ns": 6558.326424870466
+      },
+      "representation": "sorted",
+      "values": 4
+    },
+    {
+      "auto": {
+        "median_ns": 4794.316826680141,
+        "min_ns": 4737.7645275391615
+      },
+      "auto_choice": "Postings",
+      "codes": {
+        "median_ns": 11229.246127366609,
+        "min_ns": 9844.132530120482
+      },
+      "density": 0.01,
+      "docs": 1752,
+      "field": "tier",
+      "postings": {
+        "median_ns": 4683.251677852349,
+        "min_ns": 4328.855704697987
+      },
+      "representation": "sorted",
+      "values": 4
+    },
+    {
+      "auto": {
+        "median_ns": 5743.588014981274,
+        "min_ns": 5220.107865168539
+      },
+      "auto_choice": "Postings",
+      "codes": {
+        "median_ns": 20816.75588235294,
+        "min_ns": 19922.823529411766
+      },
+      "density": 0.02,
+      "docs": 3407,
+      "field": "tier",
+      "postings": {
+        "median_ns": 5866.352818371607,
+        "min_ns": 5531.027139874739
+      },
+      "representation": "sorted",
+      "values": 4
+    },
+    {
+      "auto": {
+        "median_ns": 7170.070100143062,
+        "min_ns": 6500.671673819743
+      },
+      "auto_choice": "Postings",
+      "codes": {
+        "median_ns": 30557.36858974359,
+        "min_ns": 29457.083333333332
+      },
+      "density": 0.03,
+      "docs": 5169,
+      "field": "tier",
+      "postings": {
+        "median_ns": 7178.818867924529,
+        "min_ns": 6976.21320754717
+      },
+      "representation": "sorted",
+      "values": 4
+    },
+    {
+      "auto": {
+        "median_ns": 3382.7513986013987,
+        "min_ns": 3328.4416083916085
+      },
+      "auto_choice": "Postings",
+      "codes": {
+        "median_ns": 50323.85526315789,
+        "min_ns": 47662.91447368421
+      },
+      "density": 0.05,
+      "docs": 8496,
+      "field": "tier",
+      "postings": {
+        "median_ns": 3275.8282144716295,
+        "min_ns": 3066.5424258198855
+      },
+      "representation": "bits",
+      "values": 4
+    },
+    {
+      "auto": {
+        "median_ns": 3492.4636174636175,
+        "min_ns": 3395.265765765766
+      },
+      "auto_choice": "Postings",
+      "codes": {
+        "median_ns": 37934.813953488374,
+        "min_ns": 34501.08720930233
+      },
+      "density": 0.1,
+      "docs": 17001,
+      "field": "tier",
+      "postings": {
+        "median_ns": 3392.8050383351588,
+        "min_ns": 3373.1281489594744
+      },
+      "representation": "bits",
+      "values": 4
+    },
+    {
+      "auto": {
+        "median_ns": 3523.5194359756097,
+        "min_ns": 3367.561356707317
+      },
+      "auto_choice": "Postings",
+      "codes": {
+        "median_ns": 56945.04,
+        "min_ns": 50823.14
+      },
+      "density": 0.2,
+      "docs": 34366,
+      "field": "tier",
+      "postings": {
+        "median_ns": 3562.504798464491,
+        "min_ns": 3450.345489443378
+      },
+      "representation": "bits",
+      "values": 4
+    },
+    {
+      "auto": {
+        "median_ns": 3432.0,
+        "min_ns": 3178.4754834254145
+      },
+      "auto_choice": "Postings",
+      "codes": {
+        "median_ns": 88898.22222222222,
+        "min_ns": 85035.01851851853
+      },
+      "density": 0.4,
+      "docs": 68620,
+      "field": "tier",
+      "postings": {
+        "median_ns": 3339.726050420168,
+        "min_ns": 3060.766386554622
+      },
+      "representation": "bits",
+      "values": 4
+    },
+    {
+      "auto": {
+        "median_ns": 3456.5834690553747,
+        "min_ns": 3381.4731270358307
+      },
+      "auto_choice": "Postings",
+      "codes": {
+        "median_ns": 140170.44444444444,
+        "min_ns": 132659.125
+      },
+      "density": 0.7,
+      "docs": 120214,
+      "field": "tier",
+      "postings": {
+        "median_ns": 3378.5010141987827,
+        "min_ns": 3308.7748478701824
+      },
+      "representation": "bits",
+      "values": 4
+    },
+    {
+      "auto": {
+        "median_ns": 3404.3248772504094,
+        "min_ns": 3373.8711129296235
+      },
+      "auto_choice": "Postings",
+      "codes": {
+        "median_ns": 160515.67307692306,
+        "min_ns": 154254.15384615384
+      },
+      "density": 1.0,
+      "docs": 171332,
+      "field": "tier",
+      "postings": {
+        "median_ns": 3760.4380664652567,
+        "min_ns": 3482.892749244713
+      },
+      "representation": "bits",
+      "values": 4
+    }
+  ],
+  "keyword": [
+    {
+      "docs": 35874,
+      "docset": {
+        "median_ns": 1161.2158760890609,
+        "min_ns": 1138.3378509196516
+      },
+      "field": "category",
+      "filter_open": {
+        "median_ns": 126.83459298723827,
+        "min_ns": 125.22004708214595
+      },
+      "op": "eq",
+      "value": "c00"
+    },
+    {
+      "docs": 2089,
+      "docset": {
+        "median_ns": 696.6037296037296,
+        "min_ns": 695.1802641802642
+      },
+      "field": "category",
+      "filter_open": {
+        "median_ns": 120.71236189129868,
+        "min_ns": 112.20397306647818
+      },
+      "op": "eq",
+      "value": "c17"
+    },
+    {
+      "docs": 1096,
+      "docset": {
+        "median_ns": 495.68666666666667,
+        "min_ns": 475.40166666666664
+      },
+      "field": "category",
+      "filter_open": {
+        "median_ns": 92.9941556941557,
+        "min_ns": 92.53642873642873
+      },
+      "op": "eq",
+      "value": "c32"
+    },
+    {
+      "docs": 558,
+      "docset": {
+        "median_ns": 386.1393399685699,
+        "min_ns": 379.4143530644316
+      },
+      "field": "category",
+      "filter_open": {
+        "median_ns": 121.0371455726279,
+        "min_ns": 119.98736733724061
+      },
+      "op": "eq",
+      "value": "c62"
+    },
+    {
+      "docs": 53929,
+      "docset": {
+        "median_ns": 3718.493610223642,
+        "min_ns": 3357.084664536741
+      },
+      "field": "category",
+      "op": "in",
+      "values": 2
+    },
+    {
+      "docs": 1119,
+      "docset": {
+        "median_ns": 6905.383116883117,
+        "min_ns": 6212.061688311688
+      },
+      "field": "category",
+      "op": "in_rare",
+      "values": 2
+    },
+    {
+      "docs": 74660,
+      "docset": {
+        "median_ns": 13805.497584541063,
+        "min_ns": 13442.702898550724
+      },
+      "field": "category",
+      "op": "in",
+      "values": 4
+    },
+    {
+      "docs": 2277,
+      "docset": {
+        "median_ns": 10941.213075060532,
+        "min_ns": 8619.026634382566
+      },
+      "field": "category",
+      "op": "in_rare",
+      "values": 4
+    },
+    {
+      "docs": 97730,
+      "docset": {
+        "median_ns": 50759.67415730337,
+        "min_ns": 49063.93258426966
+      },
+      "field": "category",
+      "op": "in",
+      "values": 8
+    },
+    {
+      "docs": 4735,
+      "docset": {
+        "median_ns": 15120.509202453988,
+        "min_ns": 11677.389570552148
+      },
+      "field": "category",
+      "op": "in_rare",
+      "values": 8
+    },
+    {
+      "docs": 121972,
+      "docset": {
+        "median_ns": 72290.41176470589,
+        "min_ns": 63159.82352941176
+      },
+      "field": "category",
+      "op": "in",
+      "values": 16
+    },
+    {
+      "docs": 10234,
+      "docset": {
+        "median_ns": 17767.93265993266,
+        "min_ns": 14215.09090909091
+      },
+      "field": "category",
+      "op": "in_rare",
+      "values": 16
+    },
+    {
+      "docs": 10405,
+      "docset": {
+        "median_ns": 4159.637298091043,
+        "min_ns": 3365.919236417034
+      },
+      "field": "topic",
+      "filter_open": {
+        "median_ns": 129.0015873015873,
+        "min_ns": 115.58803418803419
+      },
+      "op": "eq",
+      "value": "t19"
+    },
+    {
+      "docs": 6501,
+      "docset": {
+        "median_ns": 6693.985743380856,
+        "min_ns": 5463.152749490835
+      },
+      "field": "topic",
+      "filter_open": {
+        "median_ns": 121.19184352892218,
+        "min_ns": 116.54071299764183
+      },
+      "op": "eq",
+      "value": "t07"
+    },
+    {
+      "docs": 5335,
+      "docset": {
+        "median_ns": 1133.32080659945,
+        "min_ns": 1017.9257561869845
+      },
+      "field": "topic",
+      "filter_open": {
+        "median_ns": 101.35363384084602,
+        "min_ns": 96.29813245331134
+      },
+      "op": "eq",
+      "value": "t08"
+    },
+    {
+      "docs": 2405,
+      "docset": {
+        "median_ns": 833.8535980148883,
+        "min_ns": 749.0843672456575
+      },
+      "field": "topic",
+      "filter_open": {
+        "median_ns": 105.43504473714528,
+        "min_ns": 98.21051418916325
+      },
+      "op": "eq",
+      "value": "t20"
+    },
+    {
+      "docs": 18796,
+      "docset": {
+        "median_ns": 10569.649546827795,
+        "min_ns": 10152.504531722054
+      },
+      "field": "topic",
+      "op": "in",
+      "values": 2
+    },
+    {
+      "docs": 5248,
+      "docset": {
+        "median_ns": 10763.931147540983,
+        "min_ns": 10502.88524590164
+      },
+      "field": "topic",
+      "op": "in_rare",
+      "values": 2
+    },
+    {
+      "docs": 34882,
+      "docset": {
+        "median_ns": 27652.587837837837,
+        "min_ns": 25827.95945945946
+      },
+      "field": "topic",
+      "op": "in",
+      "values": 4
+    },
+    {
+      "docs": 11390,
+      "docset": {
+        "median_ns": 9903.984326018808,
+        "min_ns": 9677.937304075234
+      },
+      "field": "topic",
+      "op": "in_rare",
+      "values": 4
+    },
+    {
+      "docs": 62316,
+      "docset": {
+        "median_ns": 41307.43396226415,
+        "min_ns": 39927.481132075474
+      },
+      "field": "topic",
+      "op": "in",
+      "values": 8
+    },
+    {
+      "docs": 25667,
+      "docset": {
+        "median_ns": 21996.259911894274,
+        "min_ns": 20974.06167400881
+      },
+      "field": "topic",
+      "op": "in_rare",
+      "values": 8
+    },
+    {
+      "docs": 109549,
+      "docset": {
+        "median_ns": 97048.25714285714,
+        "min_ns": 95963.1
+      },
+      "field": "topic",
+      "op": "in",
+      "values": 16
+    },
+    {
+      "docs": 61783,
+      "docset": {
+        "median_ns": 52483.47663551402,
+        "min_ns": 52291.280373831774
+      },
+      "field": "topic",
+      "op": "in_rare",
+      "values": 16
+    },
+    {
+      "docs": 68249,
+      "docset": {
+        "median_ns": 1156.0840455840455,
+        "min_ns": 1123.7022792022792
+      },
+      "field": "tier",
+      "filter_open": {
+        "median_ns": 95.76016474812546,
+        "min_ns": 95.11447882564157
+      },
+      "op": "eq",
+      "value": "a"
+    },
+    {
+      "docs": 51369,
+      "docset": {
+        "median_ns": 1097.5849056603774,
+        "min_ns": 1083.8355795148248
+      },
+      "field": "tier",
+      "filter_open": {
+        "median_ns": 94.05486240671642,
+        "min_ns": 91.88747667910448
+      },
+      "op": "eq",
+      "value": "b"
+    },
+    {
+      "docs": 34398,
+      "docset": {
+        "median_ns": 1076.261021693492,
+        "min_ns": 1038.1336599020294
+      },
+      "field": "tier",
+      "filter_open": {
+        "median_ns": 89.37761336075891,
+        "min_ns": 88.8172105731741
+      },
+      "op": "eq",
+      "value": "c"
+    },
+    {
+      "docs": 17316,
+      "docset": {
+        "median_ns": 3003.236877523553,
+        "min_ns": 2899.321668909825
+      },
+      "field": "tier",
+      "filter_open": {
+        "median_ns": 91.92906518508947,
+        "min_ns": 84.32844498998644
+      },
+      "op": "eq",
+      "value": "d"
+    },
+    {
+      "docs": 119618,
+      "docset": {
+        "median_ns": 2063.1859861591697,
+        "min_ns": 2033.265570934256
+      },
+      "field": "tier",
+      "op": "in",
+      "values": 2
+    },
+    {
+      "docs": 51714,
+      "docset": {
+        "median_ns": 3978.984319315752,
+        "min_ns": 3947.038488952245
+      },
+      "field": "tier",
+      "op": "in_rare",
+      "values": 2
+    },
+    {
+      "docs": 171332,
+      "docset": {
+        "median_ns": 5673.230848861283,
+        "min_ns": 5631.138716356108
+      },
+      "field": "tier",
+      "op": "in",
+      "values": 4
+    },
+    {
+      "docs": 171332,
+      "docset": {
+        "median_ns": 5882.255737704918,
+        "min_ns": 5812.866229508197
+      },
+      "field": "tier",
+      "op": "in_rare",
+      "values": 4
+    }
+  ],
+  "peak_rss_mb": 520.7890625,
+  "probe": [
+    {
+      "candidates": 100000,
+      "cardinality": 48831,
+      "filter": "column year in [2000, 2009]",
+      "ns_per_candidate": {
+        "median_ns": 9.307206666666666,
+        "min_ns": 7.9662766666666665
+      },
+      "order": "sorted"
+    },
+    {
+      "candidates": 100000,
+      "cardinality": 48831,
+      "filter": "column year in [2000, 2009]",
+      "ns_per_candidate": {
+        "median_ns": 9.48113,
+        "min_ns": 9.048196666666666
+      },
+      "order": "random"
+    },
+    {
+      "candidates": 100000,
+      "cardinality": 34525,
+      "filter": "column rating in [1, 2]",
+      "ns_per_candidate": {
+        "median_ns": 9.807673333333334,
+        "min_ns": 9.670283333333334
+      },
+      "order": "sorted"
+    },
+    {
+      "candidates": 100000,
+      "cardinality": 34525,
+      "filter": "column rating in [1, 2]",
+      "ns_per_candidate": {
+        "median_ns": 10.628733333333333,
+        "min_ns": 10.419066666666666
+      },
+      "order": "random"
+    },
+    {
+      "candidates": 100000,
+      "cardinality": 35874,
+      "filter": "pyramid category = c00",
+      "ns_per_candidate": {
+        "median_ns": 10.178246666666666,
+        "min_ns": 9.194896666666667
+      },
+      "order": "sorted"
+    },
+    {
+      "candidates": 100000,
+      "cardinality": 35874,
+      "filter": "pyramid category = c00",
+      "ns_per_candidate": {
+        "median_ns": 13.70353,
+        "min_ns": 12.845036666666667
+      },
+      "order": "random"
+    },
+    {
+      "candidates": 100000,
+      "cardinality": 2356,
+      "filter": "pyramid category = c15",
+      "ns_per_candidate": {
+        "median_ns": 18.25707,
+        "min_ns": 16.21709
+      },
+      "order": "sorted"
+    },
+    {
+      "candidates": 100000,
+      "cardinality": 2356,
+      "filter": "pyramid category = c15",
+      "ns_per_candidate": {
+        "median_ns": 17.39866333333333,
+        "min_ns": 16.9924
+      },
+      "order": "random"
+    },
+    {
+      "candidates": 100000,
+      "cardinality": 4100,
+      "filter": "pyramid topic = t00",
+      "ns_per_candidate": {
+        "median_ns": 13.930983333333332,
+        "min_ns": 12.979913333333332
+      },
+      "order": "sorted"
+    },
+    {
+      "candidates": 100000,
+      "cardinality": 4100,
+      "filter": "pyramid topic = t00",
+      "ns_per_candidate": {
+        "median_ns": 24.13096,
+        "min_ns": 23.931153333333334
+      },
+      "order": "random"
+    },
+    {
+      "candidates": 100000,
+      "cardinality": 68249,
+      "filter": "pyramid tier = a (Flat chunks)",
+      "ns_per_candidate": {
+        "median_ns": 8.55612,
+        "min_ns": 8.464553333333333
+      },
+      "order": "sorted"
+    },
+    {
+      "candidates": 100000,
+      "cardinality": 68249,
+      "filter": "pyramid tier = a (Flat chunks)",
+      "ns_per_candidate": {
+        "median_ns": 12.35564,
+        "min_ns": 12.26575
+      },
+      "order": "random"
+    },
+    {
+      "candidates": 100000,
+      "cardinality": 68249,
+      "filter": "codes tier = a",
+      "ns_per_candidate": {
+        "median_ns": 6.518486666666666,
+        "min_ns": 6.301033333333334
+      },
+      "order": "sorted"
+    },
+    {
+      "candidates": 100000,
+      "cardinality": 68249,
+      "filter": "codes tier = a",
+      "ns_per_candidate": {
+        "median_ns": 6.39548,
+        "min_ns": 6.25934
+      },
+      "order": "random"
+    },
+    {
+      "candidates": 100000,
+      "cardinality": 74660,
+      "filter": "codes category in 4 values",
+      "ns_per_candidate": {
+        "median_ns": 7.610016666666667,
+        "min_ns": 7.2709866666666665
+      },
+      "order": "sorted"
+    },
+    {
+      "candidates": 100000,
+      "cardinality": 74660,
+      "filter": "codes category in 4 values",
+      "ns_per_candidate": {
+        "median_ns": 7.580463333333333,
+        "min_ns": 7.56106
+      },
+      "order": "random"
+    },
+    {
+      "candidates": 100000,
+      "cardinality": 48831,
+      "filter": "docset bits year in [2000, 2009]",
+      "ns_per_candidate": {
+        "median_ns": 1.2994533333333333,
+        "min_ns": 1.2907566666666668
+      },
+      "order": "sorted"
+    },
+    {
+      "candidates": 100000,
+      "cardinality": 48831,
+      "filter": "docset bits year in [2000, 2009]",
+      "ns_per_candidate": {
+        "median_ns": 1.30262,
+        "min_ns": 1.29081
+      },
+      "order": "random"
+    },
+    {
+      "candidates": 100000,
+      "cardinality": 2356,
+      "filter": "docset sorted category = c15",
+      "ns_per_candidate": {
+        "median_ns": 15.188873333333332,
+        "min_ns": 14.117333333333333
+      },
+      "order": "sorted"
+    },
+    {
+      "candidates": 100000,
+      "cardinality": 2356,
+      "filter": "docset sorted category = c15",
+      "ns_per_candidate": {
+        "median_ns": 17.269706666666668,
+        "min_ns": 15.411386666666667
+      },
+      "order": "random"
+    }
+  ],
+  "range": [
+    {
+      "auto_choice": "Postings",
+      "auto_count": {
+        "median_ns": 400.65889361702125,
+        "min_ns": 387.65106382978723
+      },
+      "auto_count_choice": "Postings",
+      "auto_docset": {
+        "median_ns": 2887.9053497942386,
+        "min_ns": 2751.7681755829904
+      },
+      "blocks": 1339,
+      "blocks_decoded": 1339,
+      "boundary_docs": 0,
+      "covered_docs": 4867,
+      "estimate": 4867.0,
+      "field": "year",
+      "hi": 2000.0,
+      "lo": 2000.0,
+      "model_count_ns": [
+        46906.84375,
+        0.0
+      ],
+      "model_docset_ns": [
+        50333.48375,
+        2920.2
+      ],
+      "postings_count": {
+        "median_ns": 66.82336485421592,
+        "min_ns": 65.1011426319937
+      },
+      "postings_docset": {
+        "median_ns": 2225.0145719489983,
+        "min_ns": 2083.710382513661
+      },
+      "scan_count": {
+        "median_ns": 46787.454545454544,
+        "min_ns": 41739.6277056277
+      },
+      "scan_docset": {
+        "median_ns": 61038.07377049181,
+        "min_ns": 57438.89344262295
+      },
+      "scan_fractions_estimate": [
+        1.0,
+        1.0
+      ],
+      "selectivity": 0.028406835850862653,
+      "target": 0.001,
+      "window": 0
+    },
+    {
+      "auto_choice": "Postings",
+      "auto_count": {
+        "median_ns": 369.48729995595363,
+        "min_ns": 340.9154309205697
+      },
+      "auto_count_choice": "Postings",
+      "auto_docset": {
+        "median_ns": 1798.6626098715349,
+        "min_ns": 1746.2217714672076
+      },
+      "blocks": 1339,
+      "blocks_decoded": 1339,
+      "boundary_docs": 0,
+      "covered_docs": 4893,
+      "estimate": 4893.0,
+      "field": "year",
+      "hi": 2015.0,
+      "lo": 2015.0,
+      "model_count_ns": [
+        46906.84375,
+        0.0
+      ],
+      "model_docset_ns": [
+        50333.48375,
+        2935.7999999999997
+      ],
+      "postings_count": {
+        "median_ns": 41.461128802020426,
+        "min_ns": 39.78741627319644
+      },
+      "postings_docset": {
+        "median_ns": 1271.6477462437397,
+        "min_ns": 1235.3021702838064
+      },
+      "scan_count": {
+        "median_ns": 59363.42471042471,
+        "min_ns": 45109.09266409266
+      },
+      "scan_docset": {
+        "median_ns": 62780.782608695656,
+        "min_ns": 62285.11304347826
+      },
+      "scan_fractions_estimate": [
+        1.0,
+        1.0
+      ],
+      "selectivity": 0.028558588004575912,
+      "target": 0.001,
+      "window": 1
+    },
+    {
+      "auto_choice": "Postings",
+      "auto_count": {
+        "median_ns": 359.55848050649786,
+        "min_ns": 334.0591469510163
+      },
+      "auto_count_choice": "Postings",
+      "auto_docset": {
+        "median_ns": 1563.5740025740026,
+        "min_ns": 1541.9555984555984
+      },
+      "blocks": 1339,
+      "blocks_decoded": 1339,
+      "boundary_docs": 0,
+      "covered_docs": 4940,
+      "estimate": 4940.0,
+      "field": "year",
+      "hi": 1998.0,
+      "lo": 1998.0,
+      "model_count_ns": [
+        46906.84375,
+        0.0
+      ],
+      "model_docset_ns": [
+        50333.48375,
+        2964.0
+      ],
+      "postings_count": {
+        "median_ns": 41.20020080321285,
+        "min_ns": 38.00775602409639
+      },
+      "postings_docset": {
+        "median_ns": 1249.1895551257253,
+        "min_ns": 1230.8375241779497
+      },
+      "scan_count": {
+        "median_ns": 42511.55603448276,
+        "min_ns": 40787.97844827586
+      },
+      "scan_docset": {
+        "median_ns": 60528.094017094016,
+        "min_ns": 56024.931623931625
+      },
+      "scan_fractions_estimate": [
+        1.0,
+        1.0
+      ],
+      "selectivity": 0.02883290920551911,
+      "target": 0.001,
+      "window": 2
+    },
+    {
+      "auto_choice": "Postings",
+      "auto_count": {
+        "median_ns": 394.7013376383764,
+        "min_ns": 384.78966789667896
+      },
+      "auto_count_choice": "Postings",
+      "auto_docset": {
+        "median_ns": 1881.4358054226475,
+        "min_ns": 1857.737240829346
+      },
+      "blocks": 1339,
+      "blocks_decoded": 1339,
+      "boundary_docs": 0,
+      "covered_docs": 4900,
+      "estimate": 4900.0,
+      "field": "year",
+      "hi": 2016.0,
+      "lo": 2016.0,
+      "model_count_ns": [
+        46906.84375,
+        0.0
+      ],
+      "model_docset_ns": [
+        50333.48375,
+        2940.0
+      ],
+      "postings_count": {
+        "median_ns": 45.54089782429083,
+        "min_ns": 44.09948284831237
+      },
+      "postings_docset": {
+        "median_ns": 1377.9443609022555,
+        "min_ns": 1373.8556390977444
+      },
+      "scan_count": {
+        "median_ns": 43012.598455598454,
+        "min_ns": 41760.16216216216
+      },
+      "scan_docset": {
+        "median_ns": 83928.9918699187,
+        "min_ns": 58012.09756097561
+      },
+      "scan_fractions_estimate": [
+        1.0,
+        1.0
+      ],
+      "selectivity": 0.028599444353652557,
+      "target": 0.001,
+      "window": 3
+    },
+    {
+      "auto_choice": "Postings",
+      "auto_count": {
+        "median_ns": 461.9470314318975,
+        "min_ns": 336.9336437718277
+      },
+      "auto_count_choice": "Postings",
+      "auto_docset": {
+        "median_ns": 1519.9885931558936,
+        "min_ns": 1499.6844106463877
+      },
+      "blocks": 1339,
+      "blocks_decoded": 1339,
+      "boundary_docs": 0,
+      "covered_docs": 4893,
+      "estimate": 4893.0,
+      "field": "year",
+      "hi": 2015.0,
+      "lo": 2015.0,
+      "model_count_ns": [
+        46906.84375,
+        0.0
+      ],
+      "model_docset_ns": [
+        50333.48375,
+        2935.7999999999997
+      ],
+      "postings_count": {
+        "median_ns": 41.58082755075816,
+        "min_ns": 37.081624261115394
+      },
+      "postings_docset": {
+        "median_ns": 1288.5432692307693,
+        "min_ns": 1237.576923076923
+      },
+      "scan_count": {
+        "median_ns": 58124.78448275862,
+        "min_ns": 42037.099137931036
+      },
+      "scan_docset": {
+        "median_ns": 61953.35964912281,
+        "min_ns": 58901.28947368421
+      },
+      "scan_fractions_estimate": [
+        1.0,
+        1.0
+      ],
+      "selectivity": 0.028558588004575912,
+      "target": 0.001,
+      "window": 4
+    },
+    {
+      "auto_choice": "Postings",
+      "auto_count": {
+        "median_ns": 345.0779752162731,
+        "min_ns": 339.06067336918403
+      },
+      "auto_count_choice": "Postings",
+      "auto_docset": {
+        "median_ns": 7067.033659066233,
+        "min_ns": 6968.093376764386
+      },
+      "blocks": 1339,
+      "blocks_decoded": 1339,
+      "boundary_docs": 0,
+      "covered_docs": 9751,
+      "estimate": 9751.0,
+      "field": "year",
+      "hi": 2003.0,
+      "lo": 2002.0,
+      "model_count_ns": [
+        46906.84375,
+        0.0
+      ],
+      "model_docset_ns": [
+        50333.48375,
+        9277.24
+      ],
+      "postings_count": {
+        "median_ns": 42.21129365683821,
+        "min_ns": 41.916086388858666
+      },
+      "postings_docset": {
+        "median_ns": 6214.696202531645,
+        "min_ns": 6079.489451476793
+      },
+      "scan_count": {
+        "median_ns": 38510.489270386264,
+        "min_ns": 37797.69527896996
+      },
+      "scan_docset": {
+        "median_ns": 54938.686440677964,
+        "min_ns": 39709.69491525424
+      },
+      "scan_fractions_estimate": [
+        1.0,
+        1.0
+      ],
+      "selectivity": 0.05691289426376859,
+      "target": 0.01,
+      "window": 0
+    },
+    {
+      "auto_choice": "Postings",
+      "auto_count": {
+        "median_ns": 344.3440881763527,
+        "min_ns": 333.9435871743487
+      },
+      "auto_count_choice": "Postings",
+      "auto_docset": {
+        "median_ns": 1798.6626984126983,
+        "min_ns": 1628.9900793650793
+      },
+      "blocks": 1339,
+      "blocks_decoded": 1339,
+      "boundary_docs": 0,
+      "covered_docs": 5028,
+      "estimate": 5028.0,
+      "field": "year",
+      "hi": 2010.0,
+      "lo": 2010.0,
+      "model_count_ns": [
+        46906.84375,
+        0.0
+      ],
+      "model_docset_ns": [
+        50333.48375,
+        3016.7999999999997
+      ],
+      "postings_count": {
+        "median_ns": 38.40307340614681,
+        "min_ns": 38.14178308356617
+      },
+      "postings_docset": {
+        "median_ns": 1172.824,
+        "min_ns": 1141.5013333333334
+      },
+      "scan_count": {
+        "median_ns": 56529.51724137931,
+        "min_ns": 38692.724137931036
+      },
+      "scan_docset": {
+        "median_ns": 56295.14615384615,
+        "min_ns": 54914.484615384616
+      },
+      "scan_fractions_estimate": [
+        1.0,
+        1.0
+      ],
+      "selectivity": 0.029346531879625524,
+      "target": 0.01,
+      "window": 1
+    },
+    {
+      "auto_choice": "Postings",
+      "auto_count": {
+        "median_ns": 375.1934152131283,
+        "min_ns": 366.9047373309939
+      },
+      "auto_count_choice": "Postings",
+      "auto_docset": {
+        "median_ns": 7057.02422907489,
+        "min_ns": 6823.2246696035245
+      },
+      "blocks": 1339,
+      "blocks_decoded": 1339,
+      "boundary_docs": 0,
+      "covered_docs": 9770,
+      "estimate": 9770.0,
+      "field": "year",
+      "hi": 2005.0,
+      "lo": 2004.0,
+      "model_count_ns": [
+        46906.84375,
+        0.0
+      ],
+      "model_docset_ns": [
+        50333.48375,
+        9288.64
+      ],
+      "postings_count": {
+        "median_ns": 43.572713597151015,
+        "min_ns": 42.81033371197004
+      },
+      "postings_docset": {
+        "median_ns": 6727.567951318459,
+        "min_ns": 6557.091277890467
+      },
+      "scan_count": {
+        "median_ns": 41521.75714285715,
+        "min_ns": 38477.695238095235
+      },
+      "scan_docset": {
+        "median_ns": 37408.96484375,
+        "min_ns": 36833.2421875
+      },
+      "scan_fractions_estimate": [
+        1.0,
+        1.0
+      ],
+      "selectivity": 0.0570237900684052,
+      "target": 0.01,
+      "window": 2
+    },
+    {
+      "auto_choice": "Postings",
+      "auto_count": {
+        "median_ns": 371.9359501204478,
+        "min_ns": 368.5635539180955
+      },
+      "auto_count_choice": "Postings",
+      "auto_docset": {
+        "median_ns": 2956.0919439579684,
+        "min_ns": 2881.9947460595445
+      },
+      "blocks": 1339,
+      "blocks_decoded": 1339,
+      "boundary_docs": 0,
+      "covered_docs": 4928,
+      "estimate": 4928.0,
+      "field": "year",
+      "hi": 1996.0,
+      "lo": 1996.0,
+      "model_count_ns": [
+        46906.84375,
+        0.0
+      ],
+      "model_docset_ns": [
+        50333.48375,
+        2956.7999999999997
+      ],
+      "postings_count": {
+        "median_ns": 71.020608,
+        "min_ns": 69.49392
+      },
+      "postings_docset": {
+        "median_ns": 2163.32962962963,
+        "min_ns": 2122.562962962963
+      },
+      "scan_count": {
+        "median_ns": 51583.616915422885,
+        "min_ns": 41976.68656716418
+      },
+      "scan_docset": {
+        "median_ns": 60204.08474576271,
+        "min_ns": 55602.245762711864
+      },
+      "scan_fractions_estimate": [
+        1.0,
+        1.0
+      ],
+      "selectivity": 0.028762869749959143,
+      "target": 0.01,
+      "window": 3
+    },
+    {
+      "auto_choice": "Postings",
+      "auto_count": {
+        "median_ns": 377.181592039801,
+        "min_ns": 345.90985074626866
+      },
+      "auto_count_choice": "Postings",
+      "auto_docset": {
+        "median_ns": 1474.6723429242513,
+        "min_ns": 1448.2818555490312
+      },
+      "blocks": 1339,
+      "blocks_decoded": 1339,
+      "boundary_docs": 0,
+      "covered_docs": 4786,
+      "estimate": 4786.0,
+      "field": "year",
+      "hi": 2020.0,
+      "lo": 2020.0,
+      "model_count_ns": [
+        46906.84375,
+        0.0
+      ],
+      "model_docset_ns": [
+        50333.48375,
+        2871.6
+      ],
+      "postings_count": {
+        "median_ns": 40.74302998421883,
+        "min_ns": 37.39466070489216
+      },
+      "postings_docset": {
+        "median_ns": 1206.0383561643835,
+        "min_ns": 1179.2712328767122
+      },
+      "scan_count": {
+        "median_ns": 42989.28017241379,
+        "min_ns": 40885.25
+      },
+      "scan_docset": {
+        "median_ns": 59256.8347107438,
+        "min_ns": 53602.61157024794
+      },
+      "scan_fractions_estimate": [
+        1.0,
+        1.0
+      ],
+      "selectivity": 0.027934069525832887,
+      "target": 0.01,
+      "window": 4
+    },
+    {
+      "auto_choice": "Postings",
+      "auto_count": {
+        "median_ns": 367.13080233630495,
+        "min_ns": 350.5064555794651
+      },
+      "auto_count_choice": "Postings",
+      "auto_docset": {
+        "median_ns": 15756.835351089589,
+        "min_ns": 13634.731234866827
+      },
+      "blocks": 1339,
+      "blocks_decoded": 1339,
+      "boundary_docs": 0,
+      "covered_docs": 19838,
+      "estimate": 19838.0,
+      "field": "year",
+      "hi": 1996.0,
+      "lo": 1993.0,
+      "model_count_ns": [
+        46906.84375,
+        0.0
+      ],
+      "model_docset_ns": [
+        50333.48375,
+        15329.439999999999
+      ],
+      "postings_count": {
+        "median_ns": 44.17794154177362,
+        "min_ns": 42.01465595760536
+      },
+      "postings_docset": {
+        "median_ns": 13568.438095238096,
+        "min_ns": 13478.003174603175
+      },
+      "scan_count": {
+        "median_ns": 40328.87548638132,
+        "min_ns": 37832.77042801557
+      },
+      "scan_docset": {
+        "median_ns": 38957.21551724138,
+        "min_ns": 38488.92672413793
+      },
+      "scan_fractions_estimate": [
+        1.0,
+        1.0
+      ],
+      "selectivity": 0.11578689328321622,
+      "target": 0.1,
+      "window": 0
+    },
+    {
+      "auto_choice": "Postings",
+      "auto_count": {
+        "median_ns": 413.9927371273713,
+        "min_ns": 387.9938211382114
+      },
+      "auto_count_choice": "Postings",
+      "auto_docset": {
+        "median_ns": 17379.63953488372,
+        "min_ns": 16432.837209302324
+      },
+      "blocks": 1339,
+      "blocks_decoded": 1339,
+      "boundary_docs": 0,
+      "covered_docs": 24803,
+      "estimate": 24803.0,
+      "field": "year",
+      "hi": 1996.0,
+      "lo": 1992.0,
+      "model_count_ns": [
+        46906.84375,
+        0.0
+      ],
+      "model_docset_ns": [
+        50333.48375,
+        18308.44
+      ],
+      "postings_count": {
+        "median_ns": 68.61163277112723,
+        "min_ns": 64.8054826220462
+      },
+      "postings_docset": {
+        "median_ns": 16821.68098159509,
+        "min_ns": 15942.328220858895
+      },
+      "scan_count": {
+        "median_ns": 41757.666666666664,
+        "min_ns": 41442.666666666664
+      },
+      "scan_docset": {
+        "median_ns": 42051.63157894737,
+        "min_ns": 38647.40350877193
+      },
+      "scan_fractions_estimate": [
+        1.0,
+        1.0
+      ],
+      "selectivity": 0.14476571802115193,
+      "target": 0.1,
+      "window": 1
+    },
+    {
+      "auto_choice": "Postings",
+      "auto_count": {
+        "median_ns": 413.35048383290064,
+        "min_ns": 398.75312721265044
+      },
+      "auto_count_choice": "Postings",
+      "auto_docset": {
+        "median_ns": 17511.716332378222,
+        "min_ns": 16280.595988538682
+      },
+      "blocks": 1339,
+      "blocks_decoded": 1339,
+      "boundary_docs": 0,
+      "covered_docs": 24431,
+      "estimate": 24431.0,
+      "field": "year",
+      "hi": 2007.0,
+      "lo": 2003.0,
+      "model_count_ns": [
+        46906.84375,
+        0.0
+      ],
+      "model_docset_ns": [
+        50333.48375,
+        18085.24
+      ],
+      "postings_count": {
+        "median_ns": 71.81785192278615,
+        "min_ns": 68.60314500277204
+      },
+      "postings_docset": {
+        "median_ns": 18882.535714285714,
+        "min_ns": 16155.160714285714
+      },
+      "scan_count": {
+        "median_ns": 41502.731914893615,
+        "min_ns": 40078.029787234045
+      },
+      "scan_docset": {
+        "median_ns": 44490.32773109244,
+        "min_ns": 39683.29831932773
+      },
+      "scan_fractions_estimate": [
+        1.0,
+        1.0
+      ],
+      "selectivity": 0.142594494898793,
+      "target": 0.1,
+      "window": 2
+    },
+    {
+      "auto_choice": "Postings",
+      "auto_count": {
+        "median_ns": 442.75749202975555,
+        "min_ns": 418.590435706695
+      },
+      "auto_count_choice": "Postings",
+      "auto_docset": {
+        "median_ns": 25193.304195804194,
+        "min_ns": 17992.19230769231
+      },
+      "blocks": 1339,
+      "blocks_decoded": 1339,
+      "boundary_docs": 0,
+      "covered_docs": 24662,
+      "estimate": 24662.0,
+      "field": "year",
+      "hi": 1998.0,
+      "lo": 1994.0,
+      "model_count_ns": [
+        46906.84375,
+        0.0
+      ],
+      "model_docset_ns": [
+        50333.48375,
+        18223.84
+      ],
+      "postings_count": {
+        "median_ns": 78.97692715700141,
+        "min_ns": 70.84631364922207
+      },
+      "postings_docset": {
+        "median_ns": 20555.32242990654,
+        "min_ns": 17410.971962616823
+      },
+      "scan_count": {
+        "median_ns": 47181.597345132745,
+        "min_ns": 43489.43805309734
+      },
+      "scan_docset": {
+        "median_ns": 44694.97297297297,
+        "min_ns": 42691.45945945946
+      },
+      "scan_fractions_estimate": [
+        1.0,
+        1.0
+      ],
+      "selectivity": 0.14394275441832233,
+      "target": 0.1,
+      "window": 3
+    },
+    {
+      "auto_choice": "Postings",
+      "auto_count": {
+        "median_ns": 441.34954591321895,
+        "min_ns": 416.8476286579213
+      },
+      "auto_count_choice": "Postings",
+      "auto_docset": {
+        "median_ns": 16609.717451523546,
+        "min_ns": 15239.775623268699
+      },
+      "blocks": 1339,
+      "blocks_decoded": 1339,
+      "boundary_docs": 0,
+      "covered_docs": 24531,
+      "estimate": 24531.0,
+      "field": "year",
+      "hi": 2010.0,
+      "lo": 2006.0,
+      "model_count_ns": [
+        46906.84375,
+        0.0
+      ],
+      "model_docset_ns": [
+        50333.48375,
+        18145.24
+      ],
+      "postings_count": {
+        "median_ns": 68.91289608100168,
+        "min_ns": 67.57885458572527
+      },
+      "postings_docset": {
+        "median_ns": 17698.8322147651,
+        "min_ns": 16721.96979865772
+      },
+      "scan_count": {
+        "median_ns": 47770.90170940171,
+        "min_ns": 43641.72649572649
+      },
+      "scan_docset": {
+        "median_ns": 40542.02312138728,
+        "min_ns": 39047.10982658959
+      },
+      "scan_fractions_estimate": [
+        1.0,
+        1.0
+      ],
+      "selectivity": 0.14317815702845937,
+      "target": 0.1,
+      "window": 4
+    },
+    {
+      "auto_choice": "Scan",
+      "auto_count": {
+        "median_ns": 531.033439192976,
+        "min_ns": 523.1408555949935
+      },
+      "auto_count_choice": "Postings",
+      "auto_docset": {
+        "median_ns": 44005.72222222222,
+        "min_ns": 38082.76666666667
+      },
+      "blocks": 1339,
+      "blocks_decoded": 1339,
+      "boundary_docs": 0,
+      "covered_docs": 88171,
+      "estimate": 88171.0,
+      "field": "year",
+      "hi": 2013.0,
+      "lo": 1996.0,
+      "model_count_ns": [
+        46906.84375,
+        0.0
+      ],
+      "model_docset_ns": [
+        50333.48375,
+        56329.24
+      ],
+      "postings_count": {
+        "median_ns": 165.94032258064516,
+        "min_ns": 136.88736559139784
+      },
+      "postings_docset": {
+        "median_ns": 59274.738738738735,
+        "min_ns": 55053.81981981982
+      },
+      "scan_count": {
+        "median_ns": 40004.6640625,
+        "min_ns": 38011.58984375
+      },
+      "scan_docset": {
+        "median_ns": 41827.45106382979,
+        "min_ns": 39108.42127659574
+      },
+      "scan_fractions_estimate": [
+        1.0,
+        1.0
+      ],
+      "selectivity": 0.5146207363481428,
+      "target": 0.5,
+      "window": 0
+    },
+    {
+      "auto_choice": "Scan",
+      "auto_count": {
+        "median_ns": 540.4602622847211,
+        "min_ns": 539.8009164164955
+      },
+      "auto_count_choice": "Postings",
+      "auto_docset": {
+        "median_ns": 39526.8417721519,
+        "min_ns": 38211.36075949367
+      },
+      "blocks": 1339,
+      "blocks_decoded": 1339,
+      "boundary_docs": 0,
+      "covered_docs": 92704,
+      "estimate": 92704.0,
+      "field": "year",
+      "hi": 2020.0,
+      "lo": 2002.0,
+      "model_count_ns": [
+        46906.84375,
+        0.0
+      ],
+      "model_docset_ns": [
+        50333.48375,
+        59049.04
+      ],
+      "postings_count": {
+        "median_ns": 162.9992029967323,
+        "min_ns": 155.49119311389177
+      },
+      "postings_docset": {
+        "median_ns": 59764.425742574254,
+        "min_ns": 56600.08910891089
+      },
+      "scan_count": {
+        "median_ns": 40385.523605150214,
+        "min_ns": 37643.19742489271
+      },
+      "scan_docset": {
+        "median_ns": 40351.8347107438,
+        "min_ns": 37190.50826446281
+      },
+      "scan_fractions_estimate": [
+        1.0,
+        1.0
+      ],
+      "selectivity": 0.5410781406859198,
+      "target": 0.5,
+      "window": 1
+    },
+    {
+      "auto_choice": "Scan",
+      "auto_count": {
+        "median_ns": 527.5173387096775,
+        "min_ns": 514.3425403225806
+      },
+      "auto_count_choice": "Postings",
+      "auto_docset": {
+        "median_ns": 37363.80503144654,
+        "min_ns": 37196.96855345912
+      },
+      "blocks": 1339,
+      "blocks_decoded": 1339,
+      "boundary_docs": 0,
+      "covered_docs": 93421,
+      "estimate": 93421.0,
+      "field": "year",
+      "hi": 2008.0,
+      "lo": 1990.0,
+      "model_count_ns": [
+        46906.84375,
+        0.0
+      ],
+      "model_docset_ns": [
+        50333.48375,
+        59479.24
+      ],
+      "postings_count": {
+        "median_ns": 148.8997668997669,
+        "min_ns": 131.0818514818515
+      },
+      "postings_docset": {
+        "median_ns": 88853.44067796611,
+        "min_ns": 71459.59322033898
+      },
+      "scan_count": {
+        "median_ns": 41603.85227272727,
+        "min_ns": 39136.30303030303
+      },
+      "scan_docset": {
+        "median_ns": 41662.46245059289,
+        "min_ns": 37610.0
+      },
+      "scan_fractions_estimate": [
+        1.0,
+        1.0
+      ],
+      "selectivity": 0.5452629981556276,
+      "target": 0.5,
+      "window": 2
+    },
+    {
+      "auto_choice": "Scan",
+      "auto_count": {
+        "median_ns": 589.7426900584795,
+        "min_ns": 586.8502024291498
+      },
+      "auto_count_choice": "Postings",
+      "auto_docset": {
+        "median_ns": 65223.08383233533,
+        "min_ns": 41037.50898203593
+      },
+      "blocks": 1339,
+      "blocks_decoded": 1339,
+      "boundary_docs": 0,
+      "covered_docs": 87927,
+      "estimate": 87927.0,
+      "field": "year",
+      "hi": 2017.0,
+      "lo": 2000.0,
+      "model_count_ns": [
+        46906.84375,
+        0.0
+      ],
+      "model_docset_ns": [
+        50333.48375,
+        56182.84
+      ],
+      "postings_count": {
+        "median_ns": 154.67556416301784,
+        "min_ns": 151.81416301785112
+      },
+      "postings_docset": {
+        "median_ns": 94414.90909090909,
+        "min_ns": 60287.93388429752
+      },
+      "scan_count": {
+        "median_ns": 43414.95319148936,
+        "min_ns": 42031.04680851064
+      },
+      "scan_docset": {
+        "median_ns": 39827.744680851065,
+        "min_ns": 36698.09574468085
+      },
+      "scan_fractions_estimate": [
+        1.0,
+        1.0
+      ],
+      "selectivity": 0.5131966007517568,
+      "target": 0.5,
+      "window": 3
+    },
+    {
+      "auto_choice": "Scan",
+      "auto_count": {
+        "median_ns": 617.1092211280214,
+        "min_ns": 566.6639809012236
+      },
+      "auto_count_choice": "Postings",
+      "auto_docset": {
+        "median_ns": 57931.97687861272,
+        "min_ns": 45588.33526011561
+      },
+      "blocks": 1339,
+      "blocks_decoded": 1339,
+      "boundary_docs": 0,
+      "covered_docs": 92573,
+      "estimate": 92573.0,
+      "field": "year",
+      "hi": 2023.0,
+      "lo": 2005.0,
+      "model_count_ns": [
+        46906.84375,
+        0.0
+      ],
+      "model_docset_ns": [
+        50333.48375,
+        58970.439999999995
+      ],
+      "postings_count": {
+        "median_ns": 161.18980502701433,
+        "min_ns": 148.71231696813092
+      },
+      "postings_docset": {
+        "median_ns": 101282.11206896552,
+        "min_ns": 56280.56896551724
+      },
+      "scan_count": {
+        "median_ns": 41781.27826086956,
+        "min_ns": 39749.178260869565
+      },
+      "scan_docset": {
+        "median_ns": 40698.57024793389,
+        "min_ns": 39314.074380165286
+      },
+      "scan_fractions_estimate": [
+        1.0,
+        1.0
+      ],
+      "selectivity": 0.5403135432960567,
+      "target": 0.5,
+      "window": 4
+    },
+    {
+      "auto_choice": "Postings",
+      "auto_count": {
+        "median_ns": 21456.296703296703,
+        "min_ns": 21426.653846153848
+      },
+      "auto_count_choice": "Postings",
+      "auto_docset": {
+        "median_ns": 19680.524390243903,
+        "min_ns": 18841.727642276423
+      },
+      "blocks": 1339,
+      "blocks_decoded": 1339,
+      "boundary_docs": 2747,
+      "covered_docs": 0,
+      "estimate": 686.75,
+      "field": "rating",
+      "hi": 0.55,
+      "lo": 0.54,
+      "model_count_ns": [
+        46906.84375,
+        24723.0
+      ],
+      "model_docset_ns": [
+        50333.48375,
+        24723.0
+      ],
+      "postings_count": {
+        "median_ns": 20517.793296089385,
+        "min_ns": 19207.354748603353
+      },
+      "postings_docset": {
+        "median_ns": 22743.59487179487,
+        "min_ns": 17948.784615384615
+      },
+      "scan_count": {
+        "median_ns": 50611.6,
+        "min_ns": 49156.864705882355
+      },
+      "scan_docset": {
+        "median_ns": 63702.98275862069,
+        "min_ns": 48219.23275862069
+      },
+      "scan_fractions_estimate": [
+        1.0,
+        1.0
+      ],
+      "selectivity": 0.004336609623421194,
+      "target": 0.001,
+      "window": 0
+    },
+    {
+      "auto_choice": "Postings",
+      "auto_count": {
+        "median_ns": 22306.378205128207,
+        "min_ns": 19719.92948717949
+      },
+      "auto_count_choice": "Postings",
+      "auto_docset": {
+        "median_ns": 22061.20979020979,
+        "min_ns": 20948.601398601397
+      },
+      "blocks": 1339,
+      "blocks_decoded": 1339,
+      "boundary_docs": 2761,
+      "covered_docs": 0,
+      "estimate": 345.125,
+      "field": "rating",
+      "hi": 2.1,
+      "lo": 2.1,
+      "model_count_ns": [
+        46906.84375,
+        24849.0
+      ],
+      "model_docset_ns": [
+        50333.48375,
+        24849.0
+      ],
+      "postings_count": {
+        "median_ns": 22638.991477272728,
+        "min_ns": 21944.514204545456
+      },
+      "postings_docset": {
+        "median_ns": 19107.41964285714,
+        "min_ns": 18579.428571428572
+      },
+      "scan_count": {
+        "median_ns": 45694.07729468599,
+        "min_ns": 41083.555555555555
+      },
+      "scan_docset": {
+        "median_ns": 49220.71028037383,
+        "min_ns": 45358.02803738318
+      },
+      "scan_fractions_estimate": [
+        1.0,
+        1.0
+      ],
+      "selectivity": 0.0018910653001190671,
+      "target": 0.001,
+      "window": 1
+    },
+    {
+      "auto_choice": "Postings",
+      "auto_count": {
+        "median_ns": 19976.95035460993,
+        "min_ns": 19575.09574468085
+      },
+      "auto_count_choice": "Postings",
+      "auto_docset": {
+        "median_ns": 19087.709433962264,
+        "min_ns": 17140.441509433964
+      },
+      "blocks": 1339,
+      "blocks_decoded": 1339,
+      "boundary_docs": 2692,
+      "covered_docs": 0,
+      "estimate": 673.0,
+      "field": "rating",
+      "hi": 0.6,
+      "lo": 0.59,
+      "model_count_ns": [
+        46906.84375,
+        24228.0
+      ],
+      "model_docset_ns": [
+        50333.48375,
+        24228.0
+      ],
+      "postings_count": {
+        "median_ns": 20742.70171149144,
+        "min_ns": 19341.171149144255
+      },
+      "postings_docset": {
+        "median_ns": 19065.94,
+        "min_ns": 17034.985
+      },
+      "scan_count": {
+        "median_ns": 49094.87431693989,
+        "min_ns": 46124.174863387976
+      },
+      "scan_docset": {
+        "median_ns": 51065.131944444445,
+        "min_ns": 50036.77777777778
+      },
+      "scan_fractions_estimate": [
+        1.0,
+        1.0
+      ],
+      "selectivity": 0.0041089813928513064,
+      "target": 0.001,
+      "window": 2
+    },
+    {
+      "auto_choice": "Postings",
+      "auto_count": {
+        "median_ns": 26887.38064516129,
+        "min_ns": 19937.0
+      },
+      "auto_count_choice": "Postings",
+      "auto_docset": {
+        "median_ns": 27573.649193548386,
+        "min_ns": 22480.290322580644
+      },
+      "blocks": 1339,
+      "blocks_decoded": 1339,
+      "boundary_docs": 2689,
+      "covered_docs": 0,
+      "estimate": 336.125,
+      "field": "rating",
+      "hi": 2.26,
+      "lo": 2.26,
+      "model_count_ns": [
+        46906.84375,
+        24201.0
+      ],
+      "model_docset_ns": [
+        50333.48375,
+        24201.0
+      ],
+      "postings_count": {
+        "median_ns": 30030.83415841584,
+        "min_ns": 23285.428217821784
+      },
+      "postings_docset": {
+        "median_ns": 20605.178137651823,
+        "min_ns": 17612.016194331984
+      },
+      "scan_count": {
+        "median_ns": 48930.28326180258,
+        "min_ns": 46733.28326180258
+      },
+      "scan_docset": {
+        "median_ns": 44485.24456521739,
+        "min_ns": 44037.086956521736
+      },
+      "scan_fractions_estimate": [
+        1.0,
+        1.0
+      ],
+      "selectivity": 0.0019435948917890411,
+      "target": 0.001,
+      "window": 3
+    },
+    {
+      "auto_choice": "Postings",
+      "auto_count": {
+        "median_ns": 21404.935309973047,
+        "min_ns": 18996.90835579515
+      },
+      "auto_count_choice": "Postings",
+      "auto_docset": {
+        "median_ns": 19758.540636042402,
+        "min_ns": 19610.664310954064
+      },
+      "blocks": 1339,
+      "blocks_decoded": 1339,
+      "boundary_docs": 2716,
+      "covered_docs": 0,
+      "estimate": 339.5,
+      "field": "rating",
+      "hi": 4.51,
+      "lo": 4.51,
+      "model_count_ns": [
+        46906.84375,
+        24444.0
+      ],
+      "model_docset_ns": [
+        50333.48375,
+        24444.0
+      ],
+      "postings_count": {
+        "median_ns": 21540.08521303258,
+        "min_ns": 20804.659147869676
+      },
+      "postings_docset": {
+        "median_ns": 18025.823293172693,
+        "min_ns": 17197.156626506025
+      },
+      "scan_count": {
+        "median_ns": 44758.94849785408,
+        "min_ns": 43461.6652360515
+      },
+      "scan_docset": {
+        "median_ns": 49882.25133689839,
+        "min_ns": 47433.97326203209
+      },
+      "scan_fractions_estimate": [
+        1.0,
+        1.0
+      ],
+      "selectivity": 0.0018268624658557655,
+      "target": 0.001,
+      "window": 4
+    },
+    {
+      "auto_choice": "Scan",
+      "auto_count": {
+        "median_ns": 45383.06,
+        "min_ns": 42813.945
+      },
+      "auto_count_choice": "Scan",
+      "auto_docset": {
+        "median_ns": 51998.0,
+        "min_ns": 49358.77142857143
+      },
+      "blocks": 1339,
+      "blocks_decoded": 1339,
+      "boundary_docs": 5392,
+      "covered_docs": 0,
+      "estimate": 2020.25,
+      "field": "rating",
+      "hi": 2.23,
+      "lo": 2.18,
+      "model_count_ns": [
+        46906.84375,
+        48528.0
+      ],
+      "model_docset_ns": [
+        50333.48375,
+        51954.64
+      ],
+      "postings_count": {
+        "median_ns": 43148.96373056995,
+        "min_ns": 42218.31606217616
+      },
+      "postings_docset": {
+        "median_ns": 65823.3111111111,
+        "min_ns": 57907.53333333333
+      },
+      "scan_count": {
+        "median_ns": 45156.933628318584,
+        "min_ns": 42229.50442477876
+      },
+      "scan_docset": {
+        "median_ns": 49698.91724137931,
+        "min_ns": 48864.44827586207
+      },
+      "scan_fractions_estimate": [
+        1.0,
+        1.0
+      ],
+      "selectivity": 0.01183666798963416,
+      "target": 0.01,
+      "window": 0
+    },
+    {
+      "auto_choice": "Postings",
+      "auto_count": {
+        "median_ns": 38833.05603448276,
+        "min_ns": 37739.81465517241
+      },
+      "auto_count_choice": "Postings",
+      "auto_docset": {
+        "median_ns": 41580.114457831325,
+        "min_ns": 40221.74096385542
+      },
+      "blocks": 1339,
+      "blocks_decoded": 1339,
+      "boundary_docs": 2819,
+      "covered_docs": 0,
+      "estimate": 2114.25,
+      "field": "rating",
+      "hi": 3.44,
+      "lo": 3.39,
+      "model_count_ns": [
+        46906.84375,
+        25371.0
+      ],
+      "model_docset_ns": [
+        50333.48375,
+        25371.0
+      ],
+      "postings_count": {
+        "median_ns": 43012.372641509435,
+        "min_ns": 40791.79716981132
+      },
+      "postings_docset": {
+        "median_ns": 20717.08173076923,
+        "min_ns": 18010.326923076922
+      },
+      "scan_count": {
+        "median_ns": 45792.395939086295,
+        "min_ns": 42941.137055837564
+      },
+      "scan_docset": {
+        "median_ns": 52356.86713286713,
+        "min_ns": 48832.118881118884
+      },
+      "scan_fractions_estimate": [
+        1.0,
+        1.0
+      ],
+      "selectivity": 0.012577918894310461,
+      "target": 0.01,
+      "window": 1
+    },
+    {
+      "auto_choice": "Postings",
+      "auto_count": {
+        "median_ns": 20810.506912442397,
+        "min_ns": 19953.956221198157
+      },
+      "auto_count_choice": "Postings",
+      "auto_docset": {
+        "median_ns": 18168.869300911854,
+        "min_ns": 17700.73860182371
+      },
+      "blocks": 1339,
+      "blocks_decoded": 1339,
+      "boundary_docs": 2758,
+      "covered_docs": 0,
+      "estimate": 2068.5,
+      "field": "rating",
+      "hi": 4.29,
+      "lo": 4.24,
+      "model_count_ns": [
+        46906.84375,
+        24822.0
+      ],
+      "model_docset_ns": [
+        50333.48375,
+        24822.0
+      ],
+      "postings_count": {
+        "median_ns": 21973.259701492538,
+        "min_ns": 20514.167164179104
+      },
+      "postings_docset": {
+        "median_ns": 20043.575,
+        "min_ns": 18953.215
+      },
+      "scan_count": {
+        "median_ns": 45336.684848484845,
+        "min_ns": 42065.07878787879
+      },
+      "scan_docset": {
+        "median_ns": 75373.86170212766,
+        "min_ns": 72909.25531914894
+      },
+      "scan_fractions_estimate": [
+        1.0,
+        1.0
+      ],
+      "selectivity": 0.012105152569280695,
+      "target": 0.01,
+      "window": 2
+    },
+    {
+      "auto_choice": "Postings",
+      "auto_count": {
+        "median_ns": 45274.454545454544,
+        "min_ns": 44201.021390374335
+      },
+      "auto_count_choice": "Postings",
+      "auto_docset": {
+        "median_ns": 63839.65217391304,
+        "min_ns": 60308.47826086957
+      },
+      "blocks": 1339,
+      "blocks_decoded": 1339,
+      "boundary_docs": 5194,
+      "covered_docs": 0,
+      "estimate": 1731.142857142857,
+      "field": "rating",
+      "hi": 0.81,
+      "lo": 0.77,
+      "model_count_ns": [
+        46906.84375,
+        46746.0
+      ],
+      "model_docset_ns": [
+        50333.48375,
+        46746.0
+      ],
+      "postings_count": {
+        "median_ns": 53261.70256410256,
+        "min_ns": 41119.579487179486
+      },
+      "postings_docset": {
+        "median_ns": 61149.5,
+        "min_ns": 57576.77777777778
+      },
+      "scan_count": {
+        "median_ns": 45671.30909090909,
+        "min_ns": 42772.92272727273
+      },
+      "scan_docset": {
+        "median_ns": 49478.503937007874,
+        "min_ns": 48539.503937007874
+      },
+      "scan_fractions_estimate": [
+        1.0,
+        1.0
+      ],
+      "selectivity": 0.010645997245114749,
+      "target": 0.01,
+      "window": 3
+    },
+    {
+      "auto_choice": "Postings",
+      "auto_count": {
+        "median_ns": 387.26905574516496,
+        "min_ns": 372.84556313993176
+      },
+      "auto_count_choice": "Postings",
+      "auto_docset": {
+        "median_ns": 1305.4226907630523,
+        "min_ns": 1054.0053547523428
+      },
+      "blocks": 1339,
+      "blocks_decoded": 1339,
+      "boundary_docs": 0,
+      "covered_docs": 2380,
+      "estimate": 2380.0,
+      "field": "rating",
+      "hi": 2.58,
+      "lo": 2.52,
+      "model_count_ns": [
+        46906.84375,
+        0.0
+      ],
+      "model_docset_ns": [
+        50333.48375,
+        1428.0
+      ],
+      "postings_count": {
+        "median_ns": 44.6433151497751,
+        "min_ns": 44.46460586340001
+      },
+      "postings_docset": {
+        "median_ns": 662.388379204893,
+        "min_ns": 592.1192660550458
+      },
+      "scan_count": {
+        "median_ns": 45422.01904761905,
+        "min_ns": 42411.10476190476
+      },
+      "scan_docset": {
+        "median_ns": 53305.28358208955,
+        "min_ns": 51967.76865671642
+      },
+      "scan_fractions_estimate": [
+        1.0,
+        1.0
+      ],
+      "selectivity": 0.013891158686059814,
+      "target": 0.01,
+      "window": 4
+    },
+    {
+      "auto_choice": "Scan",
+      "auto_count": {
+        "median_ns": 43831.43119266055,
+        "min_ns": 43112.94495412844
+      },
+      "auto_count_choice": "Scan",
+      "auto_docset": {
+        "median_ns": 41677.71052631579,
+        "min_ns": 41586.905263157896
+      },
+      "blocks": 1339,
+      "blocks_decoded": 1339,
+      "boundary_docs": 5567,
+      "covered_docs": 16102,
+      "estimate": 17502.625,
+      "field": "rating",
+      "hi": 3.92,
+      "lo": 3.42,
+      "model_count_ns": [
+        46906.84375,
+        50103.0
+      ],
+      "model_docset_ns": [
+        50333.48375,
+        63190.84
+      ],
+      "postings_count": {
+        "median_ns": 51484.86666666667,
+        "min_ns": 50117.22777777778
+      },
+      "postings_docset": {
+        "median_ns": 61034.61627906977,
+        "min_ns": 59229.25581395349
+      },
+      "scan_count": {
+        "median_ns": 44861.49785407725,
+        "min_ns": 42816.643776824036
+      },
+      "scan_docset": {
+        "median_ns": 42019.86974789916,
+        "min_ns": 40326.268907563026
+      },
+      "scan_fractions_estimate": [
+        1.0,
+        1.0
+      ],
+      "selectivity": 0.102024140265683,
+      "target": 0.1,
+      "window": 0
+    },
+    {
+      "auto_choice": "Scan",
+      "auto_count": {
+        "median_ns": 39927.82532751092,
+        "min_ns": 38522.71179039301
+      },
+      "auto_count_choice": "Scan",
+      "auto_docset": {
+        "median_ns": 39762.336492890994,
+        "min_ns": 37141.93838862559
+      },
+      "blocks": 1339,
+      "blocks_decoded": 1339,
+      "boundary_docs": 5567,
+      "covered_docs": 16102,
+      "estimate": 17502.625,
+      "field": "rating",
+      "hi": 3.92,
+      "lo": 3.42,
+      "model_count_ns": [
+        46906.84375,
+        50103.0
+      ],
+      "model_docset_ns": [
+        50333.48375,
+        63190.84
+      ],
+      "postings_count": {
+        "median_ns": 47190.135,
+        "min_ns": 44812.26
+      },
+      "postings_docset": {
+        "median_ns": 58627.0,
+        "min_ns": 55030.17894736842
+      },
+      "scan_count": {
+        "median_ns": 42310.79646017699,
+        "min_ns": 39783.63274336283
+      },
+      "scan_docset": {
+        "median_ns": 41354.58,
+        "min_ns": 40942.08
+      },
+      "scan_fractions_estimate": [
+        1.0,
+        1.0
+      ],
+      "selectivity": 0.102024140265683,
+      "target": 0.1,
+      "window": 1
+    },
+    {
+      "auto_choice": "Postings",
+      "auto_count": {
+        "median_ns": 19382.298850574713,
+        "min_ns": 19127.6091954023
+      },
+      "auto_count_choice": "Postings",
+      "auto_docset": {
+        "median_ns": 31685.605263157893,
+        "min_ns": 30540.515789473684
+      },
+      "blocks": 1339,
+      "blocks_decoded": 1339,
+      "boundary_docs": 2670,
+      "covered_docs": 15937,
+      "estimate": 17605.75,
+      "field": "rating",
+      "hi": 3.36,
+      "lo": 2.86,
+      "model_count_ns": [
+        46906.84375,
+        24030.0
+      ],
+      "model_docset_ns": [
+        50333.48375,
+        37018.84
+      ],
+      "postings_count": {
+        "median_ns": 19364.087071240105,
+        "min_ns": 19020.055408970977
+      },
+      "postings_docset": {
+        "median_ns": 34831.4126984127,
+        "min_ns": 33597.02380952381
+      },
+      "scan_count": {
+        "median_ns": 41453.703125,
+        "min_ns": 38507.24609375
+      },
+      "scan_docset": {
+        "median_ns": 39370.05583756345,
+        "min_ns": 36386.558375634515
+      },
+      "scan_fractions_estimate": [
+        1.0,
+        1.0
+      ],
+      "selectivity": 0.10273620806387598,
+      "target": 0.1,
+      "window": 2
+    },
+    {
+      "auto_choice": "Postings",
+      "auto_count": {
+        "median_ns": 20099.780487804877,
+        "min_ns": 19762.80758807588
+      },
+      "auto_count_choice": "Postings",
+      "auto_docset": {
+        "median_ns": 31877.4,
+        "min_ns": 31241.4
+      },
+      "blocks": 1339,
+      "blocks_decoded": 1339,
+      "boundary_docs": 2734,
+      "covered_docs": 16092,
+      "estimate": 17459.0,
+      "field": "rating",
+      "hi": 2.35,
+      "lo": 1.85,
+      "model_count_ns": [
+        46906.84375,
+        24606.0
+      ],
+      "model_docset_ns": [
+        50333.48375,
+        37687.84
+      ],
+      "postings_count": {
+        "median_ns": 20727.827777777777,
+        "min_ns": 20481.83611111111
+      },
+      "postings_docset": {
+        "median_ns": 36401.752,
+        "min_ns": 34911.288
+      },
+      "scan_count": {
+        "median_ns": 44385.35326086957,
+        "min_ns": 41662.67934782609
+      },
+      "scan_docset": {
+        "median_ns": 38994.082706766916,
+        "min_ns": 36418.28947368421
+      },
+      "scan_fractions_estimate": [
+        1.0,
+        1.0
+      ],
+      "selectivity": 0.1021058529638363,
+      "target": 0.1,
+      "window": 3
+    },
+    {
+      "auto_choice": "Scan",
+      "auto_count": {
+        "median_ns": 45560.273542600895,
+        "min_ns": 44148.95515695067
+      },
+      "auto_count_choice": "Scan",
+      "auto_docset": {
+        "median_ns": 48456.200934579436,
+        "min_ns": 46096.81775700935
+      },
+      "blocks": 1339,
+      "blocks_decoded": 1339,
+      "boundary_docs": 5542,
+      "covered_docs": 13283,
+      "estimate": 17437.25,
+      "field": "rating",
+      "hi": 3.51,
+      "lo": 3.02,
+      "model_count_ns": [
+        46906.84375,
+        49878.0
+      ],
+      "model_docset_ns": [
+        50333.48375,
+        61274.44
+      ],
+      "postings_count": {
+        "median_ns": 51328.8125,
+        "min_ns": 46261.875
+      },
+      "postings_docset": {
+        "median_ns": 52129.83653846154,
+        "min_ns": 50511.519230769234
+      },
+      "scan_count": {
+        "median_ns": 40871.8813559322,
+        "min_ns": 38185.83050847457
+      },
+      "scan_docset": {
+        "median_ns": 37726.196652719664,
+        "min_ns": 36022.284518828455
+      },
+      "scan_fractions_estimate": [
+        1.0,
+        1.0
+      ],
+      "selectivity": 0.10182569514159644,
+      "target": 0.1,
+      "window": 4
+    },
+    {
+      "auto_choice": "Scan",
+      "auto_count": {
+        "median_ns": 44028.87573964497,
+        "min_ns": 43582.01183431953
+      },
+      "auto_count_choice": "Scan",
+      "auto_docset": {
+        "median_ns": 53725.25581395349,
+        "min_ns": 52908.00581395349
+      },
+      "blocks": 1339,
+      "blocks_decoded": 1339,
+      "boundary_docs": 5410,
+      "covered_docs": 82999,
+      "estimate": 86037.625,
+      "field": "rating",
+      "hi": 2.96,
+      "lo": 0.45,
+      "model_count_ns": [
+        46906.84375,
+        48690.0
+      ],
+      "model_docset_ns": [
+        50333.48375,
+        101916.04000000001
+      ],
+      "postings_count": {
+        "median_ns": 84236.27835051547,
+        "min_ns": 76303.1237113402
+      },
+      "postings_docset": {
+        "median_ns": 200006.0625,
+        "min_ns": 198636.84375
+      },
+      "scan_count": {
+        "median_ns": 56145.59459459459,
+        "min_ns": 53829.74054054054
+      },
+      "scan_docset": {
+        "median_ns": 43541.525862068964,
+        "min_ns": 40906.85775862069
+      },
+      "scan_fractions_estimate": [
+        1.0,
+        1.0
+      ],
+      "selectivity": 0.5023521583825555,
+      "target": 0.5,
+      "window": 0
+    },
+    {
+      "auto_choice": "Scan",
+      "auto_count": {
+        "median_ns": 45593.51948051948,
+        "min_ns": 39912.55194805195
+      },
+      "auto_count_choice": "Postings",
+      "auto_docset": {
+        "median_ns": 40567.753488372095,
+        "min_ns": 39610.2
+      },
+      "blocks": 1339,
+      "blocks_decoded": 1339,
+      "boundary_docs": 4923,
+      "covered_docs": 83161,
+      "estimate": 85953.85714285714,
+      "field": "rating",
+      "hi": 3.23,
+      "lo": 0.73,
+      "model_count_ns": [
+        46906.84375,
+        44307.0
+      ],
+      "model_docset_ns": [
+        50333.48375,
+        97630.23999999999
+      ],
+      "postings_count": {
+        "median_ns": 41734.39037433155,
+        "min_ns": 40432.36898395722
+      },
+      "postings_docset": {
+        "median_ns": 101160.6301369863,
+        "min_ns": 93903.32876712328
+      },
+      "scan_count": {
+        "median_ns": 38760.824644549764,
+        "min_ns": 37993.88151658768
+      },
+      "scan_docset": {
+        "median_ns": 40085.969696969696,
+        "min_ns": 39559.93939393939
+      },
+      "scan_fractions_estimate": [
+        1.0,
+        1.0
+      ],
+      "selectivity": 0.5017976793593725,
+      "target": 0.5,
+      "window": 1
+    },
+    {
+      "auto_choice": "Scan",
+      "auto_count": {
+        "median_ns": 43054.642857142855,
+        "min_ns": 42637.0
+      },
+      "auto_count_choice": "Scan",
+      "auto_docset": {
+        "median_ns": 43713.617886178865,
+        "min_ns": 37348.96341463415
+      },
+      "blocks": 1339,
+      "blocks_decoded": 1339,
+      "boundary_docs": 5538,
+      "covered_docs": 82877,
+      "estimate": 85985.875,
+      "field": "rating",
+      "hi": 3.4,
+      "lo": 0.9,
+      "model_count_ns": [
+        46906.84375,
+        49842.0
+      ],
+      "model_docset_ns": [
+        50333.48375,
+        102994.84
+      ],
+      "postings_count": {
+        "median_ns": 44631.79329608939,
+        "min_ns": 43908.49720670391
+      },
+      "postings_docset": {
+        "median_ns": 147163.64583333334,
+        "min_ns": 118405.5625
+      },
+      "scan_count": {
+        "median_ns": 46106.82327586207,
+        "min_ns": 42486.94827586207
+      },
+      "scan_docset": {
+        "median_ns": 40302.107296137336,
+        "min_ns": 39839.06008583691
+      },
+      "scan_fractions_estimate": [
+        1.0,
+        1.0
+      ],
+      "selectivity": 0.5018910653001191,
+      "target": 0.5,
+      "window": 2
+    },
+    {
+      "auto_choice": "Scan",
+      "auto_count": {
+        "median_ns": 42343.84523809524,
+        "min_ns": 39022.65476190476
+      },
+      "auto_count_choice": "Scan",
+      "auto_docset": {
+        "median_ns": 40882.54298642534,
+        "min_ns": 36780.15837104072
+      },
+      "blocks": 1339,
+      "blocks_decoded": 1339,
+      "boundary_docs": 5474,
+      "covered_docs": 82890,
+      "estimate": 85988.5,
+      "field": "rating",
+      "hi": 3.3,
+      "lo": 0.8,
+      "model_count_ns": [
+        46906.84375,
+        49266.0
+      ],
+      "model_docset_ns": [
+        50333.48375,
+        102426.64
+      ],
+      "postings_count": {
+        "median_ns": 46465.68085106383,
+        "min_ns": 44456.5585106383
+      },
+      "postings_docset": {
+        "median_ns": 125318.77586206897,
+        "min_ns": 119354.91379310345
+      },
+      "scan_count": {
+        "median_ns": 43428.74786324786,
+        "min_ns": 42138.6452991453
+      },
+      "scan_docset": {
+        "median_ns": 39083.99579831933,
+        "min_ns": 38216.68907563025
+      },
+      "scan_fractions_estimate": [
+        1.0,
+        1.0
+      ],
+      "selectivity": 0.501926085027899,
+      "target": 0.5,
+      "window": 3
+    },
+    {
+      "auto_choice": "Scan",
+      "auto_count": {
+        "median_ns": 39857.020161290326,
+        "min_ns": 39009.50403225807
+      },
+      "auto_count_choice": "Scan",
+      "auto_docset": {
+        "median_ns": 39763.918103448275,
+        "min_ns": 37642.004310344826
+      },
+      "blocks": 1339,
+      "blocks_decoded": 1339,
+      "boundary_docs": 5458,
+      "covered_docs": 82836,
+      "estimate": 85892.375,
+      "field": "rating",
+      "hi": 3.15,
+      "lo": 0.65,
+      "model_count_ns": [
+        46906.84375,
+        49122.0
+      ],
+      "model_docset_ns": [
+        50333.48375,
+        102250.23999999999
+      ],
+      "postings_count": {
+        "median_ns": 48636.254385964916,
+        "min_ns": 46966.51754385965
+      },
+      "postings_docset": {
+        "median_ns": 105695.03225806452,
+        "min_ns": 103106.8870967742
+      },
+      "scan_count": {
+        "median_ns": 42081.99145299145,
+        "min_ns": 40403.87606837607
+      },
+      "scan_docset": {
+        "median_ns": 40128.192307692305,
+        "min_ns": 39768.88461538462
+      },
+      "scan_fractions_estimate": [
+        1.0,
+        1.0
+      ],
+      "selectivity": 0.5014708285667593,
+      "target": 0.5,
+      "window": 4
+    },
+    {
+      "auto_choice": "Scan",
+      "auto_count": {
+        "median_ns": 420.9894148779771,
+        "min_ns": 401.25786533372536
+      },
+      "auto_count_choice": "Scan",
+      "auto_docset": {
+        "median_ns": 2327.4243654822335,
+        "min_ns": 2126.3035532994923
+      },
+      "blocks": 1339,
+      "blocks_decoded": 3,
+      "boundary_docs": 2677,
+      "covered_docs": 0,
+      "estimate": 169.20339046478557,
+      "field": "seq",
+      "hi": 1600683427.0,
+      "lo": 1600681739.0,
+      "model_count_ns": [
+        83.6875,
+        24093.0
+      ],
+      "model_docset_ns": [
+        3510.3275,
+        24093.0
+      ],
+      "postings_count": {
+        "median_ns": 16692.463955637708,
+        "min_ns": 16130.07393715342
+      },
+      "postings_docset": {
+        "median_ns": 18032.085635359115,
+        "min_ns": 17922.085635359115
+      },
+      "scan_count": {
+        "median_ns": 244.48949543654211,
+        "min_ns": 233.14723609436888
+      },
+      "scan_docset": {
+        "median_ns": 2005.7103873239437,
+        "min_ns": 1951.793133802817
+      },
+      "scan_fractions_estimate": [
+        0.03125,
+        0.0
+      ],
+      "selectivity": 0.0009980622417295076,
+      "target": 0.001,
+      "window": 0
+    },
+    {
+      "auto_choice": "Scan",
+      "auto_count": {
+        "median_ns": 447.8205628308721,
+        "min_ns": 430.0367790470883
+      },
+      "auto_count_choice": "Scan",
+      "auto_docset": {
+        "median_ns": 4240.120980091883,
+        "min_ns": 3383.649310872894
+      },
+      "blocks": 1339,
+      "blocks_decoded": 3,
+      "boundary_docs": 2677,
+      "covered_docs": 0,
+      "estimate": 168.19635832303024,
+      "field": "seq",
+      "hi": 1600112366.0,
+      "lo": 1600110690.0,
+      "model_count_ns": [
+        62.765625,
+        24093.0
+      ],
+      "model_docset_ns": [
+        3489.405625,
+        24093.0
+      ],
+      "postings_count": {
+        "median_ns": 19716.03606557377,
+        "min_ns": 17243.190163934425
+      },
+      "postings_docset": {
+        "median_ns": 16348.719008264463,
+        "min_ns": 16231.977961432507
+      },
+      "scan_count": {
+        "median_ns": 225.63797581064034,
+        "min_ns": 221.726274393411
+      },
+      "scan_docset": {
+        "median_ns": 2040.2932166301969,
+        "min_ns": 1927.3078045222464
+      },
+      "scan_fractions_estimate": [
+        0.015625,
+        0.0
+      ],
+      "selectivity": 0.0010038988630261714,
+      "target": 0.001,
+      "window": 1
+    },
+    {
+      "auto_choice": "Scan",
+      "auto_count": {
+        "median_ns": 582.9011095031356,
+        "min_ns": 558.8446695610227
+      },
+      "auto_count_choice": "Scan",
+      "auto_docset": {
+        "median_ns": 3675.298982188295,
+        "min_ns": 2908.241730279898
+      },
+      "blocks": 1339,
+      "blocks_decoded": 3,
+      "boundary_docs": 5354,
+      "covered_docs": 0,
+      "estimate": 163.90228790906758,
+      "field": "seq",
+      "hi": 1601526527.0,
+      "lo": 1601524889.0,
+      "model_count_ns": [
+        795.03125,
+        48186.0
+      ],
+      "model_docset_ns": [
+        4221.671249999999,
+        48186.0
+      ],
+      "postings_count": {
+        "median_ns": 44376.133779264215,
+        "min_ns": 38839.70234113713
+      },
+      "postings_docset": {
+        "median_ns": 41035.08108108108,
+        "min_ns": 35958.90990990991
+      },
+      "scan_count": {
+        "median_ns": 225.64174432149096,
+        "min_ns": 224.79892253931274
+      },
+      "scan_docset": {
+        "median_ns": 2005.366132723112,
+        "min_ns": 1891.0350877192982
+      },
+      "scan_fractions_estimate": [
+        0.03125,
+        0.015625
+      ],
+      "selectivity": 0.0009980622417295076,
+      "target": 0.001,
+      "window": 2
+    },
+    {
+      "auto_choice": "Scan",
+      "auto_count": {
+        "median_ns": 615.6456467898647,
+        "min_ns": 502.61992760525817
+      },
+      "auto_count_choice": "Scan",
+      "auto_docset": {
+        "median_ns": 3090.2180267965896,
+        "min_ns": 2418.029232643118
+      },
+      "blocks": 1339,
+      "blocks_decoded": 3,
+      "boundary_docs": 2677,
+      "covered_docs": 0,
+      "estimate": 167.85610785375508,
+      "field": "seq",
+      "hi": 1600406168.0,
+      "lo": 1600404490.0,
+      "model_count_ns": [
+        83.6875,
+        24093.0
+      ],
+      "model_docset_ns": [
+        3510.3275,
+        24093.0
+      ],
+      "postings_count": {
+        "median_ns": 23207.79335793358,
+        "min_ns": 21699.79335793358
+      },
+      "postings_docset": {
+        "median_ns": 24701.815873015872,
+        "min_ns": 19774.0126984127
+      },
+      "scan_count": {
+        "median_ns": 361.60793760036705,
+        "min_ns": 322.1403991741225
+      },
+      "scan_docset": {
+        "median_ns": 3061.7890011223344,
+        "min_ns": 2724.405723905724
+      },
+      "scan_fractions_estimate": [
+        0.03125,
+        0.0
+      ],
+      "selectivity": 0.0009980622417295076,
+      "target": 0.001,
+      "window": 3
+    },
+    {
+      "auto_choice": "Scan",
+      "auto_count": {
+        "median_ns": 787.4354415622267,
+        "min_ns": 604.5272515301662
+      },
+      "auto_count_choice": "Scan",
+      "auto_docset": {
+        "median_ns": 4903.063802083333,
+        "min_ns": 4085.9986979166665
+      },
+      "blocks": 1339,
+      "blocks_decoded": 3,
+      "boundary_docs": 2677,
+      "covered_docs": 0,
+      "estimate": 174.04953826597378,
+      "field": "seq",
+      "hi": 1600875886.0,
+      "lo": 1600874148.0,
+      "model_count_ns": [
+        62.765625,
+        24093.0
+      ],
+      "model_docset_ns": [
+        3489.405625,
+        24093.0
+      ],
+      "postings_count": {
+        "median_ns": 37257.08267716535,
+        "min_ns": 29267.905511811023
+      },
+      "postings_docset": {
+        "median_ns": 38034.22340425532,
+        "min_ns": 35011.494680851065
+      },
+      "scan_count": {
+        "median_ns": 418.86681905678535,
+        "min_ns": 367.81737247353226
+      },
+      "scan_docset": {
+        "median_ns": 5322.7075163398695,
+        "min_ns": 4134.251633986928
+      },
+      "scan_fractions_estimate": [
+        0.015625,
+        0.0
+      ],
+      "selectivity": 0.0009980622417295076,
+      "target": 0.001,
+      "window": 4
+    },
+    {
+      "auto_choice": "Scan",
+      "auto_count": {
+        "median_ns": 524.1906077348066,
+        "min_ns": 502.54788213627995
+      },
+      "auto_count_choice": "Scan",
+      "auto_docset": {
+        "median_ns": 7404.168595041322,
+        "min_ns": 7046.5173553719005
+      },
+      "blocks": 1339,
+      "blocks_decoded": 3,
+      "boundary_docs": 5354,
+      "covered_docs": 0,
+      "estimate": 1711.5211304525183,
+      "field": "seq",
+      "hi": 1600890652.0,
+      "lo": 1600873510.0,
+      "model_count_ns": [
+        62.765625,
+        48186.0
+      ],
+      "model_docset_ns": [
+        3489.405625,
+        48186.0
+      ],
+      "postings_count": {
+        "median_ns": 47760.61538461538,
+        "min_ns": 39018.83760683761
+      },
+      "postings_docset": {
+        "median_ns": 61081.17441860465,
+        "min_ns": 54032.50581395349
+      },
+      "scan_count": {
+        "median_ns": 347.16959595959594,
+        "min_ns": 314.4979797979798
+      },
+      "scan_docset": {
+        "median_ns": 9958.58407079646,
+        "min_ns": 7393.159292035398
+      },
+      "scan_fractions_estimate": [
+        0.015625,
+        0.0
+      ],
+      "selectivity": 0.009998132281185068,
+      "target": 0.01,
+      "window": 0
+    },
+    {
+      "auto_choice": "Scan",
+      "auto_count": {
+        "median_ns": 542.6552171095269,
+        "min_ns": 507.9661373946857
+      },
+      "auto_count_choice": "Scan",
+      "auto_docset": {
+        "median_ns": 7107.8738095238095,
+        "min_ns": 6518.169047619048
+      },
+      "blocks": 1339,
+      "blocks_decoded": 3,
+      "boundary_docs": 2678,
+      "covered_docs": 0,
+      "estimate": 1708.2205948288747,
+      "field": "seq",
+      "hi": 1601305780.0,
+      "lo": 1601288709.0,
+      "model_count_ns": [
+        62.765625,
+        24102.0
+      ],
+      "model_docset_ns": [
+        3489.405625,
+        24102.0
+      ],
+      "postings_count": {
+        "median_ns": 21514.50257731959,
+        "min_ns": 20308.39175257732
+      },
+      "postings_docset": {
+        "median_ns": 23602.533596837944,
+        "min_ns": 22132.16600790514
+      },
+      "scan_count": {
+        "median_ns": 413.756358768407,
+        "min_ns": 397.23650156180275
+      },
+      "scan_docset": {
+        "median_ns": 7633.169265033408,
+        "min_ns": 7390.269487750556
+      },
+      "scan_fractions_estimate": [
+        0.015625,
+        0.0
+      ],
+      "selectivity": 0.009998132281185068,
+      "target": 0.01,
+      "window": 1
+    },
+    {
+      "auto_choice": "Scan",
+      "auto_count": {
+        "median_ns": 598.1207430340557,
+        "min_ns": 465.93639178159304
+      },
+      "auto_count_choice": "Scan",
+      "auto_docset": {
+        "median_ns": 7930.666666666667,
+        "min_ns": 7088.333333333333
+      },
+      "blocks": 1339,
+      "blocks_decoded": 3,
+      "boundary_docs": 5355,
+      "covered_docs": 0,
+      "estimate": 1717.9964986478356,
+      "field": "seq",
+      "hi": 1600429031.0,
+      "lo": 1600411845.0,
+      "model_count_ns": [
+        774.109375,
+        48195.0
+      ],
+      "model_docset_ns": [
+        4200.749374999999,
+        51621.64
+      ],
+      "postings_count": {
+        "median_ns": 42357.845814977976,
+        "min_ns": 39531.16740088106
+      },
+      "postings_docset": {
+        "median_ns": 50555.23809523809,
+        "min_ns": 49639.08843537415
+      },
+      "scan_count": {
+        "median_ns": 344.9480442978322,
+        "min_ns": 332.9386192271442
+      },
+      "scan_docset": {
+        "median_ns": 7394.345885634589,
+        "min_ns": 6878.542538354254
+      },
+      "scan_fractions_estimate": [
+        0.015625,
+        0.015625
+      ],
+      "selectivity": 0.009998132281185068,
+      "target": 0.01,
+      "window": 2
+    },
+    {
+      "auto_choice": "Scan",
+      "auto_count": {
+        "median_ns": 628.1912510566357,
+        "min_ns": 594.0604395604396
+      },
+      "auto_count_choice": "Scan",
+      "auto_docset": {
+        "median_ns": 8064.720720720721,
+        "min_ns": 7812.037837837838
+      },
+      "blocks": 1339,
+      "blocks_decoded": 4,
+      "boundary_docs": 5354,
+      "covered_docs": 0,
+      "estimate": 1715.4503990069175,
+      "field": "seq",
+      "hi": 1600814919.0,
+      "lo": 1600797804.0,
+      "model_count_ns": [
+        62.765625,
+        48186.0
+      ],
+      "model_docset_ns": [
+        3489.405625,
+        48186.0
+      ],
+      "postings_count": {
+        "median_ns": 43036.23444976076,
+        "min_ns": 40703.153110047846
+      },
+      "postings_docset": {
+        "median_ns": 47532.375,
+        "min_ns": 45125.32065217391
+      },
+      "scan_count": {
+        "median_ns": 438.1457852933641,
+        "min_ns": 341.10299769408147
+      },
+      "scan_docset": {
+        "median_ns": 9236.064285714287,
+        "min_ns": 8527.014285714286
+      },
+      "scan_fractions_estimate": [
+        0.015625,
+        0.0
+      ],
+      "selectivity": 0.009998132281185068,
+      "target": 0.01,
+      "window": 3
+    },
+    {
+      "auto_choice": "Scan",
+      "auto_count": {
+        "median_ns": 962.0457912457913,
+        "min_ns": 892.4713804713805
+      },
+      "auto_count_choice": "Scan",
+      "auto_docset": {
+        "median_ns": 8183.513131313131,
+        "min_ns": 7943.452525252525
+      },
+      "blocks": 1339,
+      "blocks_decoded": 3,
+      "boundary_docs": 5354,
+      "covered_docs": 0,
+      "estimate": 1705.3684395112546,
+      "field": "seq",
+      "hi": 1600704998.0,
+      "lo": 1600687943.0,
+      "model_count_ns": [
+        104.609375,
+        48186.0
+      ],
+      "model_docset_ns": [
+        3531.249375,
+        48186.0
+      ],
+      "postings_count": {
+        "median_ns": 60141.281407035174,
+        "min_ns": 43426.547738693465
+      },
+      "postings_docset": {
+        "median_ns": 51021.7304964539,
+        "min_ns": 48192.85815602837
+      },
+      "scan_count": {
+        "median_ns": 421.04655516724915,
+        "min_ns": 417.709935097354
+      },
+      "scan_docset": {
+        "median_ns": 8420.848648648649,
+        "min_ns": 7605.699099099099
+      },
+      "scan_fractions_estimate": [
+        0.046875,
+        0.0
+      ],
+      "selectivity": 0.009998132281185068,
+      "target": 0.01,
+      "window": 4
+    },
+    {
+      "auto_choice": "Scan",
+      "auto_count": {
+        "median_ns": 1042.6313246162592,
+        "min_ns": 1016.3413871517907
+      },
+      "auto_count_choice": "Scan",
+      "auto_docset": {
+        "median_ns": 1582.7991266375545,
+        "min_ns": 1556.2450873362445
+      },
+      "blocks": 1339,
+      "blocks_decoded": 2,
+      "boundary_docs": 5354,
+      "covered_docs": 13386,
+      "estimate": 17133.74422300899,
+      "field": "seq",
+      "hi": 1601355403.0,
+      "lo": 1601184020.0,
+      "model_count_ns": [
+        125.53125,
+        48186.0
+      ],
+      "model_docset_ns": [
+        3552.17125,
+        59644.24
+      ],
+      "postings_count": {
+        "median_ns": 42071.7652173913,
+        "min_ns": 41051.495652173915
+      },
+      "postings_docset": {
+        "median_ns": 50794.37106918239,
+        "min_ns": 46950.2893081761
+      },
+      "scan_count": {
+        "median_ns": 717.3778723404255,
+        "min_ns": 711.2689361702128
+      },
+      "scan_docset": {
+        "median_ns": 1173.6331246990853,
+        "min_ns": 1036.9080404429465
+      },
+      "scan_fractions_estimate": [
+        0.0625,
+        0.0
+      ],
+      "selectivity": 0.09999883267574067,
+      "target": 0.1,
+      "window": 0
+    },
+    {
+      "auto_choice": "Scan",
+      "auto_count": {
+        "median_ns": 1941.7494407158836,
+        "min_ns": 1655.5167785234898
+      },
+      "auto_count_choice": "Scan",
+      "auto_docset": {
+        "median_ns": 3259.033576642336,
+        "min_ns": 2647.6525547445253
+      },
+      "blocks": 1339,
+      "blocks_decoded": 3,
+      "boundary_docs": 5354,
+      "covered_docs": 16063,
+      "estimate": 17147.9853242227,
+      "field": "seq",
+      "hi": 1601451551.0,
+      "lo": 1601280182.0,
+      "model_count_ns": [
+        104.609375,
+        48186.0
+      ],
+      "model_docset_ns": [
+        3531.249375,
+        61250.44
+      ],
+      "postings_count": {
+        "median_ns": 75124.9037037037,
+        "min_ns": 73305.88888888889
+      },
+      "postings_docset": {
+        "median_ns": 87714.96842105263,
+        "min_ns": 77608.03157894737
+      },
+      "scan_count": {
+        "median_ns": 1234.6691813804173,
+        "min_ns": 782.1757624398074
+      },
+      "scan_docset": {
+        "median_ns": 1191.0995986866108,
+        "min_ns": 951.0175118569865
+      },
+      "scan_fractions_estimate": [
+        0.046875,
+        0.0
+      ],
+      "selectivity": 0.09999883267574067,
+      "target": 0.1,
+      "window": 1
+    },
+    {
+      "auto_choice": "Scan",
+      "auto_count": {
+        "median_ns": 1363.984760197221,
+        "min_ns": 1263.4625728372928
+      },
+      "auto_count_choice": "Scan",
+      "auto_docset": {
+        "median_ns": 2300.765720081136,
+        "min_ns": 2225.5395537525355
+      },
+      "blocks": 1339,
+      "blocks_decoded": 3,
+      "boundary_docs": 5354,
+      "covered_docs": 16063,
+      "estimate": 17134.86432481589,
+      "field": "seq",
+      "hi": 1600541029.0,
+      "lo": 1600369716.0,
+      "model_count_ns": [
+        125.53125,
+        48186.0
+      ],
+      "model_docset_ns": [
+        3552.17125,
+        61250.44
+      ],
+      "postings_count": {
+        "median_ns": 71427.84684684685,
+        "min_ns": 65154.76576576577
+      },
+      "postings_docset": {
+        "median_ns": 90968.61157024793,
+        "min_ns": 82258.62809917355
+      },
+      "scan_count": {
+        "median_ns": 1149.7588235294118,
+        "min_ns": 1073.8147058823529
+      },
+      "scan_docset": {
+        "median_ns": 2078.7140009965124,
+        "min_ns": 1770.753861484803
+      },
+      "scan_fractions_estimate": [
+        0.0625,
+        0.0
+      ],
+      "selectivity": 0.09999883267574067,
+      "target": 0.1,
+      "window": 2
+    },
+    {
+      "auto_choice": "Scan",
+      "auto_count": {
+        "median_ns": 1385.0099352051836,
+        "min_ns": 1375.4116630669546
+      },
+      "auto_count_choice": "Scan",
+      "auto_docset": {
+        "median_ns": 2546.0791229742613,
+        "min_ns": 2399.5614871306007
+      },
+      "blocks": 1339,
+      "blocks_decoded": 3,
+      "boundary_docs": 5354,
+      "covered_docs": 13386,
+      "estimate": 17136.93271372805,
+      "field": "seq",
+      "hi": 1600977532.0,
+      "lo": 1600806168.0,
+      "model_count_ns": [
+        83.6875,
+        48186.0
+      ],
+      "model_docset_ns": [
+        3510.3275,
+        59644.24
+      ],
+      "postings_count": {
+        "median_ns": 67271.2358974359,
+        "min_ns": 65513.307692307695
+      },
+      "postings_docset": {
+        "median_ns": 67835.93814432989,
+        "min_ns": 66318.88659793814
+      },
+      "scan_count": {
+        "median_ns": 1107.2043389579085,
+        "min_ns": 898.156499165585
+      },
+      "scan_docset": {
+        "median_ns": 1548.0352397458116,
+        "min_ns": 1430.6094742923167
+      },
+      "scan_fractions_estimate": [
+        0.03125,
+        0.0
+      ],
+      "selectivity": 0.10000466929703733,
+      "target": 0.1,
+      "window": 3
+    },
+    {
+      "auto_choice": "Scan",
+      "auto_count": {
+        "median_ns": 1078.518002880461,
+        "min_ns": 900.011521843495
+      },
+      "auto_count_choice": "Scan",
+      "auto_docset": {
+        "median_ns": 1264.7748091603053,
+        "min_ns": 1255.5718829516538
+      },
+      "blocks": 1339,
+      "blocks_decoded": 4,
+      "boundary_docs": 5354,
+      "covered_docs": 16062,
+      "estimate": 17129.67911269469,
+      "field": "seq",
+      "hi": 1600724514.0,
+      "lo": 1600553224.0,
+      "model_count_ns": [
+        104.609375,
+        48186.0
+      ],
+      "model_docset_ns": [
+        3531.249375,
+        61249.84
+      ],
+      "postings_count": {
+        "median_ns": 52468.73619631902,
+        "min_ns": 35284.21472392638
+      },
+      "postings_docset": {
+        "median_ns": 65610.03773584905,
+        "min_ns": 65391.61320754717
+      },
+      "scan_count": {
+        "median_ns": 1070.3373661245537,
+        "min_ns": 971.448036493455
+      },
+      "scan_docset": {
+        "median_ns": 1619.7420731707316,
+        "min_ns": 1577.081707317073
+      },
+      "scan_fractions_estimate": [
+        0.046875,
+        0.0
+      ],
+      "selectivity": 0.09999883267574067,
+      "target": 0.1,
+      "window": 4
+    },
+    {
+      "auto_choice": "Scan",
+      "auto_count": {
+        "median_ns": 1938.8069777979158,
+        "min_ns": 1796.1826008155867
+      },
+      "auto_count_choice": "Scan",
+      "auto_docset": {
+        "median_ns": 2395.2916666666665,
+        "min_ns": 2282.4683908045977
+      },
+      "blocks": 1339,
+      "blocks_decoded": 3,
+      "boundary_docs": 5354,
+      "covered_docs": 82989,
+      "estimate": 85661.59183491363,
+      "field": "seq",
+      "hi": 1601042062.0,
+      "lo": 1600185484.0,
+      "model_count_ns": [
+        83.6875,
+        48186.0
+      ],
+      "model_docset_ns": [
+        3510.3275,
+        101406.04000000001
+      ],
+      "postings_count": {
+        "median_ns": 65041.12962962963,
+        "min_ns": 39919.08148148148
+      },
+      "postings_docset": {
+        "median_ns": 76573.3137254902,
+        "min_ns": 48883.8431372549
+      },
+      "scan_count": {
+        "median_ns": 2652.0062171209947,
+        "min_ns": 2575.69775227164
+      },
+      "scan_docset": {
+        "median_ns": 3364.179502369668,
+        "min_ns": 3279.200236966825
+      },
+      "scan_fractions_estimate": [
+        0.03125,
+        0.0
+      ],
+      "selectivity": 0.5,
+      "target": 0.5,
+      "window": 0
+    },
+    {
+      "auto_choice": "Scan",
+      "auto_count": {
+        "median_ns": 2988.505949938449,
+        "min_ns": 1904.77061961428
+      },
+      "auto_count_choice": "Scan",
+      "auto_docset": {
+        "median_ns": 2519.123169107856,
+        "min_ns": 2239.4487350199734
+      },
+      "blocks": 1339,
+      "blocks_decoded": 3,
+      "boundary_docs": 5354,
+      "covered_docs": 82989,
+      "estimate": 85668.36697795149,
+      "field": "seq",
+      "hi": 1601120975.0,
+      "lo": 1600264303.0,
+      "model_count_ns": [
+        83.6875,
+        48186.0
+      ],
+      "model_docset_ns": [
+        3510.3275,
+        101406.04000000001
+      ],
+      "postings_count": {
+        "median_ns": 35831.08303249098,
+        "min_ns": 34800.05054151625
+      },
+      "postings_docset": {
+        "median_ns": 41123.93630573248,
+        "min_ns": 39229.21656050955
+      },
+      "scan_count": {
+        "median_ns": 1597.1280266343826,
+        "min_ns": 1568.2245762711864
+      },
+      "scan_docset": {
+        "median_ns": 2020.6896955503512,
+        "min_ns": 1972.8142076502731
+      },
+      "scan_fractions_estimate": [
+        0.03125,
+        0.0
+      ],
+      "selectivity": 0.5,
+      "target": 0.5,
+      "window": 1
+    },
+    {
+      "auto_choice": "Scan",
+      "auto_count": {
+        "median_ns": 1748.7290434782608,
+        "min_ns": 1645.6921739130435
+      },
+      "auto_count_choice": "Scan",
+      "auto_docset": {
+        "median_ns": 2257.455882352941,
+        "min_ns": 2196.9663865546217
+      },
+      "blocks": 1339,
+      "blocks_decoded": 3,
+      "boundary_docs": 5354,
+      "covered_docs": 82989,
+      "estimate": 85670.30493205808,
+      "field": "seq",
+      "hi": 1601037639.0,
+      "lo": 1600180963.0,
+      "model_count_ns": [
+        83.6875,
+        48186.0
+      ],
+      "model_docset_ns": [
+        3510.3275,
+        101406.04000000001
+      ],
+      "postings_count": {
+        "median_ns": 41782.25301204819,
+        "min_ns": 34612.427710843374
+      },
+      "postings_docset": {
+        "median_ns": 61033.67153284672,
+        "min_ns": 58881.42335766424
+      },
+      "scan_count": {
+        "median_ns": 2098.6356775300173,
+        "min_ns": 1561.1626072041167
+      },
+      "scan_docset": {
+        "median_ns": 3005.8898071625345,
+        "min_ns": 2129.93044077135
+      },
+      "scan_fractions_estimate": [
+        0.03125,
+        0.0
+      ],
+      "selectivity": 0.5,
+      "target": 0.5,
+      "window": 2
+    },
+    {
+      "auto_choice": "Scan",
+      "auto_count": {
+        "median_ns": 1928.8078668683813,
+        "min_ns": 1882.0668683812405
+      },
+      "auto_count_choice": "Scan",
+      "auto_docset": {
+        "median_ns": 2269.7492211838007,
+        "min_ns": 2120.1822429906542
+      },
+      "blocks": 1339,
+      "blocks_decoded": 4,
+      "boundary_docs": 5354,
+      "covered_docs": 82989,
+      "estimate": 85654.64378174339,
+      "field": "seq",
+      "hi": 1601018443.0,
+      "lo": 1600161876.0,
+      "model_count_ns": [
+        1548.21875,
+        48186.0
+      ],
+      "model_docset_ns": [
+        4974.858749999999,
+        101406.04000000001
+      ],
+      "postings_count": {
+        "median_ns": 33914.77597402597,
+        "min_ns": 32241.633116883117
+      },
+      "postings_docset": {
+        "median_ns": 36652.17326732673,
+        "min_ns": 35596.91089108911
+      },
+      "scan_count": {
+        "median_ns": 1692.2375818251828,
+        "min_ns": 1676.4705429341548
+      },
+      "scan_docset": {
+        "median_ns": 1823.3686507936509,
+        "min_ns": 1801.4599206349205
+      },
+      "scan_fractions_estimate": [
+        0.0625,
+        0.03125
+      ],
+      "selectivity": 0.5,
+      "target": 0.5,
+      "window": 3
+    },
+    {
+      "auto_choice": "Scan",
+      "auto_count": {
+        "median_ns": 2220.0158279220777,
+        "min_ns": 2061.93262987013
+      },
+      "auto_count_choice": "Scan",
+      "auto_docset": {
+        "median_ns": 2462.9789156626507,
+        "min_ns": 2417.632530120482
+      },
+      "blocks": 1339,
+      "blocks_decoded": 4,
+      "boundary_docs": 5354,
+      "covered_docs": 82989,
+      "estimate": 85664.13057927146,
+      "field": "seq",
+      "hi": 1601572479.0,
+      "lo": 1600715862.0,
+      "model_count_ns": [
+        83.6875,
+        48186.0
+      ],
+      "model_docset_ns": [
+        3510.3275,
+        101406.04000000001
+      ],
+      "postings_count": {
+        "median_ns": 36931.01486988847,
+        "min_ns": 36153.07063197026
+      },
+      "postings_docset": {
+        "median_ns": 41406.90066225165,
+        "min_ns": 40302.71523178808
+      },
+      "scan_count": {
+        "median_ns": 1605.9230030721967,
+        "min_ns": 1551.2323348694317
+      },
+      "scan_docset": {
+        "median_ns": 1869.0170233463034,
+        "min_ns": 1818.579766536965
+      },
+      "scan_fractions_estimate": [
+        0.03125,
+        0.0
+      ],
+      "selectivity": 0.5,
+      "target": 0.5,
+      "window": 4
+    }
+  ],
+  "reps": 5,
+  "sizes": {
+    "fields": {
+      "category": {
+        "code_values_bits_per_doc": 6.002101183666799,
+        "codes_bits_per_doc": 6.768239441552074,
+        "dictionary_bytes": 452,
+        "lists_bits_per_doc": 10.568300142413559,
+        "rare_bits_per_doc": 0.012140172297060678,
+        "values": 64
+      },
+      "id": {
+        "code_values_bits_per_doc": 18.006303551000396,
+        "codes_bits_per_doc": 18.772441808885674,
+        "dictionary_bytes": 2055988,
+        "lists_bits_per_doc": 0.0,
+        "rare_bits_per_doc": 32.0,
+        "values": 171332
+      },
+      "rating": {
+        "block_offsets_bits_per_doc": 0.2502743212009432,
+        "column_bits_per_doc": 9.769290033385474,
+        "histogram_buckets": 64,
+        "histogram_bytes": 1280,
+        "kind": "Decimal(2)",
+        "presence_bits_per_doc": 0.0,
+        "range_lists_bits_per_doc": 11.244414353419092,
+        "values_bits_per_doc": 9.003151775500198,
+        "zone_maps_bits_per_doc": 0.5158639366843322
+      },
+      "seq": {
+        "block_offsets_bits_per_doc": 0.2502743212009432,
+        "column_bits_per_doc": 12.251861882193635,
+        "histogram_buckets": 64,
+        "histogram_bytes": 1280,
+        "kind": "Int",
+        "presence_bits_per_doc": 0.0,
+        "range_lists_bits_per_doc": 2.307006280204515,
+        "values_bits_per_doc": 11.48572362430836,
+        "zone_maps_bits_per_doc": 0.5158639366843322
+      },
+      "tier": {
+        "code_values_bits_per_doc": 2.0007003945555994,
+        "codes_bits_per_doc": 2.766838652440875,
+        "dictionary_bytes": 24,
+        "lists_bits_per_doc": 4.0790978918123875,
+        "rare_bits_per_doc": 0.000933859407466206,
+        "values": 4
+      },
+      "topic": {
+        "code_values_bits_per_doc": 5.001750986388999,
+        "codes_bits_per_doc": 5.767889244274275,
+        "dictionary_bytes": 228,
+        "lists_bits_per_doc": 10.009478672985782,
+        "rare_bits_per_doc": 0.00616347208927696,
+        "values": 32
+      },
+      "year": {
+        "block_offsets_bits_per_doc": 0.2502743212009432,
+        "column_bits_per_doc": 6.768239441552074,
+        "histogram_buckets": 35,
+        "histogram_bytes": 700,
+        "kind": "Int",
+        "presence_bits_per_doc": 0.0,
+        "range_lists_bits_per_doc": 10.287768776410712,
+        "values_bits_per_doc": 6.002101183666799,
+        "zone_maps_bits_per_doc": 0.5158639366843322
+      }
+    },
+    "sections": {
+      "col.rating": {
+        "bits_per_doc": 9.774146102304298,
+        "bytes": 209328
+      },
+      "col.rating.hist": {
+        "bits_per_doc": 0.06126117712978311,
+        "bytes": 1312
+      },
+      "col.seq": {
+        "bits_per_doc": 12.25671795111246,
+        "bytes": 262496
+      },
+      "col.seq.hist": {
+        "bits_per_doc": 0.06126117712978311,
+        "bytes": 1312
+      },
+      "col.year": {
+        "bits_per_doc": 6.773095510470899,
+        "bytes": 145056
+      },
+      "col.year.hist": {
+        "bits_per_doc": 0.03436602619475638,
+        "bytes": 736
+      },
+      "kw.category.codes": {
+        "bits_per_doc": 6.772348422944925,
+        "bytes": 145040
+      },
+      "kw.category.dict": {
+        "bits_per_doc": 0.022412625779188945,
+        "bytes": 480
+      },
+      "kw.category.post": {
+        "bits_per_doc": 10.643008895010857,
+        "bytes": 227936
+      },
+      "kw.id.codes": {
+        "bits_per_doc": 18.776550790278524,
+        "bytes": 402128
+      },
+      "kw.id.dict": {
+        "bits_per_doc": 96.00149417505195,
+        "bytes": 2056016
+      },
+      "kw.id.post": {
+        "bits_per_doc": 32.00261480634091,
+        "bytes": 685384
+      },
+      "kw.tier.codes": {
+        "bits_per_doc": 2.7709476338337264,
+        "bytes": 59344
+      },
+      "kw.tier.dict": {
+        "bits_per_doc": 0.0026148063409053767,
+        "bytes": 56
+      },
+      "kw.tier.post": {
+        "bits_per_doc": 4.088062942124063,
+        "bytes": 87552
+      },
+      "kw.topic.codes": {
+        "bits_per_doc": 5.771998225667126,
+        "bytes": 123616
+      },
+      "kw.topic.dict": {
+        "bits_per_doc": 0.011953400415567436,
+        "bytes": 256
+      },
+      "kw.topic.post": {
+        "bits_per_doc": 10.048327224336376,
+        "bytes": 215200
+      },
+      "range.rating": {
+        "bits_per_doc": 11.295216305185255,
+        "bytes": 241904
+      },
+      "range.seq": {
+        "bits_per_doc": 2.357808231970677,
+        "bytes": 50496
+      },
+      "range.year": {
+        "bits_per_doc": 10.31765227744963,
+        "bytes": 220968
+      },
+      "store.data": {
+        "bits_per_doc": 5786.945252492237,
+        "bytes": 123936113
+      },
+      "store.index": {
+        "bits_per_doc": 8.53472789671515,
+        "bytes": 182784
+      }
+    },
+    "segment_bytes": 129297777,
+    "store": {
+      "blocks": 11417,
+      "compressed_bytes": 123936113,
+      "ratio": 1.592615100007211,
+      "raw_bytes": 197382525
+    }
+  },
+  "store": {
+    "blocks": 11417,
+    "cold": {
+      "cold": {
+        "mean_pages": 384.8,
+        "median_ns": 1904280.0,
+        "min_ns": 231712.0
+      },
+      "cold_madv_random": {
+        "mean_pages": 61.54,
+        "median_ns": 2631034.0,
+        "min_ns": 2231931.0
+      }
+    },
+    "compressed_bytes": 123936113,
+    "docs_per_query": 10,
+    "queries": 50,
+    "raw_bytes": 197382525,
+    "warm": {
+      "median_ns": 93275.02,
+      "min_ns": 89112.96
+    },
+    "warm_id_title": {
+      "median_ns": 86174.24,
+      "min_ns": 82012.42
+    }
+  }
+}

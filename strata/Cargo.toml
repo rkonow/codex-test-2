@@ -14,6 +14,7 @@ sqlparser = "0.59"
 crc32fast = "1"
 libc = "0.2"
 lz4_flex = "0.11"
+bitpacking = "0.9.3"
 rand = "0.8"
 clap = { version = "4", features = ["derive"] }
 

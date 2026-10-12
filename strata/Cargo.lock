@@ -525,6 +525,7 @@ dependencies = [
 name = "strata"
 version = "0.1.0"
 dependencies = [
+ "bitpacking",
  "clap",
  "crc32fast",
  "libc",
