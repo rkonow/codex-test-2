@@ -33,7 +33,7 @@ pub struct Bm25Params {
 
 impl Default for Bm25Params {
     fn default() -> Self {
-        Bm25Params { k1: 0.9, b: 0.4 }
+        Bm25Params { k1: 1.2, b: 0.75 }
     }
 }
 

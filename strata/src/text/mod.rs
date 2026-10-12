@@ -31,7 +31,7 @@ pub mod postings;
 pub mod query;
 pub mod reader;
 
-pub use analyzer::{analyze, analyze_with_positions};
+pub use analyzer::{analyze, analyze_query, analyze_with_positions, QUERY_STOPWORDS};
 pub use bm25::{Bm25Params, CollectionStats, FilterStrategy, TopKAlgo};
 pub use builder::TextFieldBuilder;
 pub use cursor::{PostingCursor, END};

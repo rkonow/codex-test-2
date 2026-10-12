@@ -147,7 +147,7 @@ reader (sections to a zero-copy view). Global docIDs are
 * **Positions** (optional per field) in a separate stream, read only by phrase
   queries.
 * **Norms.** Document lengths quantised to one byte, in the forward index.
-* **Scoring.** BM25 with `k1 = 0.9, b = 0.4` and collection-wide statistics
+* **Scoring.** BM25 with `k1 = 1.2, b = 0.75` and collection-wide statistics
   summed over the snapshot's segments, so a document scores the same in any
   segment.
 
@@ -218,8 +218,9 @@ GROUP BY category ORDER BY 2 DESC LIMIT 5;
   `OR`, `NOT`, `-term`, parentheses and `prefix*`; juxtaposition means AND,
   as in FTS5.
 * `bm25(field, text)`: BM25 of the analysed terms of `text` (disjunctive: a
-  document scores if it contains any term). `k1 => .., b => .., algo => ..`
-  override the defaults.
+  document scores if it contains any term). Ranked queries drop English
+  function words (NLTK's 153-word list) and count each term once.
+  `k1 => .., b => .., algo => ..` override the defaults.
 * `similarity(field, vector)` (dot product, cosine for unit vectors) and
   `distance(field, vector)`. Vectors are bound parameters or JSON arrays.
 * `rrf(s1, s2, ...)`: reciprocal rank fusion, `Σ 1/(60 + rank_i)`, where each

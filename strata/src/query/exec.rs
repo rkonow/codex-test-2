@@ -554,7 +554,7 @@ impl<'a> Executor<'a> {
     }
 
     fn bm25_top(&mut self, field: usize, query: &str, opts: &Opts, p: &Pred, k: usize) -> Result<Vec<Hit>> {
-        let terms = text::analyze(query);
+        let terms = text::analyze_query(query);
         if terms.is_empty() {
             return Ok(Vec::new());
         }
@@ -729,7 +729,7 @@ impl<'a> Executor<'a> {
         let by_seg = group_by_seg(cands);
         match score {
             Score::Bm25 { field, text: q, opts } => {
-                let terms = text::analyze(q);
+                let terms = text::analyze_query(q);
                 let stats = self.collection_stats(*field, &terms)?;
                 let (params, _) = self.bm25_params(opts);
                 for (seg, range) in by_seg {

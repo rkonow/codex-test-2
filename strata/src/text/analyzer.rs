@@ -22,6 +22,41 @@ pub const STOPWORDS: [&str; 33] = [
     "or", "such", "that", "the", "their", "then", "there", "these", "they", "this", "to", "was", "will", "with",
 ];
 
+/// English stopwords for ranked queries (NLTK's list without the apostrophe
+/// forms, which the tokenizer splits), sorted. Natural-language queries
+/// ("what is the origin of ...") carry many function words that the index
+/// keeps but that only add noise to a BM25 ranking.
+pub const QUERY_STOPWORDS: [&str; 153] = [
+    "a", "about", "above", "after", "again", "against", "ain", "all", "am", "an", "and", "any", "are", "aren", "as",
+    "at", "be", "because", "been", "before", "being", "below", "between", "both", "but", "by", "can", "couldn", "d",
+    "did", "didn", "do", "does", "doesn", "doing", "don", "down", "during", "each", "few", "for", "from", "further",
+    "had", "hadn", "has", "hasn", "have", "haven", "having", "he", "her", "here", "hers", "herself", "him", "himself",
+    "his", "how", "i", "if", "in", "into", "is", "isn", "it", "its", "itself", "just", "ll", "m", "ma", "me",
+    "mightn", "more", "most", "mustn", "my", "myself", "needn", "no", "nor", "not", "now", "o", "of", "off", "on",
+    "once", "only", "or", "other", "our", "ours", "ourselves", "out", "over", "own", "re", "s", "same", "shan", "she",
+    "should", "shouldn", "so", "some", "such", "t", "than", "that", "the", "their", "theirs", "them", "themselves",
+    "then", "there", "these", "they", "this", "those", "through", "to", "too", "under", "until", "up", "ve", "very",
+    "was", "wasn", "we", "were", "weren", "what", "when", "where", "which", "while", "who", "whom", "why", "will",
+    "with", "won", "wouldn", "y", "you", "your", "yours", "yourself", "yourselves",
+];
+
+/// The terms of a ranked (`bm25`) query: analysed like documents, minus
+/// [`QUERY_STOPWORDS`], each distinct term once.
+pub fn analyze_query(text: &str) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for_each_word(text, |w| {
+        if QUERY_STOPWORDS.binary_search(&w).is_ok() {
+            return;
+        }
+        if let Some(t) = term_of(w) {
+            if !out.iter().any(|x| *x == t) {
+                out.push(t.into_owned());
+            }
+        }
+    });
+    out
+}
+
 /// The analysed terms of `text`, in order.
 pub fn analyze(text: &str) -> Vec<String> {
     let mut out = Vec::new();
@@ -153,6 +188,8 @@ mod tests {
     #[test]
     fn stopwords_sorted() {
         assert!(STOPWORDS.windows(2).all(|w| w[0] < w[1]));
+        assert!(QUERY_STOPWORDS.windows(2).all(|w| w[0] < w[1]));
+        assert_eq!(analyze_query("What is the origin of the COVID-19 origin?"), ["origin", "covid", "19"]);
     }
 
     #[test]
