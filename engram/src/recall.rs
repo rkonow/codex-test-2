@@ -76,6 +76,18 @@ impl Default for Gate {
     }
 }
 
+impl Gate {
+    /// The gate fitted for an embedder spec (cosine scales differ).
+    pub fn for_embedder(spec: &str) -> Gate {
+        // BGE-small vectors (in the daemon, or from a benchmark cache).
+        if spec.starts_with("bert") || spec.contains("bge") {
+            Gate::bert()
+        } else {
+            Gate::default()
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub enum Decision {
     /// Strong evidence: the full budget.
@@ -86,6 +98,10 @@ pub enum Decision {
 }
 
 impl Gate {
+    pub fn bert() -> Gate {
+        Gate::default()
+    }
+
     pub fn score(&self, e: &Evidence) -> f64 {
         self.a * e.max_cos + self.b * e.max_cov + self.c * e.cue as u8 as f64 + self.d * e.agree as u8 as f64 + self.e * e.cos_gap + self.f * e.bm_gap
     }

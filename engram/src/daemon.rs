@@ -56,8 +56,15 @@ impl Default for Config {
 }
 
 impl Config {
+    /// The store's config.json; the gate defaults to the one fitted for the
+    /// configured embedder unless the file sets one.
     pub fn load(path: &Path) -> Config {
-        std::fs::read_to_string(path).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default()
+        let raw: Json = std::fs::read_to_string(path).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or(Json::Null);
+        let mut cfg: Config = serde_json::from_value(raw.clone()).unwrap_or_default();
+        if raw.get("gate").is_none() {
+            cfg.gate = Gate::for_embedder(&cfg.embedder);
+        }
+        cfg
     }
 }
 
@@ -239,9 +246,20 @@ impl Daemon {
                     }
                     s.turn
                 });
-                self.store.append(&sid, turn, now(), capture::prompt_drafts(&prompt))?;
+                // Recall first: the prompt is in the live window anyway, and
+                // storing it afterwards keeps the write (and the memtable
+                // rebuild it causes) off the prompt's critical path.
                 let text = self.recall_for(&sid, &prompt, false)?.unwrap_or_default();
-                Ok((ctx_out("UserPromptSubmit", text), None))
+                let me = self.clone();
+                Ok((
+                    ctx_out("UserPromptSubmit", text),
+                    Some(Box::new(move || {
+                        if let Err(e) = me.store.append(&sid, turn, now(), capture::prompt_drafts(&prompt)) {
+                            me.log(&json!({"ts": now(), "error": e.to_string(), "event": "UserPromptSubmit"}));
+                        }
+                        me.store.warm();
+                    })),
+                ))
             }
             "PreToolUse" => {
                 if !self.cfg.file_notes {
@@ -276,6 +294,7 @@ impl Daemon {
                         if let Err(e) = me.store.append(&sid, turn, now(), drafts) {
                             me.log(&json!({"ts": now(), "error": e.to_string(), "event": "PostToolUse"}));
                         }
+                        me.store.warm();
                     })),
                 ))
             }
@@ -303,6 +322,7 @@ impl Daemon {
                         if let Err(e) = me.store.append(&sid, turn, now(), drafts) {
                             me.log(&json!({"ts": now(), "error": e.to_string(), "event": "Stop"}));
                         }
+                        me.store.warm();
                     })),
                 ))
             }

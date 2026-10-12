@@ -191,6 +191,13 @@ impl Store {
         Ok(records)
     }
 
+    /// Builds the current snapshot's in-memory segments and readers now, so
+    /// the next query does not pay for it.
+    pub fn warm(&self) {
+        let snap = self.db.snapshot();
+        let _ = self.db.readers(&snap);
+    }
+
     /// Flushes the memtable when it is large, then merges small segments.
     pub fn maintain(&self) -> Result<()> {
         let stats = self.db.storage().file_stats();

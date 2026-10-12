@@ -9,7 +9,7 @@ and it gives the model tools to search its history. Nothing depends on the
 model remembering to save. The design is in [DESIGN.md](DESIGN.md).
 
 ```
- Claude Code ──hooks──▶ engram hook <event> ─┐   (~5 ms per hook)
+ Claude Code ──hooks──▶ engram hook <event> ─┐   (~8 ms per hook)
      └──MCP (stdio)──▶ engram mcp ───────────┤   unix socket
                                               ▼
                          engram serve: one daemon per project, started on demand

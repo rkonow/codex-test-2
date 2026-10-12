@@ -109,9 +109,10 @@ missed record cannot be recovered later. Each hook's payload is the source:
 | hook | stored |
 |---|---|
 | `SessionStart` | session registered; live window opened |
-| `UserPromptSubmit` | `prompt`, plus `preference` records for cue sentences |
+| `UserPromptSubmit` | `prompt`, plus `preference` records for cue sentences (stored after recall, off the critical path) |
 | `PostToolUse` | `tool_call` and `tool_result` (or `error`), asynchronously |
-| `Stop` | `answer` (from `last_assistant_message`) and the turn's `episode` |
+| `Stop` | `answer` (from `last_assistant_message`), the commentary written between tool calls (read from the transcript tail since the last offset), and the turn's `episode` |
+| `PreCompact` | the commentary not yet captured, before the context is summarised |
 | `PostCompact` | `summary` sections; the live window restarts here |
 | `SessionEnd` | flush |
 
@@ -174,19 +175,24 @@ line carries its provenance: kind, session, turn, relative time and id.
 ### The gate
 
 Min-max scores cannot gate, since the best candidate always scores 1. The
-gate uses absolute evidence from the best candidate \(r^*\):
+gate uses absolute evidence about the best candidates: the highest cosine
+and IDF-weighted term coverage among the top five, how far the best BM25
+and cosine scores stand above the tenth, whether BM25 and vectors agree on
+the top record, and whether the prompt refers back:
 
-\[ G = a\,\cos(q, r^*) + b\,\mathrm{cov}(q, r^*) + c\,\mathbb{1}[\text{past-reference cue}], \qquad \mathrm{cov}(q, r) = \frac{\sum_{t \in q \cap r} \mathrm{idf}(t)}{\sum_{t \in q} \mathrm{idf}(t)}. \]
+\[ G = a\,\cos_{\max} + b\,\mathrm{cov}_{\max} + c\,\mathbb{1}_{\text{cue}} + d\,\mathbb{1}_{\text{agree}} + e\,(\cos_1 - \cos_{10}) + f\,\Bigl(1 - \frac{\mathrm{bm25}_{10}}{\mathrm{bm25}_1}\Bigr), \qquad \mathrm{cov}(q, r) = \frac{\sum_{t \in q \cap r} \mathrm{idf}(t)}{\sum_{t \in q} \mathrm{idf}(t)}. \]
 
 Past-reference cues include "earlier", "we decided", "last time", "again"
 and "remember". The full budget is injected when \(G \ge \theta_{\text{hi}}\),
 and two records when \(\theta_{\text{lo}} \le G < \theta_{\text{hi}}\). The
-thresholds are fitted on held-out questions:
-- **positives:** questions whose evidence is in the store;
+weights come from a logistic fit on LongMemEval-S (`scripts/fit_gate.py`):
+- **positives:** questions whose evidence the packed injection contains;
 - **negatives:** questions asked against another conversation's store,
-  with nothing relevant to find.
+  abstentions, and misses.
 
-The fit maximises evidence coverage at an injection precision of 0.8.
+\(\theta_{\text{hi}}\) holds precision 0.9 on the fit and \(\theta_{\text{lo}}\)
+precision 0.7. The weights depend on the embedder, because cosine scales
+differ.
 
 ## 6. Costs and latency targets
 
@@ -195,6 +201,7 @@ The fit maximises evidence coverage at an injection precision of 0.8.
 | `PostToolUse`, `Stop` client | < 10 ms (queued, embedded and committed in the background) |
 | `UserPromptSubmit` | < 100 ms p99 at 1M records |
 | `SessionStart` | < 150 ms (daemon already up), < 1 s with daemon spawn |
+| background | after each write, the daemon rebuilds the in-memory segment so the next query does not |
 | ingest | > 1,000 records per second with the static embedder |
 
 The default embedder is static (Model2Vec potion-retrieval-32M: token

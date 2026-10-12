@@ -75,6 +75,11 @@ enum Cmd {
         /// Hook invocations through the engram binary per size.
         #[arg(long, default_value_t = 200)]
         hooks: usize,
+        /// Pause between hook invocations (prompts arrive seconds apart in
+        /// real sessions; background work from one should not count against
+        /// the next).
+        #[arg(long, default_value_t = 200)]
+        hook_gap_ms: u64,
     },
     /// Prints embeddings (JSON lines) for comparing implementations.
     EmbedCheck {
@@ -101,6 +106,15 @@ enum Cmd {
         project: String,
         #[arg(long, default_value = "results/probes")]
         out: PathBuf,
+        /// Embedding cache file (for slow embedders).
+        #[arg(long)]
+        cache: Option<PathBuf>,
+        /// Write texts (records and probe questions) missing from the cache
+        /// to this JSONL file and exit. Takes every probe file to cover.
+        #[arg(long)]
+        dump_missing: Option<PathBuf>,
+        #[arg(long, value_delimiter = ',')]
+        dump_probes: Vec<PathBuf>,
     },
 }
 
@@ -120,6 +134,47 @@ impl Embedder for CachedOnly {
     fn embed(&self, texts: &[&str]) -> Vec<Vec<f32>> {
         eprintln!("warning: {} texts missing from the embedding cache", texts.len());
         texts.iter().map(|_| vec![0f32; self.dim]).collect()
+    }
+}
+
+/// Serves vectors from an embedding cache (documents by text, queries by
+/// the query key); anything missing goes to `inner` or becomes zeros.
+struct CacheEmbedder {
+    inner: Arc<dyn Embedder>,
+    cache: Arc<Mutex<HashMap<u64, Vec<f32>>>>,
+    missing: AtomicUsize,
+}
+
+fn query_key(q: &str) -> u64 {
+    embed::fnv(&format!("\u{1}query\u{1}{q}"))
+}
+
+impl Embedder for CacheEmbedder {
+    fn name(&self) -> String {
+        self.inner.name()
+    }
+    fn dim(&self) -> usize {
+        self.inner.dim()
+    }
+    fn embed(&self, texts: &[&str]) -> Vec<Vec<f32>> {
+        let c = self.cache.lock().unwrap();
+        texts
+            .iter()
+            .map(|t| match c.get(&embed::fnv(t)) {
+                Some(v) => v.clone(),
+                None => {
+                    self.missing.fetch_add(1, Ordering::Relaxed);
+                    self.inner.embed(&[t]).pop().unwrap()
+                }
+            })
+            .collect()
+    }
+    fn embed_query(&self, q: &str) -> Vec<f32> {
+        if let Some(v) = self.cache.lock().unwrap().get(&query_key(q)) {
+            return v.clone();
+        }
+        self.missing.fetch_add(1, Ordering::Relaxed);
+        self.inner.embed_query(q)
     }
 }
 
@@ -209,6 +264,11 @@ fn records(u: &Unit, ctx_mode: &str) -> Vec<Record> {
         let ctx = match ctx_mode {
             "round" => {
                 let other = if t.role == "user" { same(i + 1) } else if i > 0 { same(i - 1) } else { None };
+                other.map(|o| clip(&if locomo { format!("{}: {}", o.role, o.text) } else { o.text.clone() }, 300)).unwrap_or_default()
+            }
+            // What Engram does: responses carry the request, requests carry nothing.
+            "request" => {
+                let other = if t.role == "user" { None } else if i > 0 { same(i - 1) } else { None };
                 other.map(|o| clip(&if locomo { format!("{}: {}", o.role, o.text) } else { o.text.clone() }, 300)).unwrap_or_default()
             }
             _ => String::new(),
@@ -464,8 +524,10 @@ fn main() {
             }
             eprintln!("{} texts in {:.1} ms", texts.len(), t0.elapsed().as_secs_f64() * 1e3);
         }
-        Cmd::Scale { data, sizes, embedder, out, queries, hooks } => scale_cmd(&data, &sizes, &embedder, &out, queries, hooks),
-        Cmd::Probes { transcript, probes, points, embedder, project, out } => probes_cmd(&transcript, &probes, &points, &embedder, &project, &out),
+        Cmd::Scale { data, sizes, embedder, out, queries, hooks, hook_gap_ms } => scale_cmd(&data, &sizes, &embedder, &out, queries, hooks, hook_gap_ms),
+        Cmd::Probes { transcript, probes, points, embedder, project, out, cache, dump_missing, dump_probes } => {
+            probes_cmd(&transcript, &probes, &points, &embedder, &project, &out, cache.as_deref(), dump_missing.as_deref(), &dump_probes)
+        }
         Cmd::Retrieval { data, embedder, ctx, out, every, limit, threads, cache, tag, dump_missing } => {
             let t0 = Instant::now();
             let e: Arc<dyn Embedder> = open_embedder(&embedder);
@@ -620,15 +682,48 @@ struct Probe {
     a: Vec<String>,
 }
 
-fn probes_cmd(transcript: &Path, probes: &Path, points: &[String], embedder: &str, project: &str, out: &Path) {
+#[allow(clippy::too_many_arguments)]
+fn probes_cmd(transcript: &Path, probes: &Path, points: &[String], embedder: &str, project: &str, out: &Path, cache: Option<&Path>, dump: Option<&Path>, dump_probes: &[PathBuf]) {
     use engram::recall::Gate;
     use engram::transcript as tr;
     let probes: Vec<Probe> = serde_json::from_str(&std::fs::read_to_string(probes).expect("probes")).expect("probes json");
     let pats: Vec<Vec<regex::Regex>> = probes.iter().map(|p| p.a.iter().map(|a| regex::Regex::new(a).expect("regex")).collect()).collect();
-    let e = open_embedder(embedder);
+    let inner = open_embedder(embedder);
+    let cached = Arc::new(Mutex::new(cache.map(|p| load_cache(p, inner.dim())).unwrap_or_default()));
+    let e: Arc<dyn Embedder> = if cache.is_some() { Arc::new(CacheEmbedder { inner: inner.clone(), cache: cached.clone(), missing: AtomicUsize::new(0) }) } else { inner.clone() };
     let events = tr::read(transcript).expect("transcript");
     let batches = tr::drafts(&events, project);
-    let gate = Gate::default();
+    if let Some(path) = dump {
+        let have = cached.lock().unwrap();
+        let mut seen = HashSet::new();
+        let mut jl = String::new();
+        let mut push = |key: u64, text: &str, query: bool| {
+            if !have.contains_key(&key) && seen.insert(key) {
+                jl += &serde_json::to_string(&json!({"key": key.to_string(), "text": text, "query": query})).unwrap();
+                jl.push('\n');
+            }
+        };
+        for b in &batches {
+            for d in &b.drafts {
+                let r = Record::from_draft(d.clone(), &b.session, b.turn, 0, b.ts);
+                let t = r.embed_text();
+                push(embed::fnv(&t), &t, false);
+            }
+        }
+        for p in &probes {
+            push(query_key(&p.q), &p.q, true);
+        }
+        for pf in dump_probes {
+            let ps: Vec<Probe> = serde_json::from_str(&std::fs::read_to_string(pf).expect("probes")).expect("probes json");
+            for p in ps {
+                push(query_key(&p.q), &p.q, true);
+            }
+        }
+        std::fs::write(path, jl).unwrap();
+        eprintln!("wrote {} missing texts to {}", seen.len(), path.display());
+        return;
+    }
+    let gate = Gate::for_embedder(embedder);
     let rank = RankParams::default();
     let mut rows = Vec::new();
     for pt in points {
@@ -654,8 +749,8 @@ fn probes_cmd(transcript: &Path, probes: &Path, points: &[String], embedder: &st
             std::fs::create_dir_all(&tmp).unwrap();
             let store = Store::open(&tmp.join("m.strata"), e.clone(), StoreOptions { sync: false, flush_docs: usize::MAX / 8, ..Default::default() }).unwrap();
             let texts: Vec<String> = recs.iter().map(|r| r.embed_text()).collect();
-            let refs: Vec<&str> = texts.iter().map(|s| s.as_str()).collect();
             let t0 = Instant::now();
+            let refs: Vec<&str> = texts.iter().map(|s| s.as_str()).collect();
             let embs = e.embed(&refs);
             let embed_s = t0.elapsed().as_secs_f64();
             store.bulk_insert(&recs, embs).unwrap();
@@ -714,7 +809,7 @@ fn pct(v: &mut [f64], p: f64) -> f64 {
     v[((v.len() as f64 - 1.0) * p).round() as usize]
 }
 
-fn scale_cmd(data: &Path, sizes: &[usize], embedder: &str, out: &Path, n_queries: usize, n_hooks: usize) {
+fn scale_cmd(data: &Path, sizes: &[usize], embedder: &str, out: &Path, n_queries: usize, n_hooks: usize, hook_gap_ms: u64) {
     let e = open_embedder(embedder);
     let text = std::fs::read_to_string(data).expect("data");
     let units: Vec<Unit> = text.lines().filter(|l| !l.trim().is_empty()).map(|l| serde_json::from_str(l).expect("unit")).collect();
@@ -722,44 +817,82 @@ fn scale_cmd(data: &Path, sizes: &[usize], embedder: &str, out: &Path, n_queries
     let mut results = Vec::new();
     for &n in sizes {
         eprintln!("== {n} records");
-        // Records unit by unit (copies with new session ids past the end), and
-        // the questions whose units are fully inside the store.
-        let mut recs: Vec<Record> = Vec::with_capacity(n);
+        // Needle in a haystack: the evidence ("answer_") sessions of every
+        // fifth unit's question, mixed at random positions into generic
+        // filler sessions (no evidence) repeated until the store has n records.
+        let mut evidence: Vec<Vec<Record>> = Vec::new();
         let mut qs: Vec<(Question, HashSet<String>)> = Vec::new();
-        let mut copy = 0;
-        'fill: loop {
-            for u in &units {
-                let mut ur = records(u, "round");
-                let ev_texts = |q: &Question| -> HashSet<String> {
+        let mut filler: Vec<Vec<Record>> = Vec::new();
+        let mut seen_sessions: HashSet<String> = HashSet::new();
+        for (ui, u) in units.iter().enumerate() {
+            let ur = records(u, "round");
+            let mut by_session: Vec<(String, Vec<Record>)> = Vec::new();
+            for r in ur {
+                match by_session.last_mut() {
+                    Some((sid, v)) if *sid == r.session => v.push(r),
+                    _ => by_session.push((r.session.clone(), vec![r])),
+                }
+            }
+            if ui % 5 == 0 {
+                if let Some(q) = u.questions.iter().find(|q| !q.abstention && !q.evidence_turn_ids.is_empty()) {
                     let ids: HashSet<&str> = q.evidence_turn_ids.iter().map(|s| s.as_str()).collect();
-                    ur.iter().filter(|r| ids.contains(r.tag.as_str())).map(|r| r.text.clone()).collect()
-                };
-                if copy == 0 {
-                    for q in &u.questions {
-                        if !q.abstention && !q.evidence_turn_ids.is_empty() {
-                            qs.push((q.clone(), ev_texts(q)));
+                    let mut ev = HashSet::new();
+                    for (sid, v) in &by_session {
+                        if q.evidence_session_ids.contains(sid) {
+                            ev.extend(v.iter().filter(|r| ids.contains(r.tag.as_str())).map(|r| r.text.clone()));
+                            let mut v = v.clone();
+                            v.iter_mut().for_each(|r| r.session = format!("u{ui}:{}", r.session));
+                            evidence.push(v);
                         }
                     }
-                }
-                for r in ur.iter_mut() {
-                    if recs.len() >= n {
-                        break 'fill;
+                    if !ev.is_empty() {
+                        qs.push((q.clone(), ev));
                     }
-                    let seq = recs.len() as i64 + 1;
-                    r.seq = seq;
-                    r.id = format!("r{seq}");
-                    if copy > 0 {
-                        r.session = format!("c{copy}:{}", r.session);
-                    }
-                    recs.push(r.clone());
                 }
+            }
+            for (sid, v) in by_session {
+                if !sid.starts_with("answer_") && seen_sessions.insert(sid) {
+                    filler.push(v);
+                }
+            }
+        }
+        qs.truncate(n_queries);
+        let ev_records: usize = evidence.iter().map(|v| v.len()).sum();
+        // Deterministic shuffle of session order (evidence among filler).
+        let mut sessions: Vec<Vec<Record>> = evidence;
+        let mut copy = 0usize;
+        let mut total = ev_records;
+        'fill: loop {
+            for f in &filler {
+                if total >= n {
+                    break 'fill;
+                }
+                let mut v = f.clone();
+                if copy > 0 {
+                    v.iter_mut().for_each(|r| r.session = format!("c{copy}:{}", r.session));
+                }
+                total += v.len();
+                sessions.push(v);
             }
             copy += 1;
         }
-        // Only questions whose unit made it in (their evidence texts are present).
-        let present: HashSet<&str> = recs.iter().map(|r| r.text.as_str()).collect();
-        qs.retain(|(_, ev)| !ev.is_empty() && ev.iter().all(|t| present.contains(t.as_str())));
-        qs.truncate(n_queries);
+        let mut rng: u64 = 0x9e3779b97f4a7c15;
+        for i in (1..sessions.len()).rev() {
+            rng ^= rng << 13;
+            rng ^= rng >> 7;
+            rng ^= rng << 17;
+            sessions.swap(i, (rng % (i as u64 + 1)) as usize);
+        }
+        let mut recs: Vec<Record> = Vec::with_capacity(total);
+        for v in sessions {
+            for mut r in v {
+                let seq = recs.len() as i64 + 1;
+                r.seq = seq;
+                r.id = format!("r{seq}");
+                recs.push(r);
+            }
+        }
+        let n = recs.len();
         let chars: usize = recs.iter().map(|r| r.text.len() + r.ctx.len()).sum();
 
         let t0 = Instant::now();
@@ -840,6 +973,7 @@ fn scale_cmd(data: &Path, sizes: &[usize], embedder: &str, out: &Path, n_queries
         let mut hook_ms = Vec::new();
         let mut first_ms = 0.0;
         for i in 0..n_hooks.min(qs.len().max(1)) {
+            std::thread::sleep(std::time::Duration::from_millis(hook_gap_ms));
             let prompt = qs.get(i).map(|q| q.0.question.clone()).unwrap_or_else(|| "what did we decide".into());
             let payload = json!({"session_id": "bench-hook", "hook_event_name": "UserPromptSubmit", "prompt": prompt, "cwd": project});
             let t = Instant::now();
@@ -867,13 +1001,13 @@ fn scale_cmd(data: &Path, sizes: &[usize], embedder: &str, out: &Path, n_queries
         let _ = engram::daemon::request(&dir, &project.to_string_lossy(), &json!({"op": "shutdown"}), std::time::Duration::from_secs(5));
         std::thread::sleep(std::time::Duration::from_millis(300));
         let r = json!({
-            "records": n, "chars": chars, "embed_s": embed_s, "embed_records_per_s": n as f64 / embed_s,
+            "records": n, "evidence_records": ev_records, "chars": chars, "embed_s": embed_s, "embed_records_per_s": n as f64 / embed_s,
             "bulk_load_s": load_s, "file_bytes": bytes, "bytes_per_record": bytes as f64 / n as f64,
             "open_ms": open_ms,
             "append_ms_p50": pct(&mut append_ms.clone(), 0.5), "append_ms_p99": pct(&mut append_ms, 0.99),
             "query_ms_p50": pct(&mut q_ms.clone(), 0.5), "query_ms_p99": pct(&mut q_ms, 0.99), "queries": qs.len(),
             "recall10": hit10 as f64 / qs.len().max(1) as f64, "pack4k": pack_hit as f64 / qs.len().max(1) as f64,
-            "hook_first_ms": first_ms, "hook_ms_p50": pct(&mut hook_ms.clone(), 0.5), "hook_ms_p99": pct(&mut hook_ms, 0.99),
+            "hook_gap_ms": hook_gap_ms, "hook_first_ms": first_ms, "hook_ms_p50": pct(&mut hook_ms.clone(), 0.5), "hook_ms_p99": pct(&mut hook_ms, 0.99),
         });
         eprintln!("{}", serde_json::to_string(&r).unwrap());
         results.push(r);
