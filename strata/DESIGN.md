@@ -90,9 +90,9 @@ Small transactions would otherwise write a segment per commit. Instead,
 `INSERT`/`DELETE` append checksummed records to the `-wal` sidecar and
 `fsync` at commit (group commit). Uncommitted records are ignored on
 recovery. The memtable holds the WAL's documents; a snapshot that needs them
-builds a small in-memory segment from them (cached until the next write), so
-queries see committed writes immediately and the memtable needs no index code
-of its own. When the memtable exceeds a threshold it is flushed into a
+builds small in-memory segments from them, one per chunk of 1,024 documents
+(cached; a write rebuilds only the last chunk), so queries see committed
+writes immediately and the memtable needs no index code of its own. When the memtable exceeds a threshold it is flushed into a
 segment by the shadow-paging commit and the WAL is truncated. Bulk loads
 bypass the WAL and write segments directly.
 
@@ -107,10 +107,12 @@ pin one, writers publish the next.
 
 ### 3.6 Merges
 
-A tiered policy merges segments of similar size. A merge streams the live
-documents of its inputs out of their doc stores and rebuilds every index for
-the merged segment, which also drops deleted documents and re-optimises the
-encodings for the larger lists. Large, rarely updated segments may use the
+A tiered policy merges segments of similar size. A merge reads the live
+documents of its inputs back (stored fields from the doc store, vectors and
+unstored structured fields from their indexes, generated columns recomputed)
+and rebuilds every index for the merged segment, which also drops deleted
+documents and re-optimises the encodings for the larger lists. `vacuum`
+moves data down and shrinks the file. Large, rarely updated segments may use the
 space-optimised codecs (Entropic) instead of the speed-optimised ones.
 
 ## 4. Segments
@@ -134,10 +136,14 @@ reader (sections to a zero-copy view). Global docIDs are
   sparse in-memory index over block first-terms. Each entry gives the
   document frequency and the posting list's location.
 * **Postings.** DocIDs, term frequencies and per-block maximum scores, so that
-  top-k BM25 can skip blocks (Block-Max WAND, MaxScore). The docID encoding is
-  chosen by the posting-list study that preceded this design: Loom (PEF size,
-  2× faster AND, 5–9× faster OR). The prototype compares Loom docIDs with a
-  frequency stream against a classic BP128 block layout.
+  top-k BM25 can skip blocks (Block-Max WAND, MaxScore). DocIDs are Loom lists
+  for terms in at least 512 documents (the posting-list study that preceded
+  this design), with frequencies bit-packed in 128-posting blocks addressed by
+  posting rank; rarer terms use BP128 blocks. Against an all-BP128 layout,
+  Loom is 2–4% smaller with 7.5–10× faster conjunctions. MaxScore is the
+  default top-k algorithm: on these long natural-language queries it beats
+  Block-Max WAND by 2–2.5×. A filter either drives the scoring (its members
+  are scored directly) or is probed per candidate, by a fitted crossover.
 * **Positions** (optional per field) in a separate stream, read only by phrase
   queries.
 * **Norms.** Document lengths quantised to one byte, in the forward index.
@@ -152,9 +158,11 @@ reader (sections to a zero-copy view). Global docIDs are
   encoded (sorted dictionary per segment) with bit-packed codes. A column
   answers "value of document d" in O(1) and scans at memory bandwidth.
 * **Keyword postings.** Every keyword value also gets a docID list, so
-  equality and `IN` filters become set operations. Pyramid is the encoding:
-  O(1) membership probes at every density, the fastest unions, and count-only
-  intersections for facet counts.
+  equality and `IN` filters become set operations. Pyramid is the encoding
+  (plain sorted arrays below 64 documents): the fastest unions and count-only
+  intersections for facet counts. Per-candidate probes use the code column
+  and a bitset of accepted codes (6–9 ns), which beats probing the Pyramid
+  lists (9–24 ns).
 * **Range postings.** Numeric fields get an equi-depth histogram (64
   buckets) whose buckets are docID lists. A range is the union of the buckets
   it covers, plus the boundary buckets filtered through the column. The
@@ -166,7 +174,8 @@ reader (sections to a zero-copy view). Global docIDs are
 
 * **Forward vectors.** Every vector field stores float32 vectors (for exact
   re-ranking) and 8-bit scalar-quantised codes (SQ8, per-dimension min/max)
-  for scanning: 4× less I/O and integer SIMD dot products.
+  for scanning: 4× less I/O, and with the query quantised too, integer dot
+  products with AVX-512 VNNI at 10–15 ns per 1,024-dimension vector.
 * **Flat.** Exact scan of SQ8 codes plus float32 re-ranking. The right answer
   for small segments and very selective filters.
 * **IVF.** k-means centroids; each cluster's members are stored contiguously
@@ -209,12 +218,16 @@ GROUP BY category ORDER BY 2 DESC LIMIT 5;
   `OR`, `NOT`, `-term`, parentheses and `prefix*`; juxtaposition means AND,
   as in FTS5.
 * `bm25(field, text)`: BM25 of the analysed terms of `text` (disjunctive: a
-  document scores if it contains any term).
+  document scores if it contains any term). `k1 => .., b => .., algo => ..`
+  override the defaults.
 * `similarity(field, vector)` (dot product, cosine for unit vectors) and
   `distance(field, vector)`. Vectors are bound parameters or JSON arrays.
 * `rrf(s1, s2, ...)`: reciprocal rank fusion, `Σ 1/(60 + rank_i)`, where each
-  ranking is over the rows passing `WHERE`. Arithmetic on scores gives
-  weighted fusion.
+  ranking is over the rows passing `WHERE` (`k => ..`, `depth => ..`).
+  Arithmetic on scores gives weighted fusion: candidates are the union of
+  each input's top 100, re-scored exactly by every input and min-max
+  normalised (`norm => 'none'` keeps raw scores, `exact => 1` scores every
+  row passing `WHERE`).
 * Options as named arguments, e.g. `similarity(emb, :q, nprobe => 32)`,
   `bm25(body, :t, exact => true)`.
 
@@ -246,9 +259,14 @@ candidate stream is long relative to the lists, and probes otherwise.
 
 The vector strategies are chosen by estimated cost against an estimated
 filter selectivity `s`: pre-filter costs `s·n` distance computations; IVF
-needs about `nprobe/s` probes' worth of clusters to collect enough matching
-candidates; HNSW in-filter degrades sharply below a few per cent selectivity
-(the graph disconnects); post-filter needs `k/s` candidates.
+needs about `nprobe/√s` probes' worth of clusters to collect enough matching
+candidates; HNSW in-filter visits about `1/s` times more nodes; post-filter
+needs `k/s` candidates. What matters for the index strategies is the
+selectivity *near the query*, which differs from the global one when the
+filter correlates with the query's topic. When the global estimate picks an
+index strategy, the planner checks it with a 32-result unfiltered search:
+the fraction of those results that pass the filter (smoothed) replaces `s`
+for in-index search, and bounds it from above for post-filtering.
 
 **Facets.** `GROUP BY` a keyword over a result set either reads the
 dictionary codes of the result's documents (small results) or intersects the
@@ -258,6 +276,11 @@ result set with each value's Pyramid list using count-only intersection
 **Segments.** Each segment runs the same physical plan with its own
 statistics; per-segment top-k lists are merged, and collection-wide BM25
 statistics keep scores comparable.
+
+**Generated columns.** A TEXT field may be declared as generated from other
+stored text fields (`body` = title + text in the evaluation table, like
+SQLite's `GENERATED ALWAYS AS`). It is indexed but not stored; merges
+recompute it.
 
 ## 8. Evaluation plan
 
