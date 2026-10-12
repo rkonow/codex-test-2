@@ -44,7 +44,8 @@ pub struct CollectionStats {
     pub n_docs: u64,
     /// Sum of document lengths.
     pub total_len: u64,
-    /// Document frequency of each query term.
+    /// Document frequency of each query term (a term missing here uses
+    /// the segment's own document frequency).
     pub df: HashMap<String, u64>,
 }
 
@@ -58,6 +59,7 @@ impl CollectionStats {
         }
     }
 
+    /// Average document length.
     pub fn avgdl(&self) -> f32 {
         if self.n_docs == 0 {
             1.0
@@ -87,28 +89,31 @@ pub enum TopKAlgo {
     BlockMaxWand,
 }
 
-/// How [`TextFieldReader::top_k_with`] applies a filter.
+/// How a filter is applied by [`TextFieldReader::top_k_with`] and
+/// [`TextFieldReader::eval_with`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FilterStrategy {
-    /// By the filter's cardinality (see [`drive_cost`]).
+    /// By the filter's cardinality against the query's cost (see
+    /// [`drive_cost`] and [`super::reader::PROBE_COST`]).
     Auto,
-    /// Iterate the filter's members and score each by seeking the lists.
+    /// Iterate the filter's members and check or score each by seeking the
+    /// lists (needs a filter that lists its members, else `Probe`).
     Drive,
-    /// Run the algorithm and skip candidates not in the filter.
+    /// Run the query and skip candidates not in the filter.
     Probe,
 }
 
-/// Scoring one filter member by seeking one query list costs about as
-/// much as `drive_cost(algo)` postings of the unfiltered algorithm: `Auto`
-/// drives from the filter when `members * terms * drive_cost(algo)` is
-/// below the query's postings (fitted by `strata-text-bench`, see
-/// `notes/text.md`). Probing pays more under Block-Max WAND and the
-/// exhaustive scan than under MaxScore, so they drive longer.
+/// `Auto` drives a top-k from the filter when `members * terms *
+/// drive_cost(algo)` is below the total length of the query's lists, i.e.
+/// when scoring a member by seeking one list costs `drive_cost` postings
+/// of the filtered algorithm (fitted per query by `strata-text-bench` over
+/// selectivities from 0.01% to 30%; see `notes/text.md`). A filter weakens
+/// Block-Max WAND's pruning more than MaxScore's, so it drives longer.
 pub fn drive_cost(algo: TopKAlgo) -> f64 {
     match algo {
-        TopKAlgo::Exhaustive => 0.25,
-        TopKAlgo::MaxScore => 1.0,
-        TopKAlgo::BlockMaxWand => 0.25,
+        TopKAlgo::Exhaustive => 0.9,
+        TopKAlgo::MaxScore => 1.8,
+        TopKAlgo::BlockMaxWand => 0.9,
     }
 }
 
@@ -363,26 +368,29 @@ impl Query<'_> {
     }
 
     fn exhaustive(&mut self, top: &mut TopK, filter: Option<&dyn DocFilter>) {
+        let sc = &mut self.scorers;
+        // Current docIDs, dense, so that finding the next candidate does not
+        // touch the (large) cursors.
+        let mut docs: Vec<DocId> = sc.iter().map(|s| s.cur.doc()).collect();
         loop {
-            let d = self.scorers.iter().map(|s| s.cur.doc()).min().unwrap_or(END);
+            let d = docs.iter().copied().min().unwrap_or(END);
             if d == END {
                 break;
             }
-            let keep = filter.is_none_or(|f| f.contains(d));
-            if keep {
+            if filter.is_none_or(|f| f.contains(d)) {
                 let norm = self.norms[d as usize];
                 let mut s = 0.0;
-                for sc in &mut self.scorers {
-                    if sc.cur.doc() == d {
-                        s += sc.score(&self.k, norm);
-                        sc.cur.next();
+                for (i, x) in docs.iter_mut().enumerate() {
+                    if *x == d {
+                        s += sc[i].score(&self.k, norm);
+                        *x = sc[i].cur.next();
                     }
                 }
                 top.insert(d, s);
             } else {
-                for sc in &mut self.scorers {
-                    if sc.cur.doc() == d {
-                        sc.cur.next();
+                for (i, x) in docs.iter_mut().enumerate() {
+                    if *x == d {
+                        *x = sc[i].cur.next();
                     }
                 }
             }
@@ -401,6 +409,7 @@ impl Query<'_> {
                 Some(*acc)
             })
             .collect();
+        let mut docs: Vec<DocId> = sc.iter().map(|s| s.cur.doc()).collect();
         // Lists [0, ne) are non-essential.
         let mut ne = 0;
         loop {
@@ -411,24 +420,24 @@ impl Query<'_> {
             if ne == n {
                 break;
             }
-            let d = sc[ne..].iter().map(|s| s.cur.doc()).min().unwrap();
+            let d = docs[ne..].iter().copied().min().unwrap();
             if d == END {
                 break;
             }
             if filter.is_some_and(|f| !f.contains(d)) {
-                for s in &mut sc[ne..] {
-                    if s.cur.doc() == d {
-                        s.cur.next();
+                for i in ne..n {
+                    if docs[i] == d {
+                        docs[i] = sc[i].cur.next();
                     }
                 }
                 continue;
             }
             let norm = self.norms[d as usize];
             let mut s = 0.0;
-            for e in &mut sc[ne..] {
-                if e.cur.doc() == d {
-                    s += e.score(&self.k, norm);
-                    e.cur.next();
+            for i in ne..n {
+                if docs[i] == d {
+                    s += sc[i].score(&self.k, norm);
+                    docs[i] = sc[i].cur.next();
                 }
             }
             let mut alive = true;
@@ -437,7 +446,10 @@ impl Query<'_> {
                     alive = false;
                     break;
                 }
-                if sc[i].cur.seek(d) == d {
+                if docs[i] < d {
+                    docs[i] = sc[i].cur.seek(d);
+                }
+                if docs[i] == d {
                     s += sc[i].score(&self.k, norm);
                 }
             }
@@ -450,15 +462,16 @@ impl Query<'_> {
     fn block_max_wand(&mut self, top: &mut TopK, filter: Option<&dyn DocFilter>) {
         let sc = &mut self.scorers;
         let n = sc.len();
+        let mut docs: Vec<DocId> = sc.iter().map(|s| s.cur.doc()).collect();
         let mut order: Vec<usize> = (0..n).collect();
-        order.sort_by_key(|&i| sc[i].cur.doc());
+        order.sort_by_key(|&i| docs[i]);
         loop {
             let theta = top.threshold();
             // Pivot: the first list at which the bounds so far exceed theta.
             let mut upper = 0.0f32;
             let mut pivot = n;
             for (p, &i) in order.iter().enumerate() {
-                if sc[i].cur.doc() == END {
+                if docs[i] == END {
                     break;
                 }
                 upper += sc[i].max;
@@ -470,8 +483,8 @@ impl Query<'_> {
             if pivot == n {
                 break;
             }
-            let pivot_doc = sc[order[pivot]].cur.doc();
-            while pivot + 1 < n && sc[order[pivot + 1]].cur.doc() == pivot_doc {
+            let pivot_doc = docs[order[pivot]];
+            while pivot + 1 < n && docs[order[pivot + 1]] == pivot_doc {
                 pivot += 1;
             }
             // Refine with the bounds of the blocks holding pivot_doc.
@@ -480,7 +493,7 @@ impl Query<'_> {
                 block_upper += sc[i].block_max(&self.k, pivot_doc);
             }
             if block_upper > theta {
-                if sc[order[0]].cur.doc() == pivot_doc {
+                if docs[order[0]] == pivot_doc {
                     // Every list up to the pivot is on pivot_doc. Score it,
                     // replacing block bounds by scores while it can qualify.
                     if filter.is_none_or(|f| f.contains(pivot_doc)) {
@@ -497,17 +510,17 @@ impl Query<'_> {
                         top.insert(pivot_doc, s);
                     }
                     for &i in &order[..=pivot] {
-                        sc[i].cur.next();
+                        docs[i] = sc[i].cur.next();
                     }
-                    insertion_sort(&mut order, |i| sc[i].cur.doc());
+                    insertion_sort(&mut order, |i| docs[i]);
                 } else {
                     // Move the last list before the pivot's run up to it.
                     let mut p = pivot;
-                    while sc[order[p]].cur.doc() == pivot_doc {
+                    while docs[order[p]] == pivot_doc {
                         p -= 1;
                     }
-                    sc[order[p]].cur.seek(pivot_doc);
-                    bubble(&mut order, p, |i| sc[i].cur.doc());
+                    docs[order[p]] = sc[order[p]].cur.seek(pivot_doc);
+                    bubble(&mut order, p, |i| docs[i]);
                 }
             } else {
                 // No document up to the end of the smallest of these blocks
@@ -518,15 +531,15 @@ impl Query<'_> {
                 }
                 let mut next = next as DocId;
                 if pivot + 1 < n {
-                    next = next.min(sc[order[pivot + 1]].cur.doc());
+                    next = next.min(docs[order[pivot + 1]]);
                 }
                 if next <= pivot_doc {
                     next = pivot_doc + 1;
                 }
                 // Advance the list with the largest bound among them.
                 let p = (0..=pivot).max_by(|&a, &b| sc[order[a]].max.total_cmp(&sc[order[b]].max)).unwrap();
-                sc[order[p]].cur.seek(next);
-                bubble(&mut order, p, |i| sc[i].cur.doc());
+                docs[order[p]] = sc[order[p]].cur.seek(next);
+                bubble(&mut order, p, |i| docs[i]);
             }
         }
     }

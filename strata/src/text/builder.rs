@@ -67,6 +67,8 @@ pub struct TextFieldBuilder {
 }
 
 impl TextFieldBuilder {
+    /// A builder for field `field`, storing positions if asked, with lists
+    /// of at least `loom_min_df` postings stored as Loom in the Loom format.
     pub fn new(field: &str, positions: bool, format: PostingsFormat, loom_min_df: u32) -> Self {
         TextFieldBuilder {
             field: field.to_string(),

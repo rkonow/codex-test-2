@@ -20,7 +20,7 @@ use crate::segment::{DocFilter, DocId, DocSet, SegmentFile};
 /// ([`TextFieldReader::eval_cost`]): `eval` drives from the filter when
 /// `members * terms * PROBE_COST < eval_cost` (fitted by
 /// `strata-text-bench`, see `notes/text.md`).
-pub const PROBE_COST: f64 = 16.0;
+pub const PROBE_COST: f64 = 2.0;
 
 /// Prefix expansions above this many terms are evaluated as one
 /// materialised union inside filter-driven evaluation.
@@ -50,6 +50,8 @@ pub struct TextSizes {
 }
 
 impl TextFieldReader {
+    /// Opens field `field` of a segment: parses the meta and dictionary
+    /// headers; every array stays a view into the segment.
     pub fn open(seg: &SegmentFile, field: &str) -> Result<Self> {
         let meta: TextMeta = serde_json::from_slice(&seg.require(&section(field, "meta"))?).map_err(corrupt)?;
         let dict = Dict::open(seg.require(&section(field, "dict"))?)?;
@@ -65,6 +67,7 @@ impl TextFieldReader {
         Ok(TextFieldReader { meta, dict, post, pos, norms })
     }
 
+    /// Documents in the segment.
     pub fn n_docs(&self) -> u32 {
         self.meta.n_docs
     }
@@ -85,14 +88,17 @@ impl TextFieldReader {
         &self.norms
     }
 
+    /// Encoding of the docIDs of this field's lists.
     pub fn format(&self) -> PostingsFormat {
         self.meta.format
     }
 
+    /// The field's meta section (format, counts, size breakdown).
     pub fn meta(&self) -> &TextMeta {
         &self.meta
     }
 
+    /// Distinct terms in the field.
     pub fn n_terms(&self) -> u32 {
         self.meta.n_terms
     }
@@ -115,6 +121,16 @@ impl TextFieldReader {
     /// Every term with its entry, in order.
     pub fn for_each_term(&self, f: impl FnMut(&[u8], TermInfo)) {
         self.dict.for_each(f)
+    }
+
+    /// The entries of every term starting with `prefix`.
+    fn prefix_infos(&self, prefix: &str) -> Vec<TermInfo> {
+        let mut out = Vec::new();
+        self.dict.for_each_prefix(prefix, |_, i| {
+            out.push(i);
+            true
+        });
+        out
     }
 
     /// A cursor over an (analysed) term's postings.
@@ -218,7 +234,7 @@ impl TextFieldReader {
         match q {
             BoolQuery::Term(t) => self.doc_freq(t) as f64,
             BoolQuery::Phrase(ts) => ts.len() as f64 * ts.iter().map(|t| self.doc_freq(t) as f64).fold(f64::INFINITY, f64::min),
-            BoolQuery::Prefix(p) => self.dict.prefix(p, usize::MAX).iter().map(|(_, i)| i.df as f64).sum(),
+            BoolQuery::Prefix(p) => self.prefix_infos(p).iter().map(|i| i.df as f64).sum(),
             BoolQuery::Or(cs) => cs.iter().map(|c| self.eval_cost(c)).sum(),
             BoolQuery::And(cs) => {
                 let (neg, pos): (Vec<&BoolQuery>, Vec<&BoolQuery>) = cs.iter().partition(|c| matches!(c, BoolQuery::Not(_)));
@@ -239,7 +255,7 @@ impl TextFieldReader {
             },
             BoolQuery::Phrase(ts) => DocSet::from_sorted(self.phrase_docs(ts), n),
             BoolQuery::Prefix(p) => {
-                let infos: Vec<TermInfo> = self.dict.prefix(p, usize::MAX).into_iter().map(|(_, i)| i).collect();
+                let infos = self.prefix_infos(p);
                 self.union_terms(&infos)
             }
             BoolQuery::And(cs) => {
@@ -372,7 +388,7 @@ impl TextFieldReader {
             BoolQuery::Term(t) => self.doc_freq(t) as f64,
             BoolQuery::Phrase(ts) => n * ts.iter().map(|t| self.doc_freq(t) as f64 / n).product::<f64>(),
             BoolQuery::Prefix(p) => {
-                n * (1.0 - self.dict.prefix(p, usize::MAX).iter().map(|(_, i)| 1.0 - i.df as f64 / n).product::<f64>())
+                n * (1.0 - self.prefix_infos(p).iter().map(|i| 1.0 - i.df as f64 / n).product::<f64>())
             }
             BoolQuery::And(cs) => {
                 n * cs
@@ -404,12 +420,11 @@ impl TextFieldReader {
                 }
             }
             BoolQuery::Prefix(p) => {
-                let ex = self.dict.prefix(p, usize::MAX);
-                if ex.len() > MATCHER_MAX_EXPANSIONS {
-                    let infos: Vec<TermInfo> = ex.into_iter().map(|(_, i)| i).collect();
+                let infos = self.prefix_infos(p);
+                if infos.len() > MATCHER_MAX_EXPANSIONS {
                     Matcher::Set(self.union_terms(&infos))
                 } else {
-                    Matcher::Any(ex.iter().map(|(_, i)| Matcher::Term(self.cursor(i))).collect())
+                    Matcher::Any(infos.iter().map(|i| Matcher::Term(self.cursor(i))).collect())
                 }
             }
             BoolQuery::And(cs) => Matcher::All(cs.iter().map(|c| self.matcher(c)).collect()),

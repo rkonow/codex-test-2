@@ -26,7 +26,7 @@ pub fn write_positions(out: &mut Vec<u8>, freqs: &[u32], positions: &[u32]) {
     let data = out.len();
     let mut at = 0;
     for (r, &f) in freqs.iter().enumerate() {
-        if nb > 1 && r % BLOCK == 0 {
+        if nb > 1 && r.is_multiple_of(BLOCK) {
             let k = index + 4 * (r / BLOCK);
             let off = (out.len() - data) as u32;
             out[k..k + 4].copy_from_slice(&off.to_le_bytes());

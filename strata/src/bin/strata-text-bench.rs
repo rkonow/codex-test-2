@@ -83,6 +83,9 @@ struct Args {
     out: PathBuf,
     #[arg(long, default_value_t = 1)]
     seed: u64,
+    /// Top-k algorithms timed warm (exhaustive, maxscore, bmw).
+    #[arg(long, value_delimiter = ',', default_value = "exhaustive,maxscore,bmw")]
+    algos: Vec<String>,
 }
 
 /// The text of a BEIR collection.
@@ -166,6 +169,10 @@ fn random_filter(rng: &mut StdRng, n: u32, p: f64) -> DocSet {
 
 const ALGOS: [TopKAlgo; 3] = [TopKAlgo::Exhaustive, TopKAlgo::MaxScore, TopKAlgo::BlockMaxWand];
 
+fn parse_algo(s: &str) -> TopKAlgo {
+    *ALGOS.iter().find(|&&a| algo_name(a) == s).unwrap_or_else(|| panic!("unknown algorithm {s}"))
+}
+
 fn algo_name(a: TopKAlgo) -> &'static str {
     match a {
         TopKAlgo::Exhaustive => "exhaustive",
@@ -230,10 +237,11 @@ fn ndcg(c: &Coll, w: &Workload, k: usize, mut rank: impl FnMut(&[String]) -> Vec
 
 /// Exhaustive BM25 with exact document lengths (the index stores one-byte
 /// norms), for the quantisation experiment.
-fn exact_len_top_k(r: &TextFieldReader, terms: &[String], lens: &[u32], p: Bm25Params, k: usize) -> Vec<(DocId, f32)> {
+fn exact_len_top_k(r: &TextFieldReader, terms: &[String], lens: &[u32], p: Bm25Params, k: usize, acc: &mut Vec<f32>) -> Vec<(DocId, f32)> {
     let stats = r.stats(terms);
     let avgdl = stats.avgdl();
-    let mut acc: HashMap<DocId, f32> = HashMap::new();
+    acc.resize(r.n_docs() as usize, 0.0);
+    let mut touched: Vec<DocId> = Vec::new();
     let mut uniq: Vec<(&String, u32)> = Vec::new();
     for t in terms {
         match uniq.iter_mut().find(|(u, _)| *u == t) {
@@ -248,11 +256,14 @@ fn exact_len_top_k(r: &TextFieldReader, terms: &[String], lens: &[u32], p: Bm25P
             let d = c.doc();
             let tf = c.freq() as f32;
             let kk = p.k1 * (1.0 - p.b + p.b * lens[d as usize] as f32 / avgdl);
-            *acc.entry(d).or_default() += w * tf / (tf + kk);
+            if acc[d as usize] == 0.0 {
+                touched.push(d);
+            }
+            acc[d as usize] += w * tf / (tf + kk);
             c.next();
         }
     }
-    let mut v: Vec<(DocId, f32)> = acc.into_iter().collect();
+    let mut v: Vec<(DocId, f32)> = touched.iter().map(|&d| (d, std::mem::take(&mut acc[d as usize]))).collect();
     v.sort_by(|a, b| b.1.total_cmp(&a.1).then(a.0.cmp(&b.0)));
     v.truncate(k);
     v
@@ -370,7 +381,7 @@ fn sizes_json(r: &TextFieldReader, seg: &SegmentFile) -> Value {
 /// Warm latency of every query kind on one reader.
 fn warm(r: &TextFieldReader, w: &Workload, filters: &[(f64, DocSet)], a: &Args) -> Value {
     let mut bm25 = Vec::new();
-    for algo in ALGOS {
+    for algo in a.algos.iter().map(|s| parse_algo(s)) {
         for (sel, f) in std::iter::once((None, None)).chain(filters.iter().map(|(s, f)| (Some(*s), Some(f)))) {
             let ts = time_queries(w.sample.len(), a.reps, |i| {
                 let terms = &w.bm25[w.sample[i]].1;
@@ -430,9 +441,20 @@ fn cold(image: &[u8], path: &Path, w: &Workload, a: &Args) -> Value {
     let seg = SegmentFile::open(OwnedBytes::new(mmap)).unwrap();
     let r = TextFieldReader::open(&seg, "body").unwrap();
     let n = a.cold_queries.min(w.sample.len());
+    // Page ranges of the sections, to split the pages read by section.
+    let sections: Vec<(String, std::ops::Range<usize>)> = seg
+        .section_sizes()
+        .into_iter()
+        .map(|(name, _)| {
+            let r = seg.section_range(&name).unwrap();
+            let part = name.rsplit('.').next().unwrap().to_string();
+            (part, r.start / iostat::PAGE..r.end.div_ceil(iostat::PAGE))
+        })
+        .collect();
     let mut out = Vec::new();
     let mut run = |name: &str, nq: usize, f: &mut dyn FnMut(usize)| {
         let (mut ts, mut pages) = (Vec::new(), Vec::new());
+        let mut by_section: HashMap<String, f64> = HashMap::new();
         for i in 0..nq {
             // SAFETY: a read-only shared mapping of a file nobody writes.
             unsafe { iostat::drop_mapping(ptr, len).unwrap() };
@@ -444,10 +466,15 @@ fn cold(image: &[u8], path: &Path, w: &Workload, a: &Args) -> Value {
             f(i);
             ts.push(t.elapsed().as_secs_f64() * 1e6);
             pages.push(iostat::resident_pages(path).unwrap().saturating_sub(before) as f64);
+            let resident = resident_map(ptr, len);
+            for (part, range) in &sections {
+                *by_section.entry(part.clone()).or_default() += resident[range.clone()].iter().filter(|&&b| b & 1 == 1).count() as f64;
+            }
         }
         let mut e = lat(&ts);
         e["query"] = json!(name);
         e["pages_mean"] = json!(mean(&pages));
+        e["pages_mean_by_section"] = json!(by_section.iter().map(|(k, v)| (k.clone(), v / nq.max(1) as f64)).collect::<HashMap<_, _>>());
         e["pages_p50"] = json!(percentile(&pages, 50.0));
         e["pages_p99"] = json!(percentile(&pages, 99.0));
         out.push(e);
@@ -470,6 +497,15 @@ fn cold(image: &[u8], path: &Path, w: &Workload, a: &Args) -> Value {
     drop(seg);
     std::fs::remove_file(path).unwrap();
     json!(out)
+}
+
+/// Page-cache residency of every page of a mapping (`mincore`).
+fn resident_map(ptr: *const u8, len: usize) -> Vec<u8> {
+    let mut v = vec![0u8; len.div_ceil(iostat::PAGE)];
+    // SAFETY: `ptr..ptr + len` is a live, page-aligned mapping.
+    let r = unsafe { libc::mincore(ptr as *mut libc::c_void, len, v.as_mut_ptr()) };
+    assert_eq!(r, 0, "mincore failed");
+    v
 }
 
 /// Per-query points `(x, drive us, probe us)` of one query family, where
@@ -561,6 +597,16 @@ fn crossover(r: &TextFieldReader, w: &Workload, a: &Args, rng: &mut StdRng) -> V
     json!({ "rows": rows, "fits": fits })
 }
 
+/// Peak resident set size of this process so far (Linux).
+fn peak_rss_mb() -> f64 {
+    let status = std::fs::read_to_string("/proc/self/status").unwrap_or_default();
+    status
+        .lines()
+        .find_map(|l| l.strip_prefix("VmHWM:"))
+        .and_then(|v| v.trim().trim_end_matches("kB").trim().parse::<f64>().ok())
+        .map_or(0.0, |kb| kb / 1024.0)
+}
+
 fn main() {
     let a = Args::parse();
     std::fs::create_dir_all(&a.out).unwrap();
@@ -609,12 +655,13 @@ fn main() {
                 let p = Bm25Params::default();
                 let bm25 = |terms: &[String], p: Bm25Params| r.top_k(terms, &r.stats(terms), p, a.k + 1, None, TopKAlgo::BlockMaxWand);
                 let lens: Vec<u32> = c.bodies.iter().map(|t| exact_len(t)).collect();
+                let mut acc = Vec::new();
                 let alt = Bm25Params { k1: 1.2, b: 0.75 };
                 collection["ndcg@10"] = json!({
                     "bm25 k1=0.9 b=0.4": ndcg(&c, &w, a.k, |t| bm25(t, p)),
                     "bm25 k1=1.2 b=0.75": ndcg(&c, &w, a.k, |t| bm25(t, alt)),
-                    "bm25 k1=0.9 b=0.4, exact lengths": ndcg(&c, &w, a.k, |t| exact_len_top_k(&r, t, &lens, p, a.k + 1)),
-                    "bm25 k1=1.2 b=0.75, exact lengths": ndcg(&c, &w, a.k, |t| exact_len_top_k(&r, t, &lens, alt, a.k + 1)),
+                    "bm25 k1=0.9 b=0.4, exact lengths": ndcg(&c, &w, a.k, |t| exact_len_top_k(&r, t, &lens, p, a.k + 1, &mut acc)),
+                    "bm25 k1=1.2 b=0.75, exact lengths": ndcg(&c, &w, a.k, |t| exact_len_top_k(&r, t, &lens, alt, a.k + 1, &mut acc)),
                     "judged_queries": c.queries.iter().filter(|(id, _)| c.qrels.contains_key(id)).count(),
                 });
                 eprintln!("  nDCG@10 {}", collection["ndcg@10"]);
@@ -651,8 +698,9 @@ fn main() {
             }
             collection["loom_min_df_sweep"] = json!(sweep);
         }
+        collection["peak_rss_mb"] = json!(peak_rss_mb());
         let path = a.out.join(format!("{name}.json"));
         std::fs::write(&path, serde_json::to_string_pretty(&collection).unwrap()).unwrap();
-        eprintln!("wrote {}", path.display());
+        eprintln!("wrote {} (peak RSS {:.0} MB)", path.display(), peak_rss_mb());
     }
 }

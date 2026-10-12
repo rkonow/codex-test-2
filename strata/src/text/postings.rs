@@ -54,10 +54,12 @@ pub const BLOCK: usize = 128;
 /// Sentinel docID of an exhausted cursor.
 pub const END: DocId = u32::MAX;
 
-/// Default for the shortest list the Loom format stores as Loom (shorter
-/// lists use BP128 blocks: a Loom list carries about 130 bytes of headers
-/// and padding).
-pub const LOOM_MIN_DF: u32 = 1024;
+/// Default for the shortest list the Loom format stores as Loom. Shorter
+/// lists use BP128 blocks: a serialised Loom list carries about 124 bytes
+/// of headers and padding. Measured against 256, 1024 and 2048 (see
+/// `notes/text.md`): 512 costs 0.5% over the smallest index and makes AND /
+/// OR about a quarter faster than 1024.
+pub const LOOM_MIN_DF: u32 = 512;
 
 /// Encoding of the docIDs of the posting lists of a field.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -68,6 +70,7 @@ pub enum PostingsFormat {
 }
 
 impl PostingsFormat {
+    /// `loom` or `bp128` (any case).
     pub fn parse(s: &str) -> Option<Self> {
         match s.to_ascii_lowercase().as_str() {
             "loom" => Some(PostingsFormat::Loom),
@@ -86,6 +89,7 @@ pub const LIST_IMPACT: Impact = u32::MAX;
 
 const MAX_IMPACT_TF: u32 = (1 << 24) - 1;
 
+/// The impact of a block whose largest tf and smallest norm are given.
 #[inline]
 pub fn impact(tf: u32, norm: u8) -> Impact {
     tf.min(MAX_IMPACT_TF) << 8 | norm as u32

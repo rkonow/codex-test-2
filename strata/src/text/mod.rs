@@ -14,7 +14,7 @@
 //!
 //! Build options: `text.postings = loom | bp128` (docID encoding, default
 //! `loom`) and `text.loom_min_df` (shortest list stored as Loom in the Loom
-//! format, default [`postings::LOOM_MIN_DF`]).
+//! format, default [`postings::LOOM_MIN_DF`] = 512).
 //!
 //! Reading: [`TextFieldReader::open`] maps nothing and copies nothing; every
 //! array is a view into the segment. Queries: [`parse_match`] /
