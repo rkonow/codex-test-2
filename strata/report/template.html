@@ -19,6 +19,7 @@
 .sqlbox .fn { color: var(--warm); }
 .sqlbox .cm { color: var(--ink-3); }
 .verdict { display: grid; grid-template-columns: 1fr; gap: 12px; margin: 18px 0; }
+.note { font-size: 0.86rem; color: var(--ink-3); margin-top: -4px; }
 .verdict > div { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; min-width: 0; }
 .verdict h4 { margin: 0 0 6px; font: 600 1rem/1.3 var(--body); }
 .verdict p { margin: 0; font-size: 0.92rem; color: var(--ink-2); }
@@ -31,6 +32,17 @@
 .compact th, .compact td { padding: 7px 9px; }
 .wrap-head th { white-space: normal; vertical-align: bottom; }
 td.sys { font-weight: 600; }
+.showcase td { vertical-align: top; white-space: normal; }
+.showcase td:first-child { min-width: 280px; }
+.sc-sql, .sc-plan { max-width: 330px; }
+.showcase td:not(:first-child) .sc-plan { max-width: 170px; }
+.ablation th.grp { text-align: center; border-bottom: 1px solid var(--rule); }
+.ablation td .pg { font-size: 0.74rem; color: var(--ink-3); }
+.ablation td.best .pg { color: inherit; }
+.sc-label { font-weight: 600; margin-bottom: 4px; }
+.sc-sql { display: block; font: 0.74rem/1.45 var(--mono); color: var(--ink-2); white-space: normal; word-break: break-word; background: none; padding: 0; border: 0; }
+.sc-ms { font: 500 0.82rem/1.3 var(--mono); font-variant-numeric: tabular-nums; }
+.sc-plan { font-size: 0.76rem; line-height: 1.35; color: var(--ink-3); margin-top: 3px; }
 .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
 .tabs button { font: 500 0.82rem/1 var(--body); color: var(--ink-2); background: var(--surface); border: 1px solid var(--rule); border-radius: 999px; padding: 7px 12px; cursor: pointer; }
 .tabs button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--surface); }
@@ -144,7 +156,7 @@ td.sys { font-weight: 600; }
   <h3>Full text</h3>
   <p>The analyzer splits on non-alphanumeric characters, lowercases, folds accents, drops 33 stopwords and applies the Snowball English stemmer. Ranked queries also drop NLTK's 153 English function words and count each term once. Terms sit in front-coded dictionary blocks of 32. Lists of at least 512 documents keep their docIDs as Loom, with frequencies bit-packed per 128 postings and addressed by posting rank; shorter lists use BP128 blocks. Document lengths are one-byte norms. Ranking is BM25 with collection-wide statistics summed over the snapshot's segments, so a document scores the same in any segment:</p>
   <div class="math">\[ \mathrm{BM25}(d, q) = \sum_{t \in q} \ln\Bigl(1 + \frac{N - n_t + 0.5}{n_t + 0.5}\Bigr) \cdot \frac{f_{t,d}\,(k_1 + 1)}{f_{t,d} + k_1\bigl(1 - b + b\,\frac{|d|}{\overline{|d|}}\bigr)}, \qquad k_1 = 1.2,\ b = 0.75. \]</div>
-  <p>Top-k uses MaxScore by default: terms are sorted by their upper bound \(U_t\), and once the threshold \(\theta\) of the current top-k exceeds the sum of the smaller bounds, those lists stop driving iteration and are only probed. Block-Max WAND is available, but on these natural-language queries (often 8–15 terms) MaxScore measured 2–2.5× faster. A filter either drives scoring, when it is small enough that scoring its members directly is cheaper, or is probed per candidate. The crossover is a fitted constant times the filter size against the query's list lengths.</p>
+  <p>Top-k uses MaxScore by default: terms are sorted by their upper bound \(U_t\), and once the threshold \(\theta\) of the current top-k exceeds the sum of the smaller bounds, those lists stop driving iteration and are only probed. Block-Max WAND is available, but on these collections' queries MaxScore measured 1.9–2.6× faster. A filter either drives scoring, when it is small enough that scoring its members directly is cheaper, or is probed per candidate. The crossover is a fitted constant times the filter size against the query's list lengths.</p>
   <h3>Structured fields</h3>
   <ul>
     <li><b>Columns.</b> Integers and floats sit in 128-document blocks, frame-of-reference bit-packed, with min/max zone maps per block and per 4,096-document superblock. Two-decimal floats such as <code>rating</code> are detected and stored as scaled integers (0–499).</li>

@@ -214,7 +214,7 @@
       out["vector index"] += other;
       return [NAME[c], ...Object.keys(groups).map((k) => num(mib(out[k]), 1)), num(mib(b.bytes), 0)];
     }).filter(Boolean);
-    table(el, ["collection", ...Object.keys(groups), "file"], rows, [1, 2, 3, 4, 5, 6, 7, 8]);
+    table(el, ["MiB", ...Object.keys(groups), "file"], rows, [1, 2, 3, 4, 5, 6, 7, 8]);
   }
 
   function latency() {
@@ -228,7 +228,7 @@
       const ser = series.map((sy) => ({
         name: sy.name,
         color: sy.color,
-        missing: sy.key === "tantivy" && /vector|hybrid/.test("") ? "no vectors" : "not supported",
+        missing: sy.key === "tantivy" ? "no vector search" : "not supported",
         values: kinds.map((k) => {
           const r = kindOf(C(coll)[sy.key], k);
           const lat = r && (mode === "warm" ? r.warm : r.cold);
@@ -354,14 +354,16 @@
     if (!el) return;
     const label = { filtered_vector: "filtered vector", filtered_bm25: "filtered BM25", filter: "structured filter (count)" };
     const rows = [];
-    COLLS.forEach((c) => {
-      const p = C(c).planner;
+    const groups = [];
+    COLLS.forEach((c) => groups.push([NAME[c], C(c).planner]));
+    COLLS.forEach((c) => groups.push([`${NAME[c]}, IVF`, C(c).planner_ivf]));
+    groups.forEach(([name, p]) => {
       if (!p) return;
       Object.keys(label).forEach((k, i) => {
         const x = p[k];
         if (!x) return;
         const fixed = Object.entries(x.total_ms).filter(([n]) => n !== "auto").sort((a, b) => a[1] - b[1])[0];
-        rows.push([i === 0 ? NAME[c] : "", label[k], x.queries, num(x.total_ms.auto, 0), num(x.oracle_ms, 0), `${fixed[0]} ${num(fixed[1], 0)}`, num(x.regret_geomean, 2) + "×", num(100 * x.within_1_25, 0) + "%", num(x.auto_recall_mean, 3)]);
+        rows.push([i === 0 ? name : "", label[k], x.queries, num(x.total_ms.auto, 0), num(x.oracle_ms, 0), `${fixed[0]} ${num(fixed[1], 0)}`, num(x.regret_geomean, 2) + "×", num(100 * x.within_1_25, 0) + "%", num(x.auto_recall_mean, 3)]);
       });
     });
     table(el, ["collection", "queries", "n", "planner ms", "oracle ms", "best fixed plan, ms", "regret (geo-mean)", "within 1.25× of best", "planner recall@10"], rows, [2, 3, 4, 6, 7, 8]);
@@ -398,10 +400,86 @@
         rows.push([i === 0 ? NAME[c] : "", { v: f.format === "loom" ? "Loom (default)" : "BP128 blocks", cls: "sys" }, num(f.sizes.bits_per_posting.postings_section, 2), us(bool("and")), us(bool("or")), us(bm("maxscore")), us(bm("bmw")), us(bm("exhaustive"))]);
       });
     });
-    table(el, ["collection", "posting format", "bits / posting", "AND µs", "OR µs", "BM25 MaxScore µs", "BM25 Block-Max WAND µs", "BM25 exhaustive µs"], rows, [2, 3, 4, 5, 6, 7]);
+    table(el, ["collection", "posting format", "bits / posting", "AND", "OR", "BM25 MaxScore", "BM25 Block-Max WAND", "BM25 exhaustive"], rows, [2, 3, 4, 5, 6, 7]);
+  }
+
+  // Cold-cache latency under three page-cache policies (TREC-COVID, Quora).
+  function ablationTable() {
+    const el = $("#ablation-table");
+    if (!el) return;
+    const cfg = [["readahead", "read-ahead everywhere"], ["strata", "default hints"], ["noreadahead", "no read-ahead"]];
+    const colls = ["trec-covid", "quora"].filter((c) => C(c).readahead && C(c).noreadahead);
+    const kinds = ["bm25", "and2", "filter", "filtered_bm25", "vector", "filtered_vector", "hybrid", "facet"];
+    const wrap = h("div", { class: "table-wrap compact wrap-head ablation" }, el);
+    const t = h("table", {}, wrap);
+    const th = h("thead", {}, t);
+    const r1 = h("tr", {}, th);
+    h("th", {}, r1, "");
+    colls.forEach((c) => h("th", { colspan: String(cfg.length), class: "grp" }, r1, NAME[c]));
+    const r2 = h("tr", {}, th);
+    h("th", {}, r2, "kind");
+    colls.forEach(() => cfg.forEach(([, n]) => h("th", { class: "n" }, r2, n)));
+    const tb = h("tbody", {}, t);
+    kinds.forEach((k) => {
+      const tr = h("tr", {}, tb);
+      h("td", {}, tr, KIND[k]);
+      colls.forEach((c) => {
+        const rs = cfg.map(([key]) => kindOf(C(c)[key], k));
+        const vals = rs.map((r) => (r && r.cold ? r.cold.p50_ms : null));
+        const best = Math.min(...vals.filter((v) => v != null));
+        rs.forEach((r, i) => {
+          const td = h("td", { class: "n" + (vals[i] === best ? " best" : "") }, tr);
+          if (vals[i] == null) { td.textContent = "—"; return; }
+          h("div", {}, td, ms(vals[i]));
+          h("div", { class: "pg" }, td, `${Math.round(r.cold_pages.p50).toLocaleString("en-US")} pages`);
+        });
+      });
+    });
+  }
+
+  // The compound SQL queries, their latency per collection and the plan chosen.
+  function showcaseTable() {
+    const el = $("#showcase-table");
+    if (!el) return;
+    const colls = COLLS.filter((c) => C(c).showcase);
+    if (!colls.length) return;
+    const tag = (plan) => {
+      const t = [];
+      plan.forEach((line) => {
+        const l = line.replace(/^seg \d+: /, "");
+        let m;
+        if ((m = l.match(/^selectivity ([\d.]+) global, ([\d.]+) near/))) t.push(`s ${fmt(100 * m[1], 0)}% · near ${fmt(100 * m[2], 0)}%`);
+        else if ((m = l.match(/^filter materialised, (\d+) docs/))) t.push(`set of ${(+m[1]).toLocaleString("en-US")}`);
+        else if ((m = l.match(/^bm25 \w+, filter (\w+)/))) t.push(m[1] === "Probe" ? "BM25, probe filter" : "BM25 over set");
+        else if ((m = l.match(/^vector (\w+) \((\w+) ran\)/))) t.push({ PreFilter: "vector pre-filter", PostFilter: "vector post-filter", InIndex: m[2] === "Hnsw" ? "HNSW in-filter" : "IVF in-filter", Flat: "flat scan" }[m[1]] || m[1]);
+        else if ((m = l.match(/^facet (\w+)/))) t.push(m[1] === "Codes" ? "facet by codes" : "facet by postings");
+        else if (/^count from the range index/.test(l)) t.push("count from histogram");
+      });
+      return t.join(" → ");
+    };
+    const wrap = h("div", { class: "table-wrap compact wrap-head showcase" }, el);
+    const t = h("table", {}, wrap);
+    const hr = h("tr", {}, h("thead", {}, t));
+    h("th", {}, hr, "query");
+    colls.forEach((c) => h("th", {}, hr, `${NAME[c]}: ms, plan`));
+    const tb = h("tbody", {}, t);
+    C(colls[0]).showcase.queries.forEach((q, i) => {
+      const tr = h("tr", {}, tb);
+      const td = h("td", {}, tr);
+      h("div", { class: "sc-label" }, td, q.label);
+      h("code", { class: "sc-sql" }, td, q.sql);
+      colls.forEach((c) => {
+        const r = C(c).showcase.queries[i];
+        const cell = h("td", {}, tr);
+        h("div", { class: "sc-ms" }, cell, `${ms(r.ms)} ms · ${r.rows} row${r.rows === 1 ? "" : "s"}`);
+        h("div", { class: "sc-plan" }, cell, tag(r.plan));
+      });
+    });
   }
 
   meta();
+  ablationTable();
+  showcaseTable();
   textTable();
   buildTable();
   sizeTable();

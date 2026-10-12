@@ -149,9 +149,9 @@ reader (sections to a zero-copy view). Global docIDs are
   for terms in at least 512 documents (the posting-list study that preceded
   this design), with frequencies bit-packed in 128-posting blocks addressed by
   posting rank; rarer terms use BP128 blocks. Against an all-BP128 layout,
-  Loom is 2–4% smaller with 7.5–10× faster conjunctions. MaxScore is the
-  default top-k algorithm: on these long natural-language queries it beats
-  Block-Max WAND by 2–2.5×. A filter either drives the scoring (its members
+  Loom is 2–4% smaller with 7.6–12× faster conjunctions. MaxScore is the
+  default top-k algorithm: on the BEIR queries it beats Block-Max WAND by
+  1.9–2.6×. A filter either drives the scoring (its members
   are scored directly) or is probed per candidate, by a fitted crossover.
 * **Positions** (optional per field) in a separate stream, read only by phrase
   queries.
@@ -229,7 +229,9 @@ GROUP BY category ORDER BY 2 DESC LIMIT 5;
 * `bm25(field, text)`: BM25 of the analysed terms of `text` (disjunctive: a
   document scores if it contains any term). Ranked queries drop English
   function words (NLTK's 153-word list) and count each term once.
-  `k1 => .., b => .., algo => ..` override the defaults.
+  `k1 => .., b => .., algo => ..` override the defaults; `stopwords => 0`
+  keeps the function words (better for short questions: +0.055 nDCG@10 on
+  Quora, -0.055 on TREC-COVID).
 * `similarity(field, vector)` (dot product, cosine for unit vectors) and
   `distance(field, vector)`. Vectors are bound parameters or JSON arrays.
 * `rrf(s1, s2, ...)`: reciprocal rank fusion, `Σ 1/(60 + rank_i)`, where each
@@ -239,7 +241,7 @@ GROUP BY category ORDER BY 2 DESC LIMIT 5;
   normalised (`norm => 'none'` keeps raw scores, `exact => 1` scores every
   row passing `WHERE`).
 * Options as named arguments, e.g. `similarity(emb, :q, nprobe => 32)`,
-  `bm25(body, :t, exact => true)`.
+  `bm25(body, :t, k1 => 0.9, stopwords => 0)`.
 
 ## 7. Planning and execution
 

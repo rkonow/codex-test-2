@@ -26,14 +26,15 @@ def slim_system(d):
     return keep
 
 
-def slim_planner(d):
+def slim_planner(d, rows=True):
+    """Planner summary per kind; per-query rows only where a chart needs them."""
     if not d:
         return None
     out = {}
     for kind, k in d["kinds"].items():
-        rows = [{"target": r["target"], "plans": {p["plan"]: [round(p["ms"], 4), round(p["recall"], 3)] for p in r["plans"]}, "regret": r["regret"]} for r in k["rows"]]
         out[kind] = {x: k[x] for x in ("queries", "regret_geomean", "regret_p90", "within_1_25", "auto_recall_mean", "total_ms", "oracle_ms")}
-        out[kind]["rows"] = rows
+        if rows:
+            out[kind]["rows"] = [{"target": r["target"], "plans": {p["plan"]: [round(p["ms"], 4), round(p["recall"], 3)] for p in r["plans"]}, "regret": r["regret"]} for r in k["rows"]]
     return out
 
 
@@ -74,9 +75,12 @@ for c in COLLECTIONS:
         "tantivy": slim_system(load(f"baselines/tantivy_{c}.json")),
         "hybrid": load(f"strata/hybrid_{c}.json"),
         "planner": slim_planner(load(f"strata/planner_{c}.json")),
-        "planner_ivf": slim_planner(load(f"strata/planner_ivf_{c}.json")),
+        "planner_ivf": slim_planner(load(f"strata/planner_ivf_{c}.json"), rows=False),
         "vector": slim_vector(load(f"vector/{c}.json")),
         "text": slim_text(load(f"text/{c}.json")),
+        "readahead": slim_system(load(f"strata/strata_readahead_{c}.json")),
+        "noreadahead": slim_system(load(f"strata/strata_noreadahead_{c}.json")),
+        "showcase": load(f"strata/showcase_{c}.json"),
     }
 data["storage"] = {n: load(f"storage/{n}.json") for n in ("wal", "bulk", "open", "flush", "merge", "space", "pk", "snapshot")}
 

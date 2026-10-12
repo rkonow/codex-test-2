@@ -27,8 +27,10 @@ declare -A STEPS=(
   # random-access sections MADV_RANDOM).
   [ablation_readahead]="$B/strata-eval --collections trec-covid,quora --reuse --keep --no-random-hints --studies workload"
   [ablation_noreadahead]="$B/strata-eval --collections trec-covid,quora --reuse --keep --no-read-ahead --studies workload"
+  # BM25 quality with and without query stopwords, through the `strata` shell.
+  [query_stopwords]="python3 scripts/query_stopwords.py"
 )
-ORDER=(strata_small strata_quora strata_ivf ablation_readahead ablation_noreadahead baselines_small baselines_quora vector_fiqa vector_trec vector_quora text forward_trec forward_quora storage)
+ORDER=(strata_small strata_quora strata_ivf ablation_readahead ablation_noreadahead query_stopwords baselines_small baselines_quora vector_fiqa vector_trec vector_quora text forward_trec forward_quora storage)
 
 for step in "${@:-${ORDER[@]}}"; do
   echo "== $step $(date +%T): ${STEPS[$step]}" | tee -a "$log/progress.txt"

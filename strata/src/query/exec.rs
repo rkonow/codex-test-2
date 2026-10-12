@@ -597,7 +597,7 @@ impl<'a> Executor<'a> {
     }
 
     fn bm25_top(&mut self, field: usize, query: &str, opts: &Opts, p: &Pred, k: usize) -> Result<Vec<Hit>> {
-        let terms = text::analyze_query(query);
+        let terms = query_terms(query, opts);
         if terms.is_empty() {
             return Ok(Vec::new());
         }
@@ -772,7 +772,7 @@ impl<'a> Executor<'a> {
         let by_seg = group_by_seg(cands);
         match score {
             Score::Bm25 { field, text: q, opts } => {
-                let terms = text::analyze_query(q);
+                let terms = query_terms(q, opts);
                 let stats = self.collection_stats(*field, &terms)?;
                 let (params, _) = self.bm25_params(opts);
                 for (seg, range) in by_seg {
@@ -925,6 +925,12 @@ fn merge_top(mut hits: Vec<Hit>, k: usize) -> Vec<Hit> {
     hits.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal).then((a.seg, a.doc).cmp(&(b.seg, b.doc))));
     hits.truncate(k);
     hits
+}
+
+/// The terms of a `bm25` query; `stopwords => 0` keeps query stopwords.
+fn query_terms(q: &str, opts: &Opts) -> Vec<String> {
+    let drop = opts.get("stopwords").and_then(|v| v.as_f64()).map_or(true, |x| x != 0.0);
+    text::analyze_query_with(q, drop)
 }
 
 fn group_by_seg(cands: &[(usize, DocId)]) -> Vec<(usize, std::ops::Range<usize>)> {

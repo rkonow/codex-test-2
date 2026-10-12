@@ -43,9 +43,15 @@ pub const QUERY_STOPWORDS: [&str; 153] = [
 /// The terms of a ranked (`bm25`) query: analysed like documents, minus
 /// [`QUERY_STOPWORDS`], each distinct term once.
 pub fn analyze_query(text: &str) -> Vec<String> {
+    analyze_query_with(text, true)
+}
+
+/// [`analyze_query`], optionally keeping the query stopwords (documents'
+/// own stopwords are never indexed, so those are dropped either way).
+pub fn analyze_query_with(text: &str, drop_stopwords: bool) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     for_each_word(text, |w| {
-        if QUERY_STOPWORDS.binary_search(&w).is_ok() {
+        if drop_stopwords && QUERY_STOPWORDS.binary_search(&w).is_ok() {
             return;
         }
         if let Some(t) = term_of(w) {
@@ -190,6 +196,7 @@ mod tests {
         assert!(STOPWORDS.windows(2).all(|w| w[0] < w[1]));
         assert!(QUERY_STOPWORDS.windows(2).all(|w| w[0] < w[1]));
         assert_eq!(analyze_query("What is the origin of the COVID-19 origin?"), ["origin", "covid", "19"]);
+        assert_eq!(analyze_query_with("How can I learn?", false), ["how", "can", "i", "learn"]);
     }
 
     #[test]
