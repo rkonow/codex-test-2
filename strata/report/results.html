@@ -37,12 +37,15 @@
   </div>
 </figure>
 <div class="col">
-  <!--NARR-HYBRID-->
+    <p>Weighted fusion beats both of its inputs on three of the four collections. The best BM25 weight is small, 0.1–0.3: the scales differ, and on these collections the embeddings are the stronger ranking. On TREC-COVID it reaches nDCG@10 0.851, against 0.817 for vectors alone, 0.835 for RRF and 0.658 for BM25. On Quora it reaches 0.920 against 0.899 and 0.859. On FiQA, where BM25 is weak (0.268), fusion only matches the vector ranking (0.437), and RRF falls below it (0.382), because RRF gives both rankings equal weight.</p>
+  <p>The top-100 shortcut is cheap and close to exact. Against weighted ranking computed over every document, it recovers 89–95% of the exact top-10, and its nDCG@10 is within 0.01–0.03. It costs 0.4–1.5 ms per query, where the exact computation costs 1.8 ms on SciFact, 44 ms on FiQA and 211 ms on TREC-COVID.</p>
 </div>
 
 <div class="col">
   <h3 id="r-vectors">Vector indexes</h3>
-  <!--NARR-VECTORS-->
+    <p>On Quora (522,931 vectors, 1,024 dimensions), HNSW reaches recall@10 0.962 at 0.054 ms and 0.991 at 0.13 ms (ef 64, the default). IVF needs 0.58 ms for 0.936 (nprobe 32) and 1.8 ms for 0.977. The exact scan of 8-bit codes with float32 re-ranking reaches 1.000 in 38 ms.</p>
+  <p>The quantised dot product costs 12 ns per vector with VNNI (7.6 ns when four rows are scored at once), against 48 ns in float32. Scoring on the codes alone already ranks the exact top-10 correctly in all 100 sampled queries; float32 re-ranking only settles ties. HNSW took 201 s to build with four threads, IVF 54 s.</p>
+  <p>Cold, access patterns decide. With the kernel's default read-around, one HNSW query reads 32,290 pages (124 ms). Advising the graph and its codes <code>MADV_RANDOM</code> cuts that to 1,193 pages (54 ms), and prefetching each hop's neighbours cuts it to 15 ms. IVF reads its clusters sequentially, so it is fastest with read-ahead: 15 ms, or 8 ms with prefetching.</p>
 </div>
 <figure class="narrow">
   <div class="frame">
@@ -54,7 +57,13 @@
 
 <div class="col">
   <h3 id="r-planner">Filtered vector search and the planner</h3>
-  <!--NARR-FILTERED-->
+    <p>Filtered vector search is where one fixed strategy cannot win. The chart shows mean latency per strategy at each filter selectivity on the workload's filters:</p>
+  <ul>
+    <li><b>Pre-filtered scan:</b> its cost grows with the number of matching documents.</li>
+    <li><b>HNSW with the filter inside:</b> cheap for permissive filters, but very expensive for selective ones, and for filters whose matches sit far from the query.</li>
+    <li><b>Post-filtering:</b> sensitive to both.</li>
+  </ul>
+  <p>The filters include random ones and topic filters drawn near to and far from the query.</p>
 </div>
 <figure class="narrow">
   <div class="frame">
@@ -64,13 +73,15 @@
   </div>
 </figure>
 <div class="col">
-  <!--NARR-PLANNER-->
+    <p>Across 300 filtered vector queries per collection, the planner is 2.1× faster than the best fixed strategy on TREC-COVID (251 ms against 523 ms for always pre-filtering) and 5.3× faster on Quora (451 ms against 2,375 ms). Recall@10 stays at 0.992–0.998. Always using the HNSW index would take 6–16 s. Against an oracle that knows the fastest plan per query with recall ≥ 0.9, the planner spends 1.3–1.6× more time in total.</p>
+  <p>Two refinements made that gap small. The first measures selectivity near the query. Planning on global selectivity alone, 100 TREC-COVID queries took 328 ms against an oracle's 48 ms. A 32-neighbour sample brought that to 61 ms. On Quora, though, it still sent far-topic 10% filters into 60–100 ms graph walks where a 5 ms scan sufficed: 1,076 ms in total. A second, 160-neighbour sample, taken when the first finds at most one match, brought Quora to 451 ms. The second refinement costs post-filtering with the smaller of the global and local selectivity, since its candidate pool is sized from the global one.</p>
+  <p>For BM25 with filters, and for structured filters alone, geometric-mean regret is 1.07–1.30. Range filters choose between a zone-map scan and histogram bucket postings, and filtered BM25 chooses between driving scoring from the filter and probing it. On IVF, the planner leans on the index and gets recall 0.93; an oracle limited to recall ≥ 0.9 must spend more, which is why the IVF rows show the planner faster than that oracle.</p>
 </div>
 <div class="wide" id="planner-table"></div>
 
 <div class="col">
   <h3 id="r-storage">Transactions and storage</h3>
-  <!--NARR-STORAGE-->
+    <p>A durable single-document commit is one WAL append and one <code>fsync</code>: 0.27 ms at the median, 3,190 commits per second. Batching amortises the sync. With 1,000 documents per transaction, the WAL takes 87,000 documents per second. Without <code>fsync</code> it takes 155,000–269,000; a process crash still loses nothing then, but a power failure may lose recent commits.</p>
 </div>
 <figure class="narrow">
   <div class="frame">
@@ -80,5 +91,10 @@
   </div>
 </figure>
 <div class="col">
-  <!--NARR-STORAGE2-->
+    <ul>
+    <li><b>Read your writes.</b> Committed documents are searchable at once. The first query after a write rebuilds the memtable's last 1,024-document chunk with every index of the evaluation table, which takes 31–39 ms. An unchunked memtable of 10,000 documents takes 411 ms. Later queries reuse the chunk, and taking a snapshot costs 0.1–0.2 µs.</li>
+    <li><b>Opening a database</b> reads the meta slots, the manifest and each segment's directory. Cold, that takes 3.3 ms for 10 segments, 13 ms for 100 and 123 ms for 994 (8 ms warm). Replaying 10,000 WAL documents takes 63 ms at open, plus 369 ms to index them at the first query.</li>
+    <li><b>Merges.</b> A tiered merge of eight 5,000-document segments, 10% of them deleted, rebuilds every index in 2.2 s, about 16,000 documents per second. After a delete-heavy workload the file is 1.22× its compacted size until <code>vacuum</code>.</li>
+    <li><b>Recovery.</b> The crash test kills a writer process with SIGKILL at a random moment during inserts, deletes, commits and flushes, then reopens. Every restart recovered a committed prefix: 20 runs by default, and 60 and 80 in longer runs. A damaged meta slot falls back to the other one.</li>
+  </ul>
 </div>

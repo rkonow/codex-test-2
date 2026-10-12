@@ -4,24 +4,29 @@
     {
       "first": "27797 · ",
       "label": "phrase, boolean and negation",
-      "ms": 1.688374,
-      "plan": [],
+      "ms": 1.79494,
+      "plan": [
+        "seg 0: filter materialised, 5 docs"
+      ],
       "rows": 5,
       "sql": "SELECT id, title FROM docs WHERE MATCH(body, '\"how do i\" AND (learn OR study) -money') LIMIT 10"
     },
     {
       "first": "48",
       "label": "prefix and conjunction",
-      "ms": 0.048969,
-      "plan": [],
+      "ms": 0.062408000000000005,
+      "plan": [
+        "seg 0: filter materialised, 48 docs"
+      ],
       "rows": 1,
       "sql": "SELECT COUNT(*) FROM docs WHERE MATCH(body, 'progr* AND language')"
     },
     {
       "first": "593621 · 16.6392",
       "label": "ranked text, OR / NOT filter",
-      "ms": 0.2278,
+      "ms": 0.264683,
       "plan": [
+        "seg 0: filter materialised, 14433 docs",
         "seg 0: bm25 MaxScore, filter Materialize"
       ],
       "rows": 10,
@@ -30,7 +35,7 @@
     {
       "first": "507445 · 0.5992",
       "label": "filtered vector, OR filter",
-      "ms": 0.260952,
+      "ms": 0.33402,
       "plan": [
         "seg 0: selectivity 0.1487 global, 0.1061 near the query",
         "seg 0: vector PostFilter (PostFilter ran), filter Probe"
@@ -41,8 +46,9 @@
     {
       "first": "15631 · 1.0000",
       "label": "filtered hybrid, weighted",
-      "ms": 1.434318,
+      "ms": 1.677314,
       "plan": [
+        "seg 0: filter materialised, 10524 docs",
         "seg 0: bm25 MaxScore, filter Materialize",
         "seg 0: vector PreFilter (PreFilter ran), filter Materialize",
         "weighted: 163 candidates (top-depth union), MinMax"
@@ -53,8 +59,9 @@
     {
       "first": "15631 · 0.0328",
       "label": "hybrid, RRF on a correlated filter",
-      "ms": 0.870677,
+      "ms": 1.622603,
       "plan": [
+        "seg 0: filter materialised, 3577 docs",
         "seg 0: bm25 MaxScore, filter Materialize",
         "seg 0: vector PreFilter (PreFilter ran), filter Materialize",
         "rrf: 2 inputs, depth 100, k 60"
@@ -65,8 +72,9 @@
     {
       "first": "t28 · 55",
       "label": "facets over a text match",
-      "ms": 0.054442,
+      "ms": 0.071928,
       "plan": [
+        "seg 0: filter materialised, 232 docs",
         "seg 0: facet Codes over 232 docs"
       ],
       "rows": 5,
@@ -75,24 +83,29 @@
     {
       "first": "89161 · 4.9500",
       "label": "text filter, ordered by a column",
-      "ms": 0.07681199999999999,
-      "plan": [],
+      "ms": 0.127362,
+      "plan": [
+        "seg 0: filter materialised, 30 docs"
+      ],
       "rows": 5,
       "sql": "SELECT id, rating FROM docs WHERE MATCH(body, 'travel AND visa') ORDER BY rating DESC, id LIMIT 5"
     },
     {
       "first": "65",
       "label": "count over a boolean and a range",
-      "ms": 0.033497,
-      "plan": [],
+      "ms": 0.065051,
+      "plan": [
+        "seg 0: filter materialised, 65 docs"
+      ],
       "rows": 1,
       "sql": "SELECT COUNT(*) FROM docs WHERE MATCH(body, 'iphone OR android') AND rating BETWEEN 2 AND 3"
     },
     {
       "first": "523058",
       "label": "nearest by distance, exact",
-      "ms": 1.36886,
+      "ms": 2.98509,
       "plan": [
+        "seg 0: filter materialised, 25396 docs",
         "seg 0: vector PreFilter (PreFilter ran), filter Materialize"
       ],
       "rows": 10,
