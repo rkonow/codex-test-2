@@ -322,6 +322,8 @@ pub struct QueryConfig {
     pub max_terms: usize,
     /// Only lists with at least this many postings are used as query terms.
     pub min_list_len: usize,
+    /// Only lists with at most this many postings are used as query terms.
+    pub max_list_len: Option<usize>,
     pub mode: QueryMode,
     pub seed: u64,
 }
@@ -330,7 +332,10 @@ pub struct QueryConfig {
 pub fn generate_queries(coll: &Collection, cfg: &QueryConfig) -> Vec<Vec<u32>> {
     let mut rng = StdRng::seed_from_u64(cfg.seed);
     let eligible: Vec<u32> = (0..coll.lists.len() as u32)
-        .filter(|&t| coll.lists[t as usize].len() >= cfg.min_list_len.max(1))
+        .filter(|&t| {
+            let n = coll.lists[t as usize].len();
+            n >= cfg.min_list_len.max(1) && cfg.max_list_len.is_none_or(|m| n <= m)
+        })
         .collect();
     assert!(
         eligible.len() >= cfg.max_terms,
@@ -427,7 +432,15 @@ mod tests {
             }
             let q = generate_queries(
                 &c,
-                &QueryConfig { num: 50, min_terms: 2, max_terms: 4, min_list_len: 100, mode: QueryMode::Cooccur, seed: 3 },
+                &QueryConfig {
+                    num: 50,
+                    min_terms: 2,
+                    max_terms: 4,
+                    min_list_len: 100,
+                    max_list_len: None,
+                    mode: QueryMode::Cooccur,
+                    seed: 3,
+                },
             );
             assert_eq!(q.len(), 50);
             for q in &q {

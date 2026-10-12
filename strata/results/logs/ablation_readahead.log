@@ -1,0 +1,26 @@
+== trec-covid
+   built in 63.6s (0.1s here), 1031.1 MiB
+   bm25            warm p50 0.576 ms, cold p50 3.29 ms
+   and2            warm p50 0.093 ms, cold p50 1.09 ms
+   and3            warm p50 0.117 ms, cold p50 1.54 ms
+   or3             warm p50 0.247 ms, cold p50 1.61 ms
+   filter          warm p50 0.544 ms, cold p50 3.04 ms
+   filtered_bm25   warm p50 0.375 ms, cold p50 3.76 ms
+   vector          warm p50 0.135 ms, cold p50 82.60 ms
+   filtered_vector warm p50 0.280 ms, cold p50 86.89 ms
+   hybrid          warm p50 1.394 ms, cold p50 106.64 ms
+   filtered_hybrid warm p50 1.088 ms, cold p50 117.43 ms
+   facet           warm p50 0.099 ms, cold p50 1.13 ms
+== quora
+   built in 242.5s (0.2s here), 2689.0 MiB
+   bm25            warm p50 0.173 ms, cold p50 3.49 ms
+   and2            warm p50 0.048 ms, cold p50 2.18 ms
+   and3            warm p50 0.071 ms, cold p50 1.58 ms
+   or3             warm p50 0.130 ms, cold p50 1.62 ms
+   filter          warm p50 1.653 ms, cold p50 9.82 ms
+   filtered_bm25   warm p50 0.377 ms, cold p50 5.03 ms
+   vector          warm p50 0.214 ms, cold p50 113.36 ms
+   filtered_vector warm p50 0.683 ms, cold p50 175.25 ms
+   hybrid          warm p50 0.830 ms, cold p50 165.31 ms
+   filtered_hybrid warm p50 1.775 ms, cold p50 304.73 ms
+   facet           warm p50 0.044 ms, cold p50 1.28 ms

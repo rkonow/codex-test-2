@@ -1,0 +1,171 @@
+quora: 522931 documents, 10000 queries, 1024 dimensions
+ground truth: cached (secs 0.0)
+exact dense retrieval nDCG@10 0.8872 over 10000 judged queries
+filter cases and exact filtered top-10: 22.1s
+flat: built in 3.0s (written in 12.0s, 2553.4 MiB), peak RSS 2776 MiB
+float32 re-rank of a random document: 315 ns
+kernels (1024d): f32 47.6 ns, sq8 vnni 11.9 ns (x4 7.6 ns/row), sq8 asym 49.3 ns, sq8 scalar 82.4 ns; SQ8-only recall@10 vnni 0.9980 asym 0.9980
+  flat rerank=10: recall@10 0.9960, mean 40138 us, p99 57907 us, sq8 522931
+  flat rerank=20: recall@10 1.0000, mean 40157 us, p99 56955 us, sq8 522931
+  flat rerank=40: recall@10 1.0000, mean 39824 us, p99 58142 us, sq8 522931
+  flat warm: 40371 us without hints, 46507 us with
+  flat cold (normal): mean 231954 us, p50 217001 us, pages 131853
+  flat cold (random): mean 5507892 us, p50 5377864 us, pages 130776
+  flat cold (random + hints): mean 251854 us, p50 256152 us, pages 130776
+ivf: built in 53.8s (written in 14.4s, 3069.0 MiB), peak RSS 3302 MiB
+  ivf nprobe=1: recall@10 0.5918, mean 179 us, p99 329 us, sq8 244
+  ivf nprobe=2: recall@10 0.7179, mean 188 us, p99 280 us, sq8 466
+  ivf nprobe=4: recall@10 0.8070, mean 217 us, p99 328 us, sq8 892
+  ivf nprobe=8: recall@10 0.8615, mean 252 us, p99 351 us, sq8 1718
+  ivf nprobe=16: recall@10 0.9044, mean 405 us, p99 609 us, sq8 3318
+  ivf nprobe=32: recall@10 0.9361, mean 620 us, p99 970 us, sq8 6444
+  ivf nprobe=64: recall@10 0.9595, mean 1058 us, p99 1720 us, sq8 12533
+  ivf nprobe=128: recall@10 0.9771, mean 1929 us, p99 2869 us, sq8 24579
+  ivf nprobe=256: recall@10 0.9885, mean 3754 us, p99 5915 us, sq8 48326
+  ivf warm: 629 us without hints, 726 us with
+  ivf random s=0.0010 prefilter     recall@10 1.0000 mean       23 us (est       42) ran {"prefilter": 200}
+  ivf random s=0.0010 postfilter    recall@10 1.0000 mean    41310 us (est    29479) ran {"postfilter": 200}
+  ivf random s=0.0010 ivf           recall@10 0.9610 mean      484 us (est      663) ran {"ivf": 200}
+  ivf random s=0.0029 prefilter     recall@10 1.0000 mean       78 us (est       77) ran {"prefilter": 200}
+  ivf random s=0.0029 postfilter    recall@10 1.0000 mean    39308 us (est    29441) ran {"postfilter": 200}
+  ivf random s=0.0029 ivf           recall@10 0.9525 mean      371 us (est      447) ran {"ivf": 200}
+  ivf random s=0.0091 prefilter     recall@10 1.0000 mean      272 us (est      186) ran {"prefilter": 200}
+  ivf random s=0.0091 postfilter    recall@10 0.9965 mean    23842 us (est    17979) ran {"postfilter": 200}
+  ivf random s=0.0091 ivf           recall@10 0.9450 mean      325 us (est      326) ran {"ivf": 200}
+  ivf random s=0.0292 prefilter     recall@10 1.0000 mean      763 us (est      544) ran {"prefilter": 200}
+  ivf random s=0.0292 postfilter    recall@10 0.9820 mean     7635 us (est     5687) ran {"postfilter": 200}
+  ivf random s=0.0292 ivf           recall@10 0.9380 mean      368 us (est      267) ran {"ivf": 200}
+  ivf random s=0.0990 prefilter     recall@10 1.0000 mean     2778 us (est     1785) ran {"prefilter": 200}
+  ivf random s=0.0990 postfilter    recall@10 0.9530 mean     2504 us (est     1778) ran {"postfilter": 200}
+  ivf random s=0.0990 ivf           recall@10 0.9270 mean      389 us (est      251) ran {"ivf": 200}
+  ivf random s=0.2992 prefilter     recall@10 1.0000 mean    10782 us (est     5345) ran {"prefilter": 200}
+  ivf random s=0.2992 postfilter    recall@10 0.9255 mean     1079 us (est      684) ran {"postfilter": 200}
+  ivf random s=0.2992 ivf           recall@10 0.9280 mean      520 us (est      276) ran {"ivf": 200}
+  ivf random s=1.0000 prefilter     recall@10 1.0000 mean    39192 us (est    17804) ran {"prefilter": 200}
+  ivf random s=1.0000 postfilter    recall@10 0.9330 mean      589 us (est      462) ran {"postfilter": 200}
+  ivf random s=1.0000 ivf           recall@10 0.9330 mean      538 us (est      350) ran {"ivf": 200}
+  ivf random s=0.0010 auto          recall@10 1.0000 mean       22 us (est       42) ran {"prefilter": 200}
+  ivf random s=0.0029 auto          recall@10 1.0000 mean       70 us (est       77) ran {"prefilter": 200}
+  ivf random s=0.0091 auto          recall@10 1.0000 mean      292 us (est      186) ran {"prefilter": 200}
+  ivf random s=0.0292 auto          recall@10 0.9380 mean      357 us (est      267) ran {"ivf": 200}
+  ivf random s=0.0990 auto          recall@10 0.9270 mean      350 us (est      251) ran {"ivf": 200}
+  ivf random s=0.2992 auto          recall@10 0.9280 mean      456 us (est      276) ran {"ivf": 200}
+  ivf random s=1.0000 auto          recall@10 0.9330 mean      592 us (est      350) ran {"ivf": 200}
+  ivf topic s=0.0010 prefilter     recall@10 1.0000 mean       68 us (est       43) ran {"prefilter": 200}
+  ivf topic s=0.0010 postfilter    recall@10 1.0000 mean    45255 us (est    29478) ran {"postfilter": 200}
+  ivf topic s=0.0010 ivf           recall@10 0.9150 mean      328 us (est      656) ran {"ivf": 200}
+  ivf topic s=0.0010 auto          recall@10 1.0000 mean       54 us (est       43) ran {"prefilter": 200}
+  ivf topic s=0.0030 prefilter     recall@10 1.0000 mean      116 us (est       78) ran {"prefilter": 200}
+  ivf topic s=0.0030 postfilter    recall@10 1.0000 mean    44468 us (est    29441) ran {"postfilter": 200}
+  ivf topic s=0.0030 ivf           recall@10 0.8940 mean      390 us (est      445) ran {"ivf": 200}
+  ivf topic s=0.0030 auto          recall@10 1.0000 mean      241 us (est       78) ran {"prefilter": 200}
+  ivf topic s=0.0100 prefilter     recall@10 1.0000 mean      621 us (est      202) ran {"prefilter": 200}
+  ivf topic s=0.0100 postfilter    recall@10 0.9995 mean    30334 us (est    16385) ran {"postfilter": 200}
+  ivf topic s=0.0100 ivf           recall@10 0.9125 mean      311 us (est      320) ran {"ivf": 200}
+  ivf topic s=0.0100 auto          recall@10 1.0000 mean      361 us (est      202) ran {"prefilter": 200}
+  ivf topic s=0.0300 prefilter     recall@10 1.0000 mean     1045 us (est      558) ran {"prefilter": 200}
+  ivf topic s=0.0300 postfilter    recall@10 0.9900 mean    14466 us (est     5550) ran {"postfilter": 200}
+  ivf topic s=0.0300 ivf           recall@10 0.9175 mean      478 us (est      266) ran {"ivf": 200}
+  ivf topic s=0.0300 auto          recall@10 0.9175 mean      437 us (est      266) ran {"ivf": 200}
+  ivf topic s=0.1000 prefilter     recall@10 1.0000 mean     3419 us (est     1803) ran {"prefilter": 200}
+  ivf topic s=0.1000 postfilter    recall@10 0.9740 mean     5606 us (est     1764) ran {"postfilter": 200}
+  ivf topic s=0.1000 ivf           recall@10 0.9355 mean      559 us (est      252) ran {"ivf": 200}
+  ivf topic s=0.1000 auto          recall@10 0.9355 mean      493 us (est      252) ran {"ivf": 200}
+  ivf topic s=0.3000 prefilter     recall@10 1.0000 mean    11250 us (est     5358) ran {"prefilter": 200}
+  ivf topic s=0.3000 postfilter    recall@10 0.9545 mean     1073 us (est      684) ran {"postfilter": 200}
+  ivf topic s=0.3000 ivf           recall@10 0.9390 mean      626 us (est      276) ran {"ivf": 200}
+  ivf topic s=0.3000 auto          recall@10 0.9390 mean      559 us (est      276) ran {"ivf": 200}
+  ivf topic s=1.0000 prefilter     recall@10 1.0000 mean    40011 us (est    17804) ran {"prefilter": 200}
+  ivf topic s=1.0000 postfilter    recall@10 0.9330 mean      614 us (est      462) ran {"postfilter": 200}
+  ivf topic s=1.0000 ivf           recall@10 0.9330 mean      632 us (est      350) ran {"ivf": 200}
+  ivf topic s=1.0000 auto          recall@10 0.9330 mean      693 us (est      350) ran {"ivf": 200}
+  ivf cold (normal): mean 16527 us, p50 15149 us, pages 5278
+  ivf cold (random): mean 88626 us, p50 92159 us, pages 2409
+  ivf cold (random + hints): mean 7935 us, p50 8219 us, pages 2409
+hnsw: built in 200.7s (written in 12.3s, 2619.5 MiB), peak RSS 3302 MiB
+  hnsw ef=10: recall@10 0.9287, mean 61 us, p99 154 us, sq8 337
+  hnsw ef=16: recall@10 0.9619, mean 60 us, p99 134 us, sq8 426
+  hnsw ef=24: recall@10 0.9759, mean 73 us, p99 119 us, sq8 538
+  hnsw ef=32: recall@10 0.9813, mean 95 us, p99 158 us, sq8 647
+  hnsw ef=48: recall@10 0.9869, mean 117 us, p99 178 us, sq8 859
+  hnsw ef=64: recall@10 0.9906, mean 134 us, p99 189 us, sq8 1062
+  hnsw ef=96: recall@10 0.9929, mean 186 us, p99 247 us, sq8 1453
+  hnsw ef=128: recall@10 0.9936, mean 232 us, p99 336 us, sq8 1830
+  hnsw ef=256: recall@10 0.9954, mean 404 us, p99 587 us, sq8 3245
+  hnsw warm: 134 us without hints, 484 us with
+  hnsw random s=0.0010 prefilter     recall@10 1.0000 mean       35 us (est       42) ran {"prefilter": 200}
+  hnsw random s=0.0010 postfilter    recall@10 0.9960 mean    22452 us (est    18346) ran {"postfilter": 200}
+  hnsw random s=0.0010 hnsw-traverse recall@10 0.9994 mean    55319 us (est    59111) ran {"hnsw": 181}
+  hnsw random s=0.0010 hnsw-twohop   recall@10 0.0245 mean       27 us (est    59111) ran {"hnsw": 200}
+  hnsw random s=0.0029 prefilter     recall@10 1.0000 mean      114 us (est       77) ran {"prefilter": 200}
+  hnsw random s=0.0029 postfilter    recall@10 0.9965 mean     8400 us (est     6111) ran {"postfilter": 200}
+  hnsw random s=0.0029 hnsw-traverse recall@10 0.9980 mean    20593 us (est    23612) ran {"hnsw": 200}
+  hnsw random s=0.0029 hnsw-twohop   recall@10 0.1050 mean      121 us (est    23612) ran {"hnsw": 200}
+  hnsw random s=0.0091 prefilter     recall@10 1.0000 mean      275 us (est      186) ran {"prefilter": 200}
+  hnsw random s=0.0091 postfilter    recall@10 0.9930 mean     2875 us (est     2001) ran {"postfilter": 200}
+  hnsw random s=0.0091 hnsw-traverse recall@10 0.9985 mean     7836 us (est     7657) ran {"hnsw": 200}
+  hnsw random s=0.0091 hnsw-twohop   recall@10 0.5890 mean      350 us (est     7657) ran {"hnsw": 200}
+  hnsw random s=0.0292 prefilter     recall@10 1.0000 mean      916 us (est      544) ran {"prefilter": 200}
+  hnsw random s=0.0292 postfilter    recall@10 0.9910 mean     1049 us (est      646) ran {"postfilter": 200}
+  hnsw random s=0.0292 hnsw-traverse recall@10 0.9985 mean     2894 us (est     2398) ran {"hnsw": 200}
+  hnsw random s=0.0292 hnsw-twohop   recall@10 0.8855 mean      435 us (est     2398) ran {"hnsw": 200}
+  hnsw random s=0.0990 prefilter     recall@10 1.0000 mean     3184 us (est     1785) ran {"prefilter": 200}
+  hnsw random s=0.0990 postfilter    recall@10 0.9890 mean      404 us (est      215) ran {"postfilter": 200}
+  hnsw random s=0.0990 hnsw-traverse recall@10 0.9990 mean      968 us (est      725) ran {"hnsw": 200}
+  hnsw random s=0.0990 hnsw-twohop   recall@10 0.9800 mean      432 us (est      725) ran {"hnsw": 200}
+  hnsw random s=0.2992 prefilter     recall@10 1.0000 mean     8177 us (est     5345) ran {"prefilter": 200}
+  hnsw random s=0.2992 postfilter    recall@10 0.9820 mean      147 us (est       95) ran {"postfilter": 200}
+  hnsw random s=0.2992 hnsw-traverse recall@10 0.9920 mean      354 us (est      256) ran {"hnsw": 200}
+  hnsw random s=0.2992 hnsw-twohop   recall@10 0.9880 mean      361 us (est      256) ran {"hnsw": 200}
+  hnsw random s=1.0000 prefilter     recall@10 1.0000 mean    37988 us (est    17804) ran {"prefilter": 200}
+  hnsw random s=1.0000 postfilter    recall@10 0.9900 mean      136 us (est       92) ran {"postfilter": 200}
+  hnsw random s=1.0000 hnsw-traverse recall@10 0.9900 mean      132 us (est       94) ran {"hnsw": 200}
+  hnsw random s=1.0000 hnsw-twohop   recall@10 0.9900 mean      133 us (est       94) ran {"hnsw": 200}
+  hnsw random s=0.0010 auto          recall@10 1.0000 mean       25 us (est       42) ran {"prefilter": 200}
+  hnsw random s=0.0029 auto          recall@10 1.0000 mean       78 us (est       77) ran {"prefilter": 200}
+  hnsw random s=0.0091 auto          recall@10 1.0000 mean      271 us (est      186) ran {"prefilter": 200}
+  hnsw random s=0.0292 auto          recall@10 1.0000 mean      792 us (est      544) ran {"prefilter": 200}
+  hnsw random s=0.0990 auto          recall@10 0.9890 mean      333 us (est      215) ran {"postfilter": 200}
+  hnsw random s=0.2992 auto          recall@10 0.9820 mean      126 us (est       95) ran {"postfilter": 200}
+  hnsw random s=1.0000 auto          recall@10 0.9900 mean      126 us (est       92) ran {"postfilter": 200}
+  hnsw topic s=0.0010 prefilter     recall@10 1.0000 mean       49 us (est       43) ran {"prefilter": 200}
+  hnsw topic s=0.0010 postfilter    recall@10 0.9955 mean    25410 us (est    17868) ran {"postfilter": 200}
+  hnsw topic s=0.0010 hnsw-traverse recall@10 0.9975 mean    19589 us (est    58071) ran {"hnsw": 200}
+  hnsw topic s=0.0010 hnsw-twohop   recall@10 0.5575 mean      290 us (est    58071) ran {"hnsw": 200}
+  hnsw topic s=0.0010 auto          recall@10 1.0000 mean       48 us (est       43) ran {"prefilter": 200}
+  hnsw topic s=0.0030 prefilter     recall@10 1.0000 mean      123 us (est       78) ran {"prefilter": 200}
+  hnsw topic s=0.0030 postfilter    recall@10 0.9960 mean    10205 us (est     6016) ran {"postfilter": 200}
+  hnsw topic s=0.0030 hnsw-traverse recall@10 0.9980 mean     8126 us (est    23242) ran {"hnsw": 200}
+  hnsw topic s=0.0030 hnsw-twohop   recall@10 0.7535 mean      288 us (est    23242) ran {"hnsw": 200}
+  hnsw topic s=0.0030 auto          recall@10 1.0000 mean      103 us (est       78) ran {"prefilter": 200}
+  hnsw topic s=0.0100 prefilter     recall@10 1.0000 mean      336 us (est      202) ran {"prefilter": 200}
+  hnsw topic s=0.0100 postfilter    recall@10 0.9905 mean     4468 us (est     1825) ran {"postfilter": 200}
+  hnsw topic s=0.0100 hnsw-traverse recall@10 0.9950 mean     3777 us (est     6974) ran {"hnsw": 200}
+  hnsw topic s=0.0100 hnsw-twohop   recall@10 0.8970 mean      411 us (est     6974) ran {"hnsw": 200}
+  hnsw topic s=0.0100 auto          recall@10 1.0000 mean      367 us (est      202) ran {"prefilter": 200}
+  hnsw topic s=0.0300 prefilter     recall@10 1.0000 mean     1173 us (est      558) ran {"prefilter": 200}
+  hnsw topic s=0.0300 postfilter    recall@10 0.9875 mean     2121 us (est      631) ran {"postfilter": 200}
+  hnsw topic s=0.0300 hnsw-traverse recall@10 0.9925 mean     1926 us (est     2337) ran {"hnsw": 200}
+  hnsw topic s=0.0300 hnsw-twohop   recall@10 0.9335 mean      372 us (est     2337) ran {"hnsw": 200}
+  hnsw topic s=0.0300 auto          recall@10 1.0000 mean     1333 us (est      558) ran {"prefilter": 200}
+  hnsw topic s=0.1000 prefilter     recall@10 1.0000 mean     3591 us (est     1803) ran {"prefilter": 200}
+  hnsw topic s=0.1000 postfilter    recall@10 0.9890 mean      792 us (est      214) ran {"postfilter": 200}
+  hnsw topic s=0.1000 hnsw-traverse recall@10 0.9915 mean      614 us (est      718) ran {"hnsw": 200}
+  hnsw topic s=0.1000 hnsw-twohop   recall@10 0.9860 mean      422 us (est      718) ran {"hnsw": 200}
+  hnsw topic s=0.1000 auto          recall@10 0.9890 mean      743 us (est      214) ran {"postfilter": 200}
+  hnsw topic s=0.3000 prefilter     recall@10 1.0000 mean    10186 us (est     5358) ran {"prefilter": 200}
+  hnsw topic s=0.3000 postfilter    recall@10 0.9860 mean      161 us (est       95) ran {"postfilter": 200}
+  hnsw topic s=0.3000 hnsw-traverse recall@10 0.9875 mean      180 us (est      256) ran {"hnsw": 200}
+  hnsw topic s=0.3000 hnsw-twohop   recall@10 0.9855 mean      266 us (est      256) ran {"hnsw": 200}
+  hnsw topic s=0.3000 auto          recall@10 0.9860 mean      199 us (est       95) ran {"postfilter": 200}
+  hnsw topic s=1.0000 prefilter     recall@10 1.0000 mean    38908 us (est    17804) ran {"prefilter": 200}
+  hnsw topic s=1.0000 postfilter    recall@10 0.9900 mean      161 us (est       92) ran {"postfilter": 200}
+  hnsw topic s=1.0000 hnsw-traverse recall@10 0.9900 mean      153 us (est       94) ran {"hnsw": 200}
+  hnsw topic s=1.0000 hnsw-twohop   recall@10 0.9900 mean      165 us (est       94) ran {"hnsw": 200}
+  hnsw topic s=1.0000 auto          recall@10 0.9900 mean      135 us (est       92) ran {"postfilter": 200}
+  hnsw cold (normal): mean 121514 us, p50 123688 us, pages 31440
+  hnsw cold (random): mean 65324 us, p50 54355 us, pages 1171
+  hnsw cold (random + hints): mean 15079 us, p50 14602 us, pages 1171
+cost model fit on 70 runs: CostModel { fixed_ns: 2397.6778024886185, scan_ns: 74.57401569078097, gather_ns: 54.45935359392769, rerank_ns: 314.6616, centroid_ns: 47.39520961851122, cluster_ns: 0.0, check_ns: 2.5029120511025473, node_ns: 881.2961492608912, hnsw_dist_a: 11.811099439648922, hnsw_dist_b: 270.77277529740303, hnsw_nodes_a: 0.9931603347599012, hnsw_nodes_b: 2.2381038190918616, post_margin: 2.0 }
+  median |error| fitted 7.5%, compiled-in 29.7%
+wrote results/vector/quora.json (783s, peak RSS 3302 MiB)

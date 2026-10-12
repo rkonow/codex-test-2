@@ -1,0 +1,93 @@
+== scifact
+   loaded 5183 documents, 300 queries (0.0s)
+   sqlite: built in 0.6s, 36.0 MiB (0.6s with reopen)
+   tantivy: built in 0.7s, 7.3 MiB (0.7s with reopen)
+   sqlite: running
+   bm25             n=300   x3 warm mean     3.902 p50     3.769 p99     9.111 ms | cold n=100 p50     6.765 ms, pages p50     73 | nDCG@10 0.6842
+   and2             n=300   x3 warm mean     0.087 p50     0.086 p99     0.180 ms | cold n=100 p50     1.017 ms, pages p50     34 | nDCG@10 -
+   and3             n=299   x3 warm mean     0.113 p50     0.106 p99     0.197 ms | cold n=100 p50     0.874 ms, pages p50     31 | nDCG@10 -
+   or3              n=299   x3 warm mean     0.129 p50     0.119 p99     0.264 ms | cold n=100 p50     0.949 ms, pages p50     36 | nDCG@10 -
+   filter           n=104   x3 warm mean     1.471 p50     0.781 p99     4.401 ms | cold n=100 p50    21.498 ms, pages p50    528 | nDCG@10 -
+   filtered_bm25    n=120   x3 warm mean     4.592 p50     4.158 p99    11.820 ms | cold n=100 p50    13.611 ms, pages p50    221 | nDCG@10 -
+   vector           n=300   x3 warm mean    12.164 p50    11.895 p99    15.276 ms | cold n=100 p50    26.661 ms, pages p50   7864 | nDCG@10 0.7181
+   filtered_vector  n=360   x3 warm mean     2.430 p50     1.238 p99     9.344 ms | cold n=100 p50    28.562 ms, pages p50   1581 | nDCG@10 -
+   hybrid           n=300   x3 warm mean    15.880 p50    15.645 p99    21.864 ms | cold n=100 p50    37.786 ms, pages p50   7876 | nDCG@10 0.7332
+   filtered_hybrid  n=360   x3 warm mean     9.318 p50     9.016 p99    19.433 ms | cold n=100 p50    99.632 ms, pages p50   2415 | nDCG@10 -
+   facet            n=300   x3 warm mean     0.435 p50     0.136 p99     2.821 ms | cold n=100 p50     2.796 ms, pages p50     73 | nDCG@10 -
+   tantivy: running
+   bm25             n=300   x3 warm mean     0.409 p50     0.380 p99     0.758 ms | cold n=100 p50     1.382 ms, pages p50    237 | nDCG@10 0.6866
+   and2             n=300   x3 warm mean     0.178 p50     0.243 p99     0.300 ms | cold n=100 p50     0.814 ms, pages p50    153 | nDCG@10 -
+   and3             n=299   x3 warm mean     0.099 p50     0.049 p99     0.321 ms | cold n=100 p50     0.726 ms, pages p50    166 | nDCG@10 -
+   or3              n=299   x3 warm mean     0.283 p50     0.276 p99     0.370 ms | cold n=100 p50     0.914 ms, pages p50    170 | nDCG@10 -
+   filter           n=104   x3 warm mean     0.316 p50     0.326 p99     0.496 ms | cold n=100 p50     0.476 ms, pages p50      1 | nDCG@10 -
+   filtered_bm25    n=120   x3 warm mean     0.383 p50     0.389 p99     0.732 ms | cold n=100 p50     1.355 ms, pages p50    222 | nDCG@10 -
+   facet            n=300   x3 warm mean     0.015 p50     0.012 p99     0.037 ms | cold n=100 p50     0.514 ms, pages p50    130 | nDCG@10 -
+   agreement bm25           {"differing_counts":[],"mean_overlap":0.9230000000000016,"queries":300,"same_count":null,"same_facets":null,"same_ids":0.10333333333333333}
+   agreement and2           {"differing_counts":[[300,68,70],[302,46,45],[306,15,14],[312,17,18],[316,52,63],[338,3,4],[339,10,12],[347,53,80],[353,1,2],[373,58,89]],"mean_overlap":0.9721666666666666,"queries":300,"same_count":0.8933333333333333,"same_facets":null,"same_ids":0.91}
+   agreement and3           {"differing_counts":[[600,2,1],[603,2,0],[648,9,10],[727,73,88],[732,5,15],[746,6,7],[751,11,12],[768,1,0],[770,2,0],[779,13,11]],"mean_overlap":0.9834687052078357,"queries":299,"same_count":0.959866220735786,"same_facets":null,"same_ids":0.9632107023411371}
+   agreement or3            {"differing_counts":[[901,1574,1618],[905,1780,2040],[911,390,379],[915,27,26],[917,1524,1525],[920,1257,1707],[926,1572,1615],[932,2090,2131],[935,1095,1408],[939,935,303]],"mean_overlap":0.9876254180602007,"queries":299,"same_count":0.7993311036789298,"same_facets":null,"same_ids":0.9364548494983278}
+   agreement filter         {"differing_counts":[],"mean_overlap":1.0,"queries":104,"same_count":1.0,"same_facets":null,"same_ids":1.0}
+   agreement filtered_bm25  {"differing_counts":[],"mean_overlap":0.9533928571428576,"queries":120,"same_count":null,"same_facets":null,"same_ids":0.275}
+   agreement facet          {"differing_counts":[],"mean_overlap":1.0,"queries":300,"same_count":null,"same_facets":0.94,"same_ids":1.0}
+== fiqa
+   loaded 57638 documents, 648 queries (0.3s)
+   sqlite: built in 4.5s, 310.5 MiB (4.6s with reopen)
+   tantivy: built in 4.6s, 47.4 MiB (4.6s with reopen)
+   sqlite: running
+   bm25             n=648   x3 warm mean    22.086 p50    19.981 p99    57.891 ms | cold n=100 p50    34.551 ms, pages p50    253 | nDCG@10 0.2537
+   and2             n=300   x3 warm mean     0.241 p50     0.191 p99     0.759 ms | cold n=100 p50     1.538 ms, pages p50     32 | nDCG@10 -
+   and3             n=300   x3 warm mean     0.393 p50     0.379 p99     0.909 ms | cold n=100 p50     2.525 ms, pages p50     41 | nDCG@10 -
+   or3              n=300   x3 warm mean     0.745 p50     0.672 p99     2.026 ms | cold n=100 p50     2.877 ms, pages p50     34 | nDCG@10 -
+   filter           n=100   x3 warm mean    18.369 p50    10.982 p99    60.509 ms | cold n=100 p50   196.417 ms, pages p50   5177 | nDCG@10 -
+   filtered_bm25    n=120   x3 warm mean    24.584 p50    20.451 p99    61.655 ms | cold n=100 p50    58.256 ms, pages p50    702 | nDCG@10 -
+   vector           n=648   x1 warm mean   139.825 p50   137.590 p99   177.246 ms | cold n=100 p50   372.326 ms, pages p50  72814 | nDCG@10 0.4214
+   filtered_vector  n=360   x3 warm mean    35.005 p50    17.141 p99   132.076 ms | cold n=100 p50   351.485 ms, pages p50  16019 | nDCG@10 -
+   hybrid           n=648   x1 warm mean   177.260 p50   170.679 p99   257.780 ms | cold n=100 p50   448.265 ms, pages p50  72870 | nDCG@10 0.3636
+   filtered_hybrid  n=360   x2 warm mean    76.983 p50    65.098 p99   171.209 ms | cold n=93  p50   530.256 ms, pages p50  18706 | nDCG@10 -
+   facet            n=300   x3 warm mean     3.841 p50     1.386 p99    22.263 ms | cold n=100 p50    23.713 ms, pages p50    700 | nDCG@10 -
+   tantivy: running
+   bm25             n=648   x3 warm mean     0.822 p50     0.720 p99     1.992 ms | cold n=100 p50     2.490 ms, pages p50    479 | nDCG@10 0.2513
+   and2             n=300   x3 warm mean     0.405 p50     0.419 p99     0.649 ms | cold n=100 p50     1.446 ms, pages p50    264 | nDCG@10 -
+   and3             n=300   x3 warm mean     0.322 p50     0.383 p99     0.595 ms | cold n=100 p50     1.331 ms, pages p50    313 | nDCG@10 -
+   or3              n=300   x3 warm mean     0.479 p50     0.463 p99     0.649 ms | cold n=100 p50     1.465 ms, pages p50    311 | nDCG@10 -
+   filter           n=100   x3 warm mean     0.933 p50     0.765 p99     1.847 ms | cold n=100 p50     1.394 ms, pages p50    146 | nDCG@10 -
+   filtered_bm25    n=120   x3 warm mean     0.896 p50     0.778 p99     1.781 ms | cold n=100 p50     2.675 ms, pages p50    537 | nDCG@10 -
+   facet            n=300   x3 warm mean     0.054 p50     0.045 p99     0.182 ms | cold n=100 p50     0.809 ms, pages p50    212 | nDCG@10 -
+   agreement bm25           {"differing_counts":[],"mean_overlap":0.9182098765432064,"queries":648,"same_count":null,"same_facets":null,"same_ids":0.07407407407407407}
+   agreement and2           {"differing_counts":[[651,42,60],[659,99,100],[667,3052,3065],[679,15,13],[691,1539,1226],[700,308,324],[706,1151,1154],[715,3561,3560],[720,146,33],[723,42,46]],"mean_overlap":0.9803333333333334,"queries":300,"same_count":0.8733333333333333,"same_facets":null,"same_ids":0.94}
+   agreement and3           {"differing_counts":[[954,3,6],[961,462,470],[971,12,13],[974,1221,527],[975,35,31],[982,27,26],[984,233,235],[1002,270,241],[1003,1417,1421],[1011,2,3]],"mean_overlap":0.9744126984126984,"queries":300,"same_count":0.88,"same_facets":null,"same_ids":0.9166666666666666}
+   agreement or3            {"differing_counts":[[1252,8526,8523],[1254,11794,11775],[1255,7707,7800],[1261,7339,7337],[1262,5455,5453],[1263,11997,11998],[1264,3640,3748],[1267,13756,13757],[1269,17273,17321],[1270,41832,41822]],"mean_overlap":0.9846666666666668,"queries":300,"same_count":0.6533333333333333,"same_facets":null,"same_ids":0.9266666666666666}
+   agreement filter         {"differing_counts":[],"mean_overlap":1.0,"queries":100,"same_count":1.0,"same_facets":null,"same_ids":1.0}
+   agreement filtered_bm25  {"differing_counts":[],"mean_overlap":0.9396428571428582,"queries":120,"same_count":null,"same_facets":null,"same_ids":0.2}
+   agreement facet          {"differing_counts":[],"mean_overlap":1.0,"queries":300,"same_count":null,"same_facets":0.8766666666666667,"same_ids":1.0}
+== trec-covid
+   loaded 171332 documents, 50 queries (1.0s)
+   sqlite: built in 15.9s, 1014.1 MiB (16.1s with reopen)
+   tantivy: built in 18.2s, 179.7 MiB (18.2s with reopen)
+   sqlite: running
+   bm25             n=50    x3 warm mean   128.305 p50   130.330 p99   307.806 ms | cold n=50  p50   181.148 ms, pages p50    860 | nDCG@10 0.6407
+   and2             n=50    x3 warm mean     0.772 p50     0.654 p99     3.027 ms | cold n=50  p50     3.216 ms, pages p50     68 | nDCG@10 -
+   and3             n=49    x3 warm mean     1.062 p50     0.954 p99     2.640 ms | cold n=49  p50     4.629 ms, pages p50    109 | nDCG@10 -
+   or3              n=49    x3 warm mean     3.074 p50     3.103 p99     7.061 ms | cold n=49  p50     6.230 ms, pages p50     97 | nDCG@10 -
+   filter           n=100   x3 warm mean    64.016 p50    37.908 p99   207.561 ms | cold n=58  p50   703.956 ms, pages p50  16840 | nDCG@10 -
+   filtered_bm25    n=120   x3 warm mean   127.951 p50   130.170 p99   275.756 ms | cold n=100 p50   203.108 ms, pages p50   1454 | nDCG@10 -
+   vector           n=50    x2 warm mean   424.870 p50   424.585 p99   472.462 ms | cold n=31  p50  1913.799 ms, pages p50 239497 | nDCG@10 0.8178
+   filtered_vector  n=360   x1 warm mean   110.527 p50    49.546 p99   437.496 ms | cold n=42  p50  1050.012 ms, pages p50  55834 | nDCG@10 -
+   hybrid           n=50    x1 warm mean   563.090 p50   556.241 p99   943.451 ms | cold n=28  p50  2146.561 ms, pages p50 239782 | nDCG@10 0.8331
+   filtered_hybrid  n=360   x1 warm mean   293.940 p50   269.313 p99   549.722 ms | cold n=26  p50  2283.263 ms, pages p50  61528 | nDCG@10 -
+   facet            n=50    x3 warm mean    20.423 p50     9.691 p99    77.662 ms | cold n=50  p50   151.051 ms, pages p50   4688 | nDCG@10 -
+   tantivy: running
+   bm25             n=50    x3 warm mean     1.491 p50     1.130 p99     8.413 ms | cold n=50  p50     4.991 ms, pages p50    878 | nDCG@10 0.6668
+   and2             n=50    x3 warm mean     0.387 p50     0.331 p99     1.023 ms | cold n=50  p50     1.869 ms, pages p50    462 | nDCG@10 -
+   and3             n=49    x3 warm mean     0.440 p50     0.397 p99     0.953 ms | cold n=49  p50     2.286 ms, pages p50    554 | nDCG@10 -
+   or3              n=49    x3 warm mean     0.784 p50     0.788 p99     1.185 ms | cold n=49  p50     2.513 ms, pages p50    524 | nDCG@10 -
+   filter           n=100   x3 warm mean     1.494 p50     1.076 p99     4.040 ms | cold n=100 p50     2.615 ms, pages p50    552 | nDCG@10 -
+   filtered_bm25    n=120   x3 warm mean     2.210 p50     1.667 p99     5.379 ms | cold n=100 p50     5.590 ms, pages p50   1120 | nDCG@10 -
+   facet            n=50    x3 warm mean     0.187 p50     0.124 p99     0.867 ms | cold n=50  p50     1.148 ms, pages p50    311 | nDCG@10 -
+   agreement bm25           {"differing_counts":[],"mean_overlap":0.8759999999999999,"queries":50,"same_count":null,"same_facets":null,"same_ids":0.0}
+   agreement and2           {"differing_counts":[[50,836,1281],[51,6038,6033],[53,7750,7748],[61,264,236],[64,6331,6644],[66,2340,3076],[67,941,951],[71,3840,3763],[74,2015,2432],[80,9772,10093]],"mean_overlap":0.97,"queries":50,"same_count":0.78,"same_facets":null,"same_ids":0.88}
+   agreement and3           {"differing_counts":[[112,318,317],[115,384,398],[117,1088,1056],[122,363,377],[123,1817,1775],[126,421,420],[135,993,1216],[148,2063,2238]],"mean_overlap":0.9816326530612245,"queries":49,"same_count":0.8367346938775511,"same_facets":null,"same_ids":0.9183673469387755}
+   agreement or3            {"differing_counts":[[150,32711,32709],[151,67615,68578],[152,81857,81848],[154,70422,70408],[155,52330,55967],[158,19473,19476],[159,14855,14853],[161,67294,67295],[162,45809,47085],[163,70812,70802]],"mean_overlap":0.9918367346938775,"queries":49,"same_count":0.3673469387755102,"same_facets":null,"same_ids":0.9591836734693877}
+   agreement filter         {"differing_counts":[],"mean_overlap":1.0,"queries":100,"same_count":1.0,"same_facets":null,"same_ids":1.0}
+   agreement filtered_bm25  {"differing_counts":[],"mean_overlap":0.8775000000000005,"queries":120,"same_count":null,"same_facets":null,"same_ids":0.025}
+   agreement facet          {"differing_counts":[],"mean_overlap":1.0,"queries":50,"same_count":null,"same_facets":0.74,"same_ids":1.0}

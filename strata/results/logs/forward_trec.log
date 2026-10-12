@@ -1,0 +1,115 @@
+trec-covid: 171332 documents loaded in 0.6s
+built 123 MB in 1.4s
+  year     Int: column 6.77 bits/doc (values 6.00, zone maps 0.52), range lists 10.29 bits/doc
+  rating   Decimal(2): column 9.77 bits/doc (values 9.00, zone maps 0.52), range lists 11.24 bits/doc
+  seq      Int: column 12.25 bits/doc (values 11.49, zone maps 0.52), range lists 2.31 bits/doc
+  category 64 values: dict 452 B, codes 6.77 bits/doc, lists 10.57 + rare 0.01 bits/doc
+  topic    32 values: dict 228 B, codes 5.77 bits/doc, lists 10.01 + rare 0.01 bits/doc
+  tier     4 values: dict 24 B, codes 2.77 bits/doc, lists 4.08 + rare 0.00 bits/doc
+  id       171332 values: dict 2055988 B, codes 18.77 bits/doc, lists 0.00 + rare 32.00 bits/doc
+  store: 197.4 MB raw, 123.9 MB compressed (1.59x), 11417 blocks
+  year     2.84%: docset scan     65.3 us, postings      1.3 us (auto      1.7); count scan     45.0, postings      0.0 us
+  year     5.69%: docset scan     50.4 us, postings      7.7 us (auto     12.1); count scan     58.7, postings      0.1 us
+  year    11.58%: docset scan     43.0 us, postings     14.0 us (auto     14.5); count scan     44.4, postings      0.1 us
+  year    51.46%: docset scan     42.1 us, postings     61.8 us (auto     43.6); count scan     43.5, postings      0.2 us
+  rating   0.43%: docset scan     56.3 us, postings     31.3 us (auto     21.7); count scan     63.1, postings     24.7 us
+  rating   1.18%: docset scan     58.9 us, postings    103.3 us (auto     71.3); count scan     65.6, postings     69.5 us
+  rating  10.20%: docset scan     42.9 us, postings    103.8 us (auto     42.3); count scan     53.2, postings     52.8 us
+  rating  50.24%: docset scan     41.5 us, postings    142.3 us (auto     52.9); count scan     40.9, postings     49.9 us
+  seq      0.10%: docset scan      2.4 us, postings     19.4 us (auto      2.6); count scan      0.3, postings     22.1 us
+  seq      1.00%: docset scan      6.9 us, postings     40.9 us (auto      7.0); count scan      0.3, postings     39.5 us
+  seq     10.00%: docset scan      1.4 us, postings     64.6 us (auto      1.3); count scan      0.8, postings     52.0 us
+  seq     50.00%: docset scan      2.0 us, postings     90.3 us (auto      2.6); count scan      1.8, postings     80.2 us
+  probe column year in [2000, 2009]              sorted:   7.73 ns/candidate
+  probe column year in [2000, 2009]              random:   8.31 ns/candidate
+  probe column rating in [1, 2]                  sorted:   8.97 ns/candidate
+  probe column rating in [1, 2]                  random:   9.90 ns/candidate
+  probe pyramid category = c00                   sorted:   8.47 ns/candidate
+  probe pyramid category = c00                   random:  12.18 ns/candidate
+  probe pyramid category = c15                   sorted:  14.25 ns/candidate
+  probe pyramid category = c15                   random:  15.51 ns/candidate
+  probe pyramid topic = t00                      sorted:  13.15 ns/candidate
+  probe pyramid topic = t00                      random:  24.51 ns/candidate
+  probe pyramid tier = a (Flat chunks)           sorted:   8.50 ns/candidate
+  probe pyramid tier = a (Flat chunks)           random:  12.79 ns/candidate
+  probe codes tier = a                           sorted:   6.57 ns/candidate
+  probe codes tier = a                           random:   6.63 ns/candidate
+  probe codes category in 4 values               sorted:   7.85 ns/candidate
+  probe codes category in 4 values               random:   8.27 ns/candidate
+  probe docset bits year in [2000, 2009]         sorted:   1.42 ns/candidate
+  probe docset bits year in [2000, 2009]         random:   1.21 ns/candidate
+  probe docset sorted category = c15             sorted:  15.39 ns/candidate
+  probe docset sorted category = c15             random:  15.86 ns/candidate
+  category = c00  (  35874 docs): docs      1.1 us, filter   0.12 us
+  category = c17  (   2089 docs): docs      0.6 us, filter   0.12 us
+  category = c32  (   1096 docs): docs      0.5 us, filter   0.09 us
+  category = c62  (    558 docs): docs      0.4 us, filter   0.12 us
+  category IN  2 most frequent (  53929 docs):      3.7 us
+  category IN  2 least frequent (   1119 docs):      7.4 us
+  category IN  4 most frequent (  74660 docs):     13.0 us
+  category IN  4 least frequent (   2277 docs):      8.2 us
+  category IN  8 most frequent (  97730 docs):     27.7 us
+  category IN  8 least frequent (   4735 docs):     10.0 us
+  category IN 16 most frequent ( 121972 docs):     44.2 us
+  category IN 16 least frequent (  10234 docs):     11.5 us
+  topic = t19  (  10405 docs): docs      3.3 us, filter   0.11 us
+  topic = t07  (   6501 docs): docs      4.1 us, filter   0.12 us
+  topic = t08  (   5335 docs): docs      1.1 us, filter   0.09 us
+  topic = t20  (   2405 docs): docs      0.7 us, filter   0.09 us
+  topic IN  2 most frequent (  18796 docs):      9.2 us
+  topic IN  2 least frequent (   5248 docs):      8.9 us
+  topic IN  4 most frequent (  34882 docs):     19.7 us
+  topic IN  4 least frequent (  11390 docs):      9.3 us
+  topic IN  8 most frequent (  62316 docs):     38.2 us
+  topic IN  8 least frequent (  25667 docs):     19.0 us
+  topic IN 16 most frequent ( 109549 docs):     82.8 us
+  topic IN 16 least frequent (  61783 docs):     48.2 us
+  tier = a    (  68249 docs): docs      1.2 us, filter   0.09 us
+  tier = b    (  51369 docs): docs      1.1 us, filter   0.09 us
+  tier = c    (  34398 docs): docs      1.0 us, filter   0.09 us
+  tier = d    (  17316 docs): docs      3.1 us, filter   0.09 us
+  tier IN  2 most frequent ( 119618 docs):      2.2 us
+  tier IN  2 least frequent (  51714 docs):      3.9 us
+  tier IN  4 most frequent ( 171332 docs):      5.8 us
+  tier IN  4 least frequent ( 171332 docs):      5.8 us
+  facet category       16 docs (sorted): codes      0.1 us, postings     72.6 us, auto (Codes)      0.3 us
+  facet category      158 docs (sorted): codes      2.1 us, postings    123.4 us, auto (Codes)      2.1 us
+  facet category      845 docs (sorted): codes     11.1 us, postings    109.5 us, auto (Codes)      9.7 us
+  facet category     1797 docs (sorted): codes     23.5 us, postings    121.8 us, auto (Codes)     21.6 us
+  facet category     3510 docs (sorted): codes     24.7 us, postings     72.5 us, auto (Codes)     24.1 us
+  facet category     5175 docs (sorted): codes     36.3 us, postings     77.1 us, auto (Codes)     35.6 us
+  facet category     8641 docs (bits): codes     45.9 us, postings     64.9 us, auto (Codes)     47.6 us
+  facet category    17170 docs (bits): codes     42.4 us, postings     78.1 us, auto (Codes)     47.4 us
+  facet category    34436 docs (bits): codes     56.3 us, postings     79.0 us, auto (Codes)     55.3 us
+  facet category    68406 docs (bits): codes     97.6 us, postings     84.5 us, auto (Postings)    121.8 us
+  facet category   119857 docs (bits): codes    210.4 us, postings    128.9 us, auto (Postings)    125.8 us
+  facet category   171332 docs (bits): codes    234.1 us, postings    115.6 us, auto (Postings)    120.0 us
+  facet topic          21 docs (sorted): codes      0.2 us, postings     81.3 us, auto (Codes)      0.2 us
+  facet topic         161 docs (sorted): codes      1.2 us, postings     81.6 us, auto (Codes)      1.2 us
+  facet topic         910 docs (sorted): codes      7.1 us, postings     84.9 us, auto (Codes)      7.2 us
+  facet topic        1740 docs (sorted): codes     13.4 us, postings     86.7 us, auto (Codes)     13.5 us
+  facet topic        3435 docs (sorted): codes     32.6 us, postings     93.5 us, auto (Codes)     30.5 us
+  facet topic        5184 docs (sorted): codes     68.5 us, postings    154.7 us, auto (Codes)     68.2 us
+  facet topic        8648 docs (bits): codes     46.9 us, postings     80.9 us, auto (Codes)     52.3 us
+  facet topic       16983 docs (bits): codes     37.2 us, postings     86.3 us, auto (Codes)     36.4 us
+  facet topic       34312 docs (bits): codes     53.8 us, postings     77.9 us, auto (Codes)     61.4 us
+  facet topic       68258 docs (bits): codes    101.7 us, postings     78.6 us, auto (Codes)     85.9 us
+  facet topic      119573 docs (bits): codes    122.4 us, postings     75.3 us, auto (Postings)     75.4 us
+  facet topic      171332 docs (bits): codes    136.3 us, postings     75.3 us, auto (Postings)     74.6 us
+  facet tier           20 docs (sorted): codes      0.1 us, postings      3.4 us, auto (Codes)      0.1 us
+  facet tier          175 docs (sorted): codes      1.1 us, postings      3.5 us, auto (Codes)      1.0 us
+  facet tier          904 docs (sorted): codes      5.4 us, postings      4.2 us, auto (Postings)      4.4 us
+  facet tier         1752 docs (sorted): codes     10.4 us, postings      4.6 us, auto (Postings)      4.9 us
+  facet tier         3407 docs (sorted): codes     21.0 us, postings      6.0 us, auto (Postings)      6.2 us
+  facet tier         5169 docs (sorted): codes     32.4 us, postings      7.2 us, auto (Postings)      7.2 us
+  facet tier         8496 docs (bits): codes     51.4 us, postings      3.4 us, auto (Postings)      3.5 us
+  facet tier        17001 docs (bits): codes     36.8 us, postings      3.4 us, auto (Postings)      3.5 us
+  facet tier        34366 docs (bits): codes     53.1 us, postings      3.4 us, auto (Postings)      3.5 us
+  facet tier        68620 docs (bits): codes     94.3 us, postings      3.8 us, auto (Postings)      4.9 us
+  facet tier       120214 docs (bits): codes    139.1 us, postings      3.4 us, auto (Postings)      5.5 us
+  facet tier       171332 docs (bits): codes    256.9 us, postings      3.8 us, auto (Postings)      3.7 us
+  store warm: 112.9 us per 10 documents (90.4 us for id, title)
+  store cold: 1499.4 us per 10 documents (median), 392.9 pages read
+  store cold_madv_random: 2516.9 us per 10 documents (median), 61.5 pages read
+peak RSS 521 MB
+wrote results/forward/trec-covid.json

@@ -1,0 +1,37 @@
+== strata_small 03:46:22: target/release/strata-eval --collections scifact,fiqa,trec-covid
+   strata_small ok after 286 s
+== strata_quora 03:51:08: target/release/strata-eval --collections quora
+   strata_quora ok after 528 s
+== strata_ivf 03:59:56: target/release/strata-eval --collections trec-covid,quora --index ivf --studies workload,planner --kinds vector,filtered_vector,hybrid,filtered_hybrid
+   strata_ivf ok after 287 s
+== baselines_small 04:04:43: target/release/strata-baselines --collections scifact,fiqa,trec-covid
+   baselines_small ok after 1936 s
+== baselines_quora 04:36:59: target/release/strata-baselines --collections quora --max-vector 300
+   baselines_quora ok after 2295 s
+== vector_fiqa 05:15:14: target/release/strata-vector-bench --dataset fiqa --queries 648 --threads 4
+   vector_fiqa ok after 97 s
+== vector_trec 05:16:51: target/release/strata-vector-bench --dataset trec-covid --queries 50 --filter-queries 50 --threads 4
+   vector_trec ok after 180 s
+== vector_quora 05:19:51: target/release/strata-vector-bench --dataset quora --queries 1000 --cold-queries 10 --rerank 10,20,40 --nprobe 1,2,4,8,16,32,64,128,256 --budget-secs 10 --threads 4
+   vector_quora ok after 783 s
+== text 05:32:54: target/release/strata-text-bench --collections scifact,fiqa,trec-covid,quora --max-queries 2000 --reps 3 --cold-queries 100 --sweep-min-df 256,1024,2048
+   text ok after 960 s
+== forward_trec 05:48:54: target/release/strata-forward-bench --collection trec-covid
+   forward_trec ok after 24 s
+== forward_quora 05:49:18: target/release/strata-forward-bench --collection quora
+   forward_quora ok after 28 s
+== storage 05:49:46: target/release/strata-storage-bench --dataset fiqa --reps 5
+   storage ok after 150 s
+== phase 2 05:59:29
+== strata_small 05:59:30: target/release/strata-eval --collections scifact,fiqa,trec-covid --keep
+   strata_small ok after 309 s
+== strata_quora 06:04:39: target/release/strata-eval --collections quora --keep
+   strata_quora ok after 590 s
+== strata_ivf 06:14:29: target/release/strata-eval --collections trec-covid,quora --index ivf --studies workload,planner --kinds vector,filtered_vector,hybrid,filtered_hybrid
+   strata_ivf ok after 329 s
+== ablation_readahead 06:19:58: target/release/strata-eval --collections trec-covid,quora --reuse --keep --no-random-hints --studies workload
+   ablation_readahead ok after 199 s
+== ablation_noreadahead 06:23:17: target/release/strata-eval --collections trec-covid,quora --reuse --keep --no-read-ahead --studies workload
+   ablation_noreadahead ok after 258 s
+== final default run 06:32:01
+   final default run done 06:37:33 status 0

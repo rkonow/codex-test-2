@@ -7,7 +7,10 @@ it is timed.
 
 The full write-up, with formulas, diagrams and charts of the measurements, is
 in [`report/report.html`](report/report.html); the raw numbers are in
-[`results/`](results/).
+[`results/`](results/). Three new structures designed from those results
+(Pyramid, Loom and Entropic) are described and evaluated in
+[`report/designs.html`](report/designs.html), with raw numbers in
+[`results/designs/`](results/designs/).
 
 ## What is implemented
 
@@ -28,6 +31,9 @@ in [`report/report.html`](report/report.html); the raw numbers are in
 | `Run-Trie` | succinct | trie with full subtrees cut | cursor, set ops |
 | `BP128 (bitpacking crate)` | baseline | Tantivy's `bitpacking` crate in the same block framework | cursor |
 | `Roaring (roaring crate)` | baseline | the `roaring` crate | cursor, set ops |
+| `Pyramid` | new | Roaring-like 2^16 chunks split into 256-docID blocks: dense blocks as 256-bit bitmaps, sparse ones as low bytes with a unary or `u16` directory; driven-chunk and block-join AND, touched-block OR | cursor, set ops |
+| `Loom` | new | PEF on a 16-posting DP grid with word-aligned bitvectors and a bitvector bias; batched AND with per-partition merge / probe modes, windowed word-wise OR, SIMD EF decode | cursor, set ops |
+| `Entropic` | new | 128-posting blocks of gap tokens coded with two interleaved context-switching tANS lanes (context = token two back), per-list or shared models, EF skip tables | cursor, set ops |
 
 All codecs implement `PostingList` (build, size in bits, decode). `CursorList`
 adds a cursor with `docid()`, `next()` and `next_geq(x)`; `SetOps` adds
@@ -49,8 +55,9 @@ native multi-list intersection and union.
 ## Running
 
 ```sh
-cargo test --release                       # 56 tests (+3 ignored timing tests): conformance suite for every codec, algorithms
+cargo test --release                       # 90 tests (+9 ignored timing/profiling tests): conformance suite for every codec, algorithms
 cargo run --release -- codecs              # list codecs
+cargo run --release -- stats               # structure of a collection and its query lists
 cargo run --release -- run                 # default: clustered synthetic collection, 500 queries
 cargo run --release -- run --distribution uniform --codecs "pef,roaring,bp128" --ops and
 cargo run --release -- kernels --ratios 1,4,16,64,256,1024
@@ -80,8 +87,13 @@ Results are printed as Markdown; `--json` / `--csv` save them.
 ```sh
 scripts/prepare_wikitext.sh data           # WikiText-103 via Hugging Face (needs pyarrow)
 scripts/run_experiments.sh data/wikitext103.txt
-python3 scripts/build_report.py            # report/report.html from results/*.json
+scripts/run_designs.sh data/wikitext103.txt  # new designs: three collections, selective/dense queries, 2-6 terms
+python3 scripts/build_report.py            # report/report.html and report/designs.html
 ```
+
+`run` also takes `--min-list-len` / `--max-list-len` to restrict query terms
+by list length, and reports a Pareto frontier and the auxiliary memory each
+codec builds at load time (Entropic's decode tables).
 
 ## Results (single thread, Intel Xeon @ 2.1 GHz with AVX-512)
 
@@ -117,4 +129,31 @@ queries.
 * DocID clustering shrinks PEF, interpolative, Roaring and tries by 32-50%.
 
 Full analysis, formulas and diagrams: [`report/report.html`](report/report.html).
+
+### New designs
+
+Same collections and query generator, rerun together with the existing codecs
+(`results/designs/`, so the reference rows differ slightly from the table above):
+
+| codec | clustered bits | clustered AND ms | clustered OR ms | uniform bits | WikiText bits | WikiText AND ms | WikiText OR ms |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| PEF | 4.94 | 0.040 | 2.99 | 8.08 | 4.75 | 0.018 | 0.920 |
+| Interpolative | 4.90 | 0.191 | 5.03 | 8.52 | 4.77 | 0.087 | 1.49 |
+| Roaring | 9.32 | 0.029 | 0.538 | 13.70 | 8.47 | 0.007 | 0.083 |
+| **Pyramid** | 6.20 | 0.023 | 0.308 | 10.47 | 6.30 | 0.010 | 0.068 |
+| **Loom** | 4.90 | 0.021 | 0.509 | 8.01 | 4.74 | 0.010 | 0.104 |
+| **Entropic** | 4.22 | 0.089 | 1.31 | 7.60 | 4.18 | 0.039 | 0.424 |
+
+* On 8 of 10 size/time frontiers (AND and OR on five workloads) every point is
+  a new design; Roaring keeps the fastest AND on uniform and WikiText.
+* Loom: PEF's size with 1.9-2.2x faster AND and 4.9-8.9x faster OR; on the
+  clustered collection it also beats Roaring on both at 53% of its size.
+* Pyramid: 24-33% smaller than Roaring and the fastest OR everywhere
+  (1.2-1.75x Roaring); AND is 19% faster on clustered data but 11% and 38%
+  slower on uniform and WikiText.
+* Entropic: the smallest serialized index (6-15% below PEF, 11-14% below
+  interpolative coding, 2.2-2.4x faster AND than the latter), but its decode
+  tables add 1.3-22 MB at load time and it builds 13-19x slower than PEF.
+
+Details: [`report/designs.html`](report/designs.html).
 

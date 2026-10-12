@@ -46,6 +46,8 @@ pub struct CodecReport {
     pub decode_ns_per_posting: f64,
     /// Full decoding speed over the lists that appear in queries.
     pub query_decode_ns_per_posting: f64,
+    /// Memory derived at load time beyond the serialized size (bytes).
+    pub aux_memory_bytes: u64,
     pub measurements: Vec<Measurement>,
 }
 
@@ -237,6 +239,7 @@ pub fn report<C: PostingList>(w: &Workload, cfg: &BenchConfig, algos: AlgoSuite<
         build_secs,
         decode_ns_per_posting: best * 1e9 / postings,
         query_decode_ns_per_posting: qbest * 1e9 / qpostings.max(1) as f64,
+        aux_memory_bytes: lists.iter().map(|l| l.aux_memory_bytes()).sum::<u64>() + C::shared_aux_memory_bytes(),
         measurements,
     }
 }
@@ -368,6 +371,37 @@ pub fn roaring_count_algos(
     }
 }
 
+/// Loom: cardinality-only AND / OR (no docID materialisation).
+pub fn loom_count_algos(lists: &[crate::codecs::loom::Loom], w: &Workload, cfg: &BenchConfig, m: &mut Vec<Measurement>) {
+    use crate::codecs::loom::Loom;
+    let name = Loom::NAME;
+    let refs = |q: &[u32]| q.iter().map(|&t| &lists[t as usize]).collect::<Vec<_>>();
+    if cfg.and {
+        m.push(time_queries_count(w, cfg, Op::And, name, "native, count only", |q| Loom::and_count(&refs(q))));
+    }
+    if cfg.or {
+        m.push(time_queries_count(w, cfg, Op::Or, name, "native, count only", |q| Loom::or_count(&refs(q))));
+    }
+}
+
+/// Pyramid: cardinality-only intersection and union (popcounts, no docIDs).
+pub fn pyramid_count_algos(
+    lists: &[crate::codecs::pyramid::Pyramid],
+    w: &Workload,
+    cfg: &BenchConfig,
+    m: &mut Vec<Measurement>,
+) {
+    use crate::codecs::pyramid::Pyramid;
+    let name = Pyramid::NAME;
+    let refs = |q: &[u32]| q.iter().map(|&t| &lists[t as usize]).collect::<Vec<_>>();
+    if cfg.and {
+        m.push(time_queries_count(w, cfg, Op::And, name, "native, count only", |q| Pyramid::and_count(&refs(q))));
+    }
+    if cfg.or {
+        m.push(time_queries_count(w, cfg, Op::Or, name, "native, count only", |q| Pyramid::or_count(&refs(q))));
+    }
+}
+
 /// A codec in the benchmark registry.
 pub struct CodecEntry {
     pub name: &'static str,
@@ -400,8 +434,27 @@ pub fn registry() -> Vec<CodecEntry> {
         },
         CodecEntry { name: pef::PartitionedEF::NAME, run: |w, c| report::<pef::PartitionedEF>(w, c, cursor_algos) },
         CodecEntry {
+            name: loom::Loom::NAME,
+            run: |w, c| {
+                report::<loom::Loom>(w, c, |l, w, c, m| {
+                    setops_algos(l, w, c, m);
+                    loom_count_algos(l, w, c, m);
+                    cursor_algos(l, w, c, m);
+                })
+            },
+        },
+        CodecEntry {
             name: interpolative::Interpolative::NAME,
             run: |w, c| report::<interpolative::Interpolative>(w, c, cursor_algos),
+        },
+        CodecEntry {
+            name: entropic::Entropic::NAME,
+            run: |w, c| {
+                report::<entropic::Entropic>(w, c, |l, w, c, m| {
+                    setops_algos(l, w, c, m);
+                    cursor_algos(l, w, c, m);
+                })
+            },
         },
         CodecEntry {
             name: hybrid::Hybrid::NAME,
@@ -418,6 +471,16 @@ pub fn registry() -> Vec<CodecEntry> {
                 report::<roaring::Roaring>(w, c, |l, w, c, m| {
                     setops_algos(l, w, c, m);
                     roaring_count_algos(l, w, c, m);
+                    cursor_algos(l, w, c, m);
+                })
+            },
+        },
+        CodecEntry {
+            name: pyramid::Pyramid::NAME,
+            run: |w, c| {
+                report::<pyramid::Pyramid>(w, c, |l, w, c, m| {
+                    setops_algos(l, w, c, m);
+                    pyramid_count_algos(l, w, c, m);
                     cursor_algos(l, w, c, m);
                 })
             },

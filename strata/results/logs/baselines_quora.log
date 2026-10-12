@@ -1,0 +1,31 @@
+== quora
+   loaded 522931 documents, 10000 queries (2.2s)
+   sqlite: built in 27.2s, 2362.5 MiB (27.7s with reopen)
+   tantivy: built in 9.4s, 53.0 MiB (9.4s with reopen)
+   sqlite: running
+   bm25             n=2000  x1 warm mean    25.438 p50    17.796 p99   100.870 ms | cold n=100 p50    99.586 ms, pages p50   1593 | nDCG@10 0.7596
+   and2             n=300   x3 warm mean     0.360 p50     0.336 p99     1.146 ms | cold n=100 p50     1.710 ms, pages p50     32 | nDCG@10 -
+   and3             n=300   x3 warm mean     0.411 p50     0.368 p99     1.212 ms | cold n=100 p50     1.893 ms, pages p50     27 | nDCG@10 -
+   or3              n=300   x3 warm mean     0.880 p50     0.616 p99     3.754 ms | cold n=100 p50     2.191 ms, pages p50     34 | nDCG@10 -
+   filter           n=100   x3 warm mean   165.020 p50   117.858 p99   588.928 ms | cold n=33  p50  1589.226 ms, pages p50  38166 | nDCG@10 -
+   filtered_bm25    n=120   x3 warm mean    27.731 p50    16.843 p99   108.303 ms | cold n=100 p50   106.192 ms, pages p50   1803 | nDCG@10 -
+   vector           n=300   x1 warm mean  1045.099 p50  1037.817 p99  1197.477 ms | cold n=24  p50  2704.700 ms, pages p50 592452 | nDCG@10 0.8795
+   filtered_vector  n=300   x1 warm mean   303.584 p50   146.953 p99  1347.781 ms | cold n=24  p50   829.039 ms, pages p50  25161 | nDCG@10 -
+   hybrid           n=300   x1 warm mean  1130.729 p50  1119.130 p99  1411.434 ms | cold n=20  p50  2958.633 ms, pages p50 592490 | nDCG@10 0.8500
+   filtered_hybrid  n=300   x1 warm mean   338.243 p50   176.774 p99  1158.865 ms | cold n=22  p50  2143.511 ms, pages p50  47040 | nDCG@10 -
+   facet            n=300   x3 warm mean     5.203 p50     0.629 p99    58.988 ms | cold n=100 p50    15.675 ms, pages p50    353 | nDCG@10 -
+   tantivy: running
+   bm25             n=2000  x3 warm mean     0.500 p50     0.429 p99     1.394 ms | cold n=100 p50     2.288 ms, pages p50    550 | nDCG@10 0.7585
+   and2             n=300   x3 warm mean     0.278 p50     0.317 p99     0.576 ms | cold n=100 p50     1.368 ms, pages p50    289 | nDCG@10 -
+   and3             n=300   x3 warm mean     0.143 p50     0.099 p99     0.499 ms | cold n=100 p50     1.082 ms, pages p50    328 | nDCG@10 -
+   or3              n=300   x3 warm mean     0.560 p50     0.514 p99     1.012 ms | cold n=100 p50     1.748 ms, pages p50    346 | nDCG@10 -
+   filter           n=100   x3 warm mean     4.251 p50     3.005 p99    12.789 ms | cold n=100 p50     4.439 ms, pages p50   1169 | nDCG@10 -
+   filtered_bm25    n=120   x3 warm mean     1.689 p50     1.235 p99     5.592 ms | cold n=100 p50     4.273 ms, pages p50   1472 | nDCG@10 -
+   facet            n=300   x3 warm mean     0.042 p50     0.029 p99     0.252 ms | cold n=100 p50     1.239 ms, pages p50    300 | nDCG@10 -
+   agreement bm25           {"differing_counts":[],"mean_overlap":0.9797000000000027,"queries":2000,"same_count":null,"same_facets":null,"same_ids":0.787}
+   agreement and2           {"differing_counts":[[2013,75,76],[2042,6,23],[2050,33,34],[2090,2742,599],[2096,1,4],[2106,7,12],[2107,8,9],[2108,11,6],[2154,431,423],[2159,24,35]],"mean_overlap":0.9735740740740741,"queries":300,"same_count":0.9333333333333333,"same_facets":null,"same_ids":0.95}
+   agreement and3           {"differing_counts":[[2384,0,1],[2396,20,19],[2415,0,2],[2461,4,2],[2510,21,2],[2576,8,9]],"mean_overlap":0.9882962962962965,"queries":300,"same_count":0.98,"same_facets":null,"same_ids":0.9833333333333333}
+   agreement or3            {"differing_counts":[[2600,16045,16046],[2607,1848,2043],[2615,20733,20734],[2619,22216,22224],[2622,1943,1178],[2624,2160,2161],[2630,9261,9267],[2633,1098,1100],[2635,17282,17462],[2636,29977,29974]],"mean_overlap":0.9819999999999999,"queries":300,"same_count":0.6966666666666667,"same_facets":null,"same_ids":0.9533333333333334}
+   agreement filter         {"differing_counts":[],"mean_overlap":1.0,"queries":100,"same_count":1.0,"same_facets":null,"same_ids":1.0}
+   agreement filtered_bm25  {"differing_counts":[],"mean_overlap":0.9708333333333333,"queries":120,"same_count":null,"same_facets":null,"same_ids":0.75}
+   agreement facet          {"differing_counts":[],"mean_overlap":1.0,"queries":300,"same_count":null,"same_facets":0.9166666666666666,"same_ids":1.0}
