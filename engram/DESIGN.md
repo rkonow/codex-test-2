@@ -167,10 +167,15 @@ Priors then break near-ties without overriding relevance:
 
 \[ S(r) = \mathrm{rel}(r)\,\bigl(1 + \lambda_\iota\,\iota(r)\bigr) + \lambda_t\, e^{-(\mathrm{seq}_{\max} - \mathrm{seq}(r))/\tau}. \]
 
-Packing is greedy by \(S\). At most two chunks are taken per episode, so
+Candidates exclude answers that admitted not knowing (tagged `uncertain`
+at capture) and stored prompts that are the same question again; both match
+a repeated question best and would only replay a failure. Packing is greedy
+by \(S\). At most two chunks are taken per episode, so
 that more distinct pieces of evidence fit. Each record is trimmed to the
 window of at most 600 characters with the most query terms. Each injected
-line carries its provenance: kind, session, turn, relative time and id.
+line carries its provenance: kind, session, turn, relative time and id. Up to five further
+candidates follow as one line each (id and opening words), for the model to
+open with `memory_timeline`.
 
 ### The gate
 

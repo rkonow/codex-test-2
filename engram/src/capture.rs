@@ -289,10 +289,32 @@ pub fn narration_drafts(text: &str) -> Vec<Draft> {
     chunk(&text, CHUNK_CHARS).into_iter().map(|c| Draft::new(Kind::Answer, c).tag("narration").files(files.clone()).importance(0.4)).collect()
 }
 
+/// Whether an answer says the model did not know or could not find out.
+/// Such answers are kept (low importance, tag `uncertain`) but never injected:
+/// recalling them would only repeat the failure.
+pub fn is_uncertain(answer: &str) -> bool {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    let re = RE.get_or_init(|| {
+        Regex::new(r"(?i)^\W*(i don'?t know|i do not know|i couldn'?t (?:find|answer|tell|determine)|i can'?t (?:find|answer|tell|determine|say)|i'?m not sure|i have no (?:record|information|way)|i couldn'?t answer|nothing in (?:this|the) (?:conversation|context))").unwrap()
+    });
+    re.is_match(answer.trim_start())
+}
+
 pub fn answer_drafts(text: &str) -> Vec<Draft> {
     let text = redact(text);
     let files = paths_in(&text);
-    chunk(&text, CHUNK_CHARS).into_iter().map(|c| Draft::new(Kind::Answer, c).files(files.clone())).collect()
+    let uncertain = is_uncertain(&text);
+    chunk(&text, CHUNK_CHARS)
+        .into_iter()
+        .map(|c| {
+            let d = Draft::new(Kind::Answer, c).files(files.clone());
+            if uncertain {
+                d.tag("uncertain").importance(0.1)
+            } else {
+                d
+            }
+        })
+        .collect()
 }
 
 /// A compaction summary, one or more records per numbered section
@@ -374,7 +396,8 @@ impl EpisodeAcc {
         if !answer.is_empty() {
             t += &format!("\nOutcome: {}", clip(&redact(answer), 600));
         }
-        Some(Draft::new(Kind::Episode, t).files(self.files.iter().cloned().collect()))
+        let d = Draft::new(Kind::Episode, t).files(self.files.iter().cloned().collect());
+        Some(if is_uncertain(answer) { d.tag("uncertain").importance(0.1) } else { d })
     }
 }
 
@@ -416,6 +439,14 @@ mod tests {
         let d = tool_drafts("Edit", &json!({"file_path": "/p/src/a.rs", "old_string": "x", "new_string": "y"}), &json!({}), "/p");
         assert!(d[0].text.starts_with("Edit src/a.rs"));
         assert!(tool_drafts("mcp__engram__memory_search", &json!({}), &json!({}), "/p").is_empty());
+    }
+
+    #[test]
+    fn uncertain_answers() {
+        assert!(is_uncertain("I don't know. Nothing in this conversation mentions it."));
+        assert!(is_uncertain("**I couldn't find** that"));
+        assert!(!is_uncertain("The test was dense_runs_are_nearly_free. I don't know why it failed."));
+        assert_eq!(answer_drafts("I do not know.")[0].tag, "uncertain");
     }
 
     #[test]

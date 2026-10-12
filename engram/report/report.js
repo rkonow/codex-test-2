@@ -67,8 +67,13 @@
     });
     s("text", { x: f.m.l + f.iw / 2, y: f.height - 4, "text-anchor": "middle", class: "axis-title" }, g, opt.xTitle);
     cats.forEach((cat, i) => {
-      const y0 = f.m.t + i * band + 5;
-      s("text", { x: f.m.l - 8, y: y0 + band / 2 - 2, "text-anchor": "end", class: "lab" }, g, cat);
+      let y0 = f.m.t + i * band + 5;
+      if (narrow) {
+        s("text", { x: f.m.l, y: y0 + 9, class: "lab" }, g, cat);
+        y0 += 16;
+      } else {
+        s("text", { x: f.m.l - 8, y: y0 + band / 2 - 2, "text-anchor": "end", class: "lab" }, g, cat);
+      }
       series.forEach((sr, j) => {
         const v = sr.values[i];
         const y = y0 + j * 14;
@@ -154,19 +159,25 @@
 
   // Horizontal grouped bars on a linear 0..1 axis.
   function bars(container, cats, series, opt) {
-    const band = 14 * series.length + 12;
-    const f = frame(container, cats.length * band + 46, { l: opt.labelWidth || 170, r: 52, t: 6, b: 36 });
+    const narrow = container.clientWidth < 560;
+    const band = 14 * series.length + 12 + (narrow ? 16 : 0);
+    const f = frame(container, cats.length * band + 46, { l: narrow ? 6 : opt.labelWidth || 170, r: 52, t: 6, b: 36 });
     const xs = (v) => (v / (opt.max || 1)) * f.iw;
     const g = s("g", {}, f.svg);
-    (opt.ticks || [0, 0.25, 0.5, 0.75, 1]).forEach((v) => {
+    (narrow ? [0, 0.5, 1] : opt.ticks || [0, 0.25, 0.5, 0.75, 1]).forEach((v) => {
       const x = f.m.l + xs(v);
       s("line", { x1: x, x2: x, y1: f.m.t, y2: f.m.t + f.ih, class: "grid" }, g);
       s("text", { x, y: f.m.t + f.ih + 16, "text-anchor": "middle" }, g, opt.tickFmt ? opt.tickFmt(v) : v.toFixed(2));
     });
     s("text", { x: f.m.l + f.iw / 2, y: f.height - 4, "text-anchor": "middle", class: "axis-title" }, g, opt.xTitle);
     cats.forEach((cat, i) => {
-      const y0 = f.m.t + i * band + 5;
-      s("text", { x: f.m.l - 8, y: y0 + band / 2 - 2, "text-anchor": "end", class: "lab" }, g, cat);
+      let y0 = f.m.t + i * band + 5;
+      if (narrow) {
+        s("text", { x: f.m.l, y: y0 + 9, class: "lab" }, g, cat);
+        y0 += 16;
+      } else {
+        s("text", { x: f.m.l - 8, y: y0 + band / 2 - 2, "text-anchor": "end", class: "lab" }, g, cat);
+      }
       series.forEach((sr, j) => {
         const v = sr.values[i];
         const y = y0 + j * 14;
@@ -186,8 +197,9 @@
 
   // One stacked horizontal bar per category; parts sum to 1.
   function stacked(container, cats, parts, opt) {
-    const band = 34;
-    const f = frame(container, cats.length * band + 50, { l: opt.labelWidth || 230, r: 16, t: 6, b: 38 });
+    const narrow = container.clientWidth < 560;
+    const band = narrow ? 50 : 34;
+    const f = frame(container, cats.length * band + 50, { l: narrow ? 6 : opt.labelWidth || 230, r: 16, t: 6, b: 38 });
     const g = s("g", {}, f.svg);
     [0, 0.25, 0.5, 0.75, 1].forEach((v) => {
       const x = f.m.l + v * f.iw;
@@ -196,9 +208,14 @@
     });
     s("text", { x: f.m.l + f.iw / 2, y: f.height - 4, "text-anchor": "middle", class: "axis-title" }, g, opt.xTitle);
     cats.forEach((cat, i) => {
-      const y = f.m.t + i * band + 8;
+      let y = f.m.t + i * band + 8;
       const label = cat.label.split("\n");
-      label.forEach((t, k) => s("text", { x: f.m.l - 8, y: y + 9 + k * 13 - (label.length - 1) * 6, "text-anchor": "end", class: "lab" }, g, t));
+      if (narrow) {
+        s("text", { x: f.m.l, y: y + 8, class: "lab" }, g, label.join(", "));
+        y += 16;
+      } else {
+        label.forEach((t, k) => s("text", { x: f.m.l - 8, y: y + 9 + k * 13 - (label.length - 1) * 6, "text-anchor": "end", class: "lab" }, g, t));
+      }
       let x = f.m.l;
       parts.forEach((p, j) => {
         const v = cat.values[j] || 0;
@@ -386,7 +403,35 @@
     });
   }
 
+  function liveQA() {
+    const el = $("#live-qa-table");
+    const L = D.live_qa;
+    if (!el || !L) return;
+    const qs = [...new Set(L.runs.map((r) => r.q))];
+    const wrap = h("div", { class: "table-wrap compact wrap-head live" }, el);
+    const t = h("table", {}, wrap);
+    const hr = h("tr", {}, h("thead", {}, t));
+    ["question", "Engram, round 1", "Engram, round 2 (asked again)", "Engram off"].forEach((x) => h("th", {}, hr, x));
+    const tb = h("tbody", {}, t);
+    const cell = (tr, r) => {
+      const td = h("td", {}, tr);
+      if (!r) return;
+      const how = r.engram ? `${r.decision === "Inject" ? "full injection" : r.decision === "Brief" ? "brief injection" : "no injection"} (G ${fmt(r.gate || 0, 2)})${r.tools && r.tools.some((x) => /memory_/.test(x)) ? " · tools: " + r.tools.filter((x) => /memory_/.test(x)).join(", ") : ""}` : "no memory";
+      h("div", { class: "q" }, td, how);
+      const res = (r.result || "").replace(/\*\*|`{1,3}/g, "").replace(/\s+/g, " ");
+      h("div", { class: "r" }, td, res.length > 300 ? res.slice(0, 300) + "…" : res);
+    };
+    qs.forEach((q) => {
+      const tr = h("tr", {}, tb);
+      h("td", { class: "sys" }, tr, q);
+      cell(tr, L.runs.find((r) => r.q === q && r.round === 1));
+      cell(tr, L.runs.find((r) => r.q === q && r.round === 2));
+      cell(tr, L.runs.find((r) => r.q === q && !r.engram));
+    });
+  }
+
   meta();
+  liveQA();
   retrieval();
   typeTable();
   ctxTable();

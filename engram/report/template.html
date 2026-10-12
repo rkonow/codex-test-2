@@ -123,7 +123,13 @@ td.sys { font-weight: 600; }
   <h3>Ranking</h3>
   <p>BM25 over the text and its context, and cosine similarity over the vectors, each return their top 50 through Strata. Scores are min-max normalised over the union, with a missing score counting as 0. Priors break near-ties without overriding relevance:</p>
   <div class="math">\[ \mathrm{rel}(r) = w\,\widehat{\mathrm{bm25}}(r) + (1-w)\,\widehat{\cos}(r), \qquad S(r) = \mathrm{rel}(r)\bigl(1 + \lambda_\iota\,\iota(r)\bigr) + \lambda_t\, e^{-(\mathrm{seq}_{\max} - \mathrm{seq}(r))/\tau}, \]</div>
-  <p>with \(w = 0.5\), \(\lambda_\iota = 0.2\), \(\lambda_t = 0.05\) and \(\tau = 5{,}000\) records. Packing takes records by \(S\), at most two per turn so that more distinct evidence fits. Each record is cut to the 600 characters around the query's terms. The packed records are shown oldest first, each with its id, time, session, turn and kind, and labelled as possibly outdated.</p>
+  <p>with \(w = 0.5\), \(\lambda_\iota = 0.2\), \(\lambda_t = 0.05\) and \(\tau = 5{,}000\) records. Packing takes records by \(S\), at most two per turn so that more distinct evidence fits. Each record is cut to the 600 characters around the query's terms. The packed records are shown oldest first, each with its id, time, session, turn and kind, and labelled as possibly outdated. After them come up to five further candidates, one line each (id and opening words), which the model can open with <code>memory_timeline</code>.</p>
+  <p>Two kinds of record are never candidates:</p>
+  <ul>
+    <li><b>Answers that admitted not knowing</b> ("I don't know…"), which are stored with low importance and tagged.</li>
+    <li><b>Earlier copies of the question being asked.</b></li>
+  </ul>
+  <p>Both match a repeated question best and carry nothing, so recalling them would only repeat the failure. The live tests below show why this matters.</p>
   <h3>The gate</h3>
   <p>Normalised scores cannot gate, because the best candidate always scores 1. The gate uses absolute evidence about the best candidates:</p>
   <ul>

@@ -399,22 +399,18 @@ impl Daemon {
         let decision = if force && !hits.is_empty() { Decision::Inject } else { self.cfg.gate.decide(&ev) };
         let (text, ids) = match decision {
             _ if hits.is_empty() => (None, Vec::new()),
-            Decision::Inject => {
-                let items = recall::pack(&hits, &query, &skip, &self.cfg.pack);
+            Decision::Inject | Decision::Brief => {
+                let weak = decision == Decision::Brief;
+                let params = if weak { PackParams::brief() } else { self.cfg.pack.clone() };
+                let items = recall::pack(&hits, &query, &skip, &params);
                 let ids: Vec<String> = items.iter().map(|(r, _)| r.id.clone()).collect();
                 if items.is_empty() {
                     (None, ids)
                 } else {
-                    (Some(recall::fmt_recall(&items, now())), ids)
-                }
-            }
-            Decision::Brief => {
-                let items = recall::pack(&hits, &query, &skip, &PackParams::brief());
-                let ids: Vec<String> = items.iter().map(|(r, _)| r.id.clone()).collect();
-                if items.is_empty() {
-                    (None, ids)
-                } else {
-                    (Some(recall::fmt_recall_as(&items, now(), true)), ids)
+                    let shown: HashSet<String> = ids.iter().cloned().chain(skip.iter().cloned()).collect();
+                    let mut t = recall::fmt_recall_as(&items, now(), weak);
+                    t += &recall::fmt_more(&hits, &shown, if weak { 5 } else { 3 });
+                    (Some(t), ids)
                 }
             }
             Decision::Skip => (None, Vec::new()),

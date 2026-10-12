@@ -7,13 +7,13 @@
     </div>
     <div>
       <h4>Load without being asked, only when it helps</h4>
-      <p><span class="ok">Met:</span> after a compaction, 13 of 15 lost details came back automatically, and a new session recalled decisions that the same question without Engram could not answer. Nothing still in the context window is repeated.</p>
+      <p><span class="ok">Met:</span> after a compaction, 13 of 15 lost details came back automatically. Live sessions answered all eight questions about this repository's 26-hour history, against none of four with Engram off. Nothing still in the context window is repeated, and answers that admitted not knowing are not replayed.</p>
       <p><span class="no">Missed:</span> the gate's precision is modest: 59% against 42% for always injecting on LongMemEval, with no gain on LoCoMo. Vague questions recover less, 8 of 10 after compaction and 7 of 12 in a new session.</p>
     </div>
     <div>
       <h4>Let the model ask precisely</h4>
       <p><span class="ok">Met:</span> in a live session, the model followed an injected record id with <code>memory_timeline</code> and quoted the exact command and output from the previous session. SQL over the memory table answers questions such as "the last errors in this file".</p>
-      <p><span class="no">Missed:</span> headless sessions need an explicit permission rule for MCP tools, which the installer now adds. The model once called a tool with the wrong argument name.</p>
+      <p><span class="no">Missed:</span> whether the model searches depends on the model and on the prompt. A "don't run commands" instruction stopped it from searching memory at all. Headless sessions also need a permission rule for the MCP tools, which the installer now adds.</p>
     </div>
     <div>
       <h4>Scale to projects far beyond a context window</h4>

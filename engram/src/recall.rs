@@ -126,10 +126,18 @@ pub fn search(store: &Store, query: &str, filter: &Filter, p: &RankParams) -> Re
     let terms = strata::text::analyze_query(query);
     let bm = if p.use_bm25 && !terms.is_empty() { store.bm25_top(query, p.n, filter)? } else { Vec::new() };
     let vq = if p.use_vectors { Some(store.embedder.embed_query(query)) } else { None };
-    let dv = match &vq {
+    let mut dv = match &vq {
         Some(v) => store.vector_top(v, p.n, filter)?,
         None => Vec::new(),
     };
+    // Earlier copies of the same question and answers that admitted not
+    // knowing match a repeated question best and carry nothing: they would
+    // inflate the gate and repeat the failure.
+    let qterms: HashSet<String> = terms.iter().cloned().collect();
+    let useful = |r: &Record| r.tag != "uncertain" && !same_question(r, &qterms);
+    let mut bm = bm;
+    bm.retain(|(r, _)| useful(r));
+    dv.retain(|(r, _)| useful(r));
     Ok(fuse(store, query, &terms, bm, dv, p))
 }
 
@@ -251,7 +259,22 @@ impl PackParams {
     }
 }
 
+/// Whether a stored prompt is essentially the query asked again: it matches
+/// best and says nothing new, so it only takes up the budget.
+fn same_question(r: &Record, terms: &HashSet<String>) -> bool {
+    // Only stored questions: a statement that repeats the question's words
+    // ("my dog is called Max") is the answer, not a repeat.
+    if r.kind != Kind::Prompt || terms.is_empty() || !r.text.contains('?') {
+        return false;
+    }
+    let other: HashSet<String> = strata::text::analyze_query(&r.text).into_iter().collect();
+    let inter = terms.intersection(&other).count() as f64;
+    let union = terms.union(&other).count() as f64;
+    union > 0.0 && inter / union >= 0.7
+}
+
 /// Selects hits within the budget; returns them oldest first with snippets.
+/// Answers marked uncertain and earlier copies of the same question are skipped.
 pub fn pack(hits: &[Hit], query: &str, skip: &HashSet<String>, p: &PackParams) -> Vec<(Record, String)> {
     let terms: HashSet<String> = strata::text::analyze_query(query).into_iter().collect();
     let mut per: HashMap<(String, i64), usize> = HashMap::new();
@@ -261,7 +284,7 @@ pub fn pack(hits: &[Hit], query: &str, skip: &HashSet<String>, p: &PackParams) -
         if out.len() >= p.max_records {
             break;
         }
-        if skip.contains(&h.record.id) {
+        if skip.contains(&h.record.id) || h.record.tag == "uncertain" || same_question(&h.record, &terms) {
             continue;
         }
         let k = (h.record.session.clone(), h.record.turn);
@@ -348,6 +371,25 @@ pub fn fmt_recall_as(items: &[(Record, String)], now: i64, weak: bool) -> String
 
 pub fn fmt_recall(items: &[(Record, String)], now: i64) -> String {
     fmt_recall_as(items, now, false)
+}
+
+/// One line per further candidate (id, kind, opening words), for the model
+/// to follow up with `memory_timeline`.
+pub fn fmt_more(hits: &[Hit], shown: &HashSet<String>, n: usize) -> String {
+    let more: Vec<String> = hits
+        .iter()
+        .filter(|h| !shown.contains(&h.record.id) && h.record.tag != "uncertain")
+        .take(n)
+        .map(|h| {
+            let first: String = h.record.text.split_whitespace().collect::<Vec<_>>().join(" ").chars().take(90).collect();
+            format!("- [{}] {}: {}…", h.record.id, h.record.kind.as_str(), first)
+        })
+        .collect();
+    if more.is_empty() {
+        String::new()
+    } else {
+        format!("\nFurther candidates (memory_timeline with an id shows the full record and its surroundings):\n{}", more.join("\n"))
+    }
 }
 
 /// The `SessionStart` briefing: preferences, decisions, open tasks and where

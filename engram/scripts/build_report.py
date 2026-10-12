@@ -56,6 +56,7 @@ data = {
     "gate_bge": load("gate_bge.json"),
     "scale": load("scale/scale_static.json"),
     "live": load("live/live_runs.json"),
+    "live_qa": load("live/live_transcript_qa.json"),
     "session": load("session_stats.json"),
 }
 
