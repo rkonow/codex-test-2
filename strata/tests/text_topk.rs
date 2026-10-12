@@ -16,7 +16,7 @@ struct Every(u32);
 
 impl DocFilter for Every {
     fn contains(&self, d: DocId) -> bool {
-        d % self.0 == 0
+        d.is_multiple_of(self.0)
     }
     fn cardinality(&self) -> usize {
         1 << 30

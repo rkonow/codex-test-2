@@ -304,7 +304,7 @@ fn impact_tightness(r: &TextFieldReader, w: &Workload) -> Value {
             best = best.max(s(tf, n));
             rank += 1;
             c.next();
-            if rank % 128 == 0 || c.doc() == END {
+            if rank.is_multiple_of(128) || c.doc() == END {
                 // The block of `first` ends here; compare with its stored impact.
                 let mut probe = r.postings(t).unwrap();
                 let (_, imp) = probe.block_bound(first);
