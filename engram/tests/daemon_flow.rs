@@ -22,7 +22,7 @@ fn hook(d: &Arc<Daemon>, event: &str, payload: Json) -> String {
 }
 
 fn daemon(dir: &std::path::Path) -> Arc<Daemon> {
-    std::fs::write(dir.join("config.json"), r#"{"embedder": "hash:64", "sync": false}"#).unwrap();
+    std::fs::write(dir.join("config.json"), r#"{"embedder": "hash:64", "sync": false, "distill": {"enabled": false}}"#).unwrap();
     Arc::new(Daemon::open(dir, "/proj").unwrap())
 }
 
@@ -99,4 +99,56 @@ fn hook_payloads_never_error() {
         let r = call(&d, json!({"op": "hook", "event": event, "payload": {}}));
         assert!(r.get("error").is_none(), "{event}: {r}");
     }
+}
+
+/// Distillation with a stand-in for the model: what a turn announced reaches
+/// the next session's briefing and prompts, and is closed once done.
+#[test]
+fn distilled_knowledge_reaches_later_sessions() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("out.json");
+    let script = dir.path().join("fake-model.sh");
+    std::fs::write(&script, format!("#!/bin/sh\ncat > /dev/null\ncat '{}'\n", out.display())).unwrap();
+    std::fs::set_permissions(&script, std::os::unix::fs::PermissionsExt::from_mode(0o755)).unwrap();
+    let cfg = json!({"embedder": "hash:64", "sync": false, "briefing_chars": 2000, "distill": {"command": script, "model": "m"}});
+    std::fs::write(dir.path().join("config.json"), cfg.to_string()).unwrap();
+    let d = Arc::new(Daemon::open(dir.path(), "/proj").unwrap());
+    let model_says = |lines: &[Json]| {
+        let result: Vec<String> = lines.iter().map(|l| l.to_string()).collect();
+        std::fs::write(&out, json!({"is_error": false, "total_cost_usd": 0.001, "result": result.join("\n")}).to_string()).unwrap();
+    };
+
+    model_says(&[
+        json!({"kind": "requirement", "text": "The CSV export of the ledger must use semicolons and DD.MM.YYYY dates."}),
+        json!({"kind": "decision", "text": "Storage stays JSON because the admins edit the files by hand."}),
+    ]);
+    hook(&d, "SessionStart", json!({"session_id": "s1", "source": "startup"}));
+    hook(&d, "UserPromptSubmit", json!({"session_id": "s1", "prompt": "Next week we add a CSV export; the bank wants semicolons and DD.MM.YYYY dates."}));
+    hook(&d, "Stop", json!({"session_id": "s1", "last_assistant_message": "Noted, the CSV export will follow those rules."}));
+    let planned = call(&d, json!({"op": "sql", "sql": "SELECT id FROM memory WHERE kind = 'todo' AND tag = 'planned' LIMIT 5"}));
+    let planned_id = planned["text"].as_str().unwrap().lines().find_map(|l| l.split_whitespace().find(|w| w.starts_with("s1:"))).unwrap().to_string();
+
+    let brief = hook(&d, "SessionStart", json!({"session_id": "s2", "source": "startup"}));
+    assert!(brief.contains("Planned work") && brief.contains("semicolons"), "{brief}");
+    assert!(brief.contains("Decisions:") && brief.contains("admins edit"), "{brief}");
+    assert!(brief.contains("search memory"), "{brief}");
+
+    // A third session whose briefing cannot hold the knowledge still gets it
+    // with a prompt it bears on.
+    let cfg = json!({"embedder": "hash:64", "sync": false, "briefing_chars": 100, "distill": {"command": script, "model": "m"}});
+    std::fs::write(dir.path().join("config.json"), cfg.to_string()).unwrap();
+    drop(d);
+    let d = Arc::new(Daemon::open(dir.path(), "/proj").unwrap());
+    let brief = hook(&d, "SessionStart", json!({"session_id": "s3", "source": "startup"}));
+    assert!(!brief.contains("semicolons"), "{brief}");
+    let ctx = hook(&d, "UserPromptSubmit", json!({"session_id": "s3", "prompt": "Add the CSV export of the ledger."}));
+    assert!(ctx.contains("[planned]") && ctx.contains("semicolons"), "{ctx}");
+
+    // The model reports the planned work done: it leaves the briefing.
+    model_says(&[json!({"kind": "done", "id": planned_id})]);
+    hook(&d, "Stop", json!({"session_id": "s3", "last_assistant_message": "Added export_csv with semicolons and DD.MM.YYYY dates."}));
+    let tag = call(&d, json!({"op": "sql", "sql": format!("SELECT tag FROM memory WHERE id = '{planned_id}' LIMIT 1")}));
+    assert!(tag["text"].as_str().unwrap().contains("done"), "{tag}");
+    let ctx = hook(&d, "UserPromptSubmit", json!({"session_id": "s3", "prompt": "Is the CSV export of the ledger planned?"}));
+    assert!(!ctx.contains("[planned]"), "{ctx}");
 }

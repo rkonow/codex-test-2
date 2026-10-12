@@ -16,13 +16,20 @@
   python3 scripts/ab_eval.py run --model <model> --repeats 3 --workers 4
   python3 scripts/ab_eval.py report
 
-Work happens in --work (default /home/user/ab); results go to
-results/ab/runs.jsonl and results/ab/summary.json.
+The built-in scenario is Tally (below). --scenario NAME loads
+eval/ab/scenarios/NAME instead: seed/, scenario.json (name, history, tasks)
+and graders.py with grade(task_id, repo, answer). Work happens in --work
+(default /home/user/ab, and /home/user/ab/NAME for other scenarios); results
+go to results/ab[/NAME]/RUNS.jsonl (--runs, default runs) and a summary next
+to it. --store-src restores another store for the Engram condition (for a
+store distilled after the history was recorded), and --conditions limits
+the conditions run.
 """
 
 import argparse
 import concurrent.futures as cf
 import glob
+import importlib.util
 import json
 import os
 import random
@@ -256,39 +263,53 @@ def grade_advice(repo, answer):
 
 
 TASKS = [
-    {"id": "csv_export", "needs": "a requirement stated only in conversation",
+    {"id": "csv_export", "kind": "conversation", "needs": "a requirement stated only in conversation",
      "prompt": "Let's build the CSV export for the accountant now: add `export_csv(ledger, year, month, directory)` in src/tally/export.py. It writes that month's expenses to a file in `directory` and returns the file's path.",
      "grade": grade_export},
-    {"id": "weighted_split", "needs": "a client rule (leftover cents)",
+    {"id": "weighted_split", "kind": "conversation", "needs": "a client rule (leftover cents)",
      "prompt": "Add a method `split_weighted(total_cents, payer, weights)` to Ledger, where weights maps each person to an integer weight. It returns each person's share in cents.",
      "grade": grade_weighted},
-    {"id": "exchange_rates", "needs": "a constraint stated only in conversation (no dependencies)",
+    {"id": "exchange_rates", "kind": "conversation", "needs": "a constraint stated only in conversation (no dependencies)",
      "prompt": "Add `fetch_rates(base='CHF')` in src/tally/rates.py that downloads the current exchange rates from https://api.frankfurter.app/latest?from=<base> and returns a dict mapping currency codes to rates. You don't need to call the API, just write it.",
      "grade": grade_rates},
-    {"id": "rename_api", "needs": "a process rule (changelog)",
+    {"id": "rename_api", "kind": "conversation", "needs": "a process rule (changelog)",
      "prompt": "Rename `Ledger.balance_of` to `Ledger.balance_for`, keeping `balance_of` working as a deprecated alias.",
      "grade": grade_rename},
-    {"id": "faster_save", "needs": "a decision stated only in conversation (JSON for hand-editing)",
+    {"id": "faster_save", "kind": "conversation", "needs": "a decision stated only in conversation (JSON for hand-editing)",
      "prompt": "Saving gets slow for big ledgers. Make `storage.save` faster.",
      "grade": grade_save},
-    {"id": "discount", "needs": "a rule partly visible in the code (integer cents)",
+    {"id": "discount", "kind": "repo", "needs": "a rule partly visible in the code (integer cents)",
      "prompt": "Add `apply_discount(amount_cents, percent)` to src/tally/money.py that returns the discounted amount.",
      "grade": grade_discount},
-    {"id": "summary", "needs": "a convention visible in the code (CHF format)",
+    {"id": "summary", "kind": "repo", "needs": "a convention visible in the code (CHF format)",
      "prompt": "Add a `summary()` method to Ledger that returns a text report with one line per person and their balance.",
      "grade": grade_summary},
-    {"id": "run_tests", "needs": "a discovered quirk (PYTHONPATH=src)",
+    {"id": "run_tests", "kind": "repo", "needs": "a discovered quirk (PYTHONPATH=src)",
      "prompt": "Run the test suite and tell me how many tests there are and whether they all pass.",
      "grade": grade_tests},
-    {"id": "slugify", "needs": "nothing (control)",
+    {"id": "slugify", "kind": "control", "needs": "nothing (control)",
      "prompt": "Add a `slugify(text)` helper in src/tally/text.py: lowercase, runs of non-alphanumeric characters become a single '-', and no '-' at either end. Add a test for it.",
      "grade": grade_slugify},
-    {"id": "advice", "needs": "rationale stated only in conversation",
+    {"id": "advice", "kind": "conversation", "needs": "rationale stated only in conversation",
      "prompt": "Should we move storage to SQLite and use pandas for the reports? Give me a short recommendation, no code changes.",
      "grade": grade_advice},
 ]
 
 # ---------------------------------------------------------------- running
+
+
+def load_scenario(name):
+    """The scenario's seed, history, tasks (each with a grade function) and
+    where its work and results go."""
+    if name == "tally":
+        return {"name": "tally", "seed": SEED, "history": HISTORY, "tasks": TASKS, "results": RESULTS, "sub": ""}
+    d = os.path.join(ROOT, "eval", "ab", "scenarios", name)
+    spec = json.load(open(os.path.join(d, "scenario.json")))
+    mod_spec = importlib.util.spec_from_file_location(f"graders_{name}", os.path.join(d, "graders.py"))
+    mod = importlib.util.module_from_spec(mod_spec)
+    mod_spec.loader.exec_module(mod)
+    tasks = [dict(t, grade=(lambda repo, answer, tid=t["id"]: mod.grade(tid, repo, answer))) for t in spec["tasks"]]
+    return {"name": spec["name"], "seed": os.path.join(d, "seed"), "history": spec["history"], "tasks": tasks, "results": os.path.join(RESULTS, name), "sub": name}
 
 
 def claude(prompt, cwd, env, model, session=None, resume=None, timeout=900):
@@ -341,15 +362,24 @@ def engram_events(home):
     return out
 
 
-def base_env(home, enabled):
+def base_env(home, enabled, distill=True):
     env = dict(os.environ, ENGRAM_HOME=home, ENGRAM_MODELS=MODELS)
     if not enabled:
         env["ENGRAM_DISABLE"] = "1"
+    if not distill:
+        # A task run is graded on its one turn; what Engram would write down
+        # after it is never read.
+        env["ENGRAM_DISTILL"] = "0"
     return env
 
 
-def stop_daemon(repo, home):
+def stop_daemon(repo, home, wait=0):
+    """Stops the project's daemon; with `wait`, waits up to that many seconds
+    for it to finish pending distillation and exit."""
     subprocess.run([ENGRAM, "stop", "--project", repo], env=dict(os.environ, ENGRAM_HOME=home, ENGRAM_MODELS=MODELS), capture_output=True, timeout=30)
+    until = time.time() + wait
+    while time.time() < until and glob.glob(os.path.join(home, "projects", "*", "*.sock")):
+        time.sleep(1)
     time.sleep(0.5)
 
 
@@ -359,33 +389,35 @@ def install(repo, home):
 
 
 def cmd_history(args):
+    sc = args.sc
     work = args.work
-    repo = os.path.join(work, "s1", "tally")
+    repo = os.path.join(work, "s1", sc["name"])
     home = os.path.join(work, "s1", "engram")
     if os.path.exists(os.path.join(work, "s1")):
         sys.exit(f"{work}/s1 exists; remove it to rerun the history")
-    shutil.copytree(SEED, repo)
+    shutil.copytree(sc["seed"], repo)
     subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
     subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
     subprocess.run(["git", "-c", "user.name=Dana", "-c", "user.email=dana@example.com", "commit", "-qm", "Tally 0.1.0"], cwd=repo, check=True)
     store = install(repo, home)
     env = base_env(home, True)
+    env["ENGRAM_DISTILL_MODEL"] = args.distill_model or args.model
     turns = []
     sessions = []
-    for k, prompts in enumerate(HISTORY):
+    for k, prompts in enumerate(sc["history"]):
         session = str(uuid.uuid4())
         sessions.append(session)
         for i, prompt in enumerate(prompts):
             out = claude(prompt, repo, env, args.model, session=session if i == 0 else None, resume=session if i else None)
             turns.append({"session": k, "prompt": prompt, "result": out.get("result"), "cost": out.get("total_cost_usd"), "turns": out.get("num_turns"), "error": out.get("is_error"), "wall_s": out["wall_s"]})
             print(f"session {k + 1} turn {i + 1}: {out.get('num_turns')} steps, ${out.get('total_cost_usd', 0):.3f}, {out['wall_s']:.0f} s", file=sys.stderr)
-    stop_daemon(repo, home)
-    os.makedirs(RESULTS, exist_ok=True)
+    stop_daemon(repo, home, wait=300)
+    os.makedirs(sc["results"], exist_ok=True)
     stats = subprocess.run(["git", "log", "--oneline"], cwd=repo, capture_output=True, text=True).stdout
     status = subprocess.run(["git", "status", "--short"], cwd=repo, capture_output=True, text=True).stdout
     n_tests, ok = count_tests(repo)
     json.dump({"sessions": sessions, "store": store, "turns": turns, "git_log": stats, "git_status": status, "tests": n_tests, "tests_pass": ok, "tools": [transcript_tools(s) for s in sessions]},
-              open(os.path.join(RESULTS, "history.json"), "w"), indent=1)
+              open(os.path.join(sc["results"], "history.json"), "w"), indent=1)
     print(f"history done: {len(turns)} turns; git log:\n{stats}status:\n{status}tests: {n_tests} pass={ok}", file=sys.stderr)
 
 
@@ -394,16 +426,17 @@ def one_run(args, task, cond, rep, lock):
     rid = f"{task['id']}-{cond}-{rep}"
     base = os.path.join(work, "runs", rid)
     shutil.rmtree(base, ignore_errors=True)
-    repo = os.path.join(base, "tally")
+    sc = args.sc
+    repo = os.path.join(base, sc["name"])
     home = os.path.join(base, "engram")
     os.makedirs(base)
-    subprocess.run(["git", "clone", "-q", os.path.join(work, "s1", "tally"), repo], check=True)
+    subprocess.run(["git", "clone", "-q", os.path.join(work, "s1", sc["name"]), repo], check=True)
     enabled = cond == "engram"
     if enabled:
         store = install(repo, home)
-        src = json.load(open(os.path.join(RESULTS, "history.json")))["store"]
+        src = args.store_src or json.load(open(os.path.join(sc["results"], "history.json")))["store"]
         shutil.copytree(src, store, ignore=shutil.ignore_patterns("*.sock", "spawn.lock", "daemon.log", "events.log"), dirs_exist_ok=True)
-    env = base_env(home, enabled)
+    env = base_env(home, enabled, distill=False)
     session = str(uuid.uuid4())
     out = claude(task["prompt"], repo, env, args.model, session=session)
     if enabled:
@@ -413,7 +446,7 @@ def one_run(args, task, cond, rep, lock):
     tools = transcript_tools(session)
     u = out.get("usage") or {}
     row = {
-        "task": task["id"], "condition": cond, "repeat": rep, "score": score, "solved": score >= 1.0, "checks": detail,
+        "task": task["id"], "kind": task.get("kind"), "condition": cond, "repeat": rep, "score": score, "solved": score >= 1.0, "checks": detail,
         "cost_usd": out.get("total_cost_usd"), "turns": out.get("num_turns"), "wall_s": out["wall_s"], "duration_ms": out.get("duration_ms"),
         "input_tokens": (u.get("input_tokens", 0) + u.get("cache_read_input_tokens", 0) + u.get("cache_creation_input_tokens", 0)), "output_tokens": u.get("output_tokens", 0),
         "error": out.get("is_error"), "answer": (out.get("result") or "")[:3000], "tools": tools,
@@ -421,7 +454,7 @@ def one_run(args, task, cond, rep, lock):
         "engram": engram_events(home) if enabled else None,
     }
     with lock:
-        with open(os.path.join(RESULTS, "runs.jsonl"), "a") as f:
+        with open(args.runs_path, "a") as f:
             f.write(json.dumps(row) + "\n")
     if not args.keep:
         shutil.rmtree(base, ignore_errors=True)
@@ -429,15 +462,15 @@ def one_run(args, task, cond, rep, lock):
 
 
 def cmd_run(args):
-    os.makedirs(RESULTS, exist_ok=True)
+    os.makedirs(args.sc["results"], exist_ok=True)
     done = set()
-    path = os.path.join(RESULTS, "runs.jsonl")
+    path = args.runs_path
     if os.path.exists(path):
         for line in open(path):
             r = json.loads(line)
             done.add((r["task"], r["condition"], r["repeat"]))
-    tasks = [t for t in TASKS if not args.tasks or t["id"] in args.tasks]
-    jobs = [(t, c, r) for t in tasks for c in ("engram", "none") for r in range(args.repeats) if (t["id"], c, r) not in done]
+    tasks = [t for t in args.sc["tasks"] if not args.tasks or t["id"] in args.tasks]
+    jobs = [(t, c, r) for t in tasks for c in args.conditions for r in range(args.repeats) if (t["id"], c, r) not in done]
     random.Random(7).shuffle(jobs)
     print(f"{len(jobs)} runs", file=sys.stderr)
     lock = threading.Lock()
@@ -453,14 +486,14 @@ def cmd_run(args):
 
 
 def cmd_report(args):
-    rows = [json.loads(l) for l in open(os.path.join(RESULTS, "runs.jsonl"))]
+    rows = [json.loads(l) for l in open(args.runs_path)]
     by = defaultdict(list)
     for r in rows:
         by[(r["task"], r["condition"])].append(r)
     mean = lambda xs: sum(xs) / len(xs) if xs else None  # noqa: E731
     out = {"tasks": {}, "overall": {}}
-    for t in TASKS:
-        out["tasks"][t["id"]] = {"needs": t["needs"]}
+    for t in args.sc["tasks"]:
+        out["tasks"][t["id"]] = {"needs": t["needs"], "kind": t.get("kind")}
         for c in ("engram", "none"):
             rs = by.get((t["id"], c), [])
             out["tasks"][t["id"]][c] = {
@@ -473,9 +506,9 @@ def cmd_report(args):
         rs = [r for r in rows if r["condition"] == c]
         out["overall"][c] = {"n": len(rs), "score": mean([r["score"] for r in rs]), "solved": mean([r["solved"] for r in rs]),
                              "cost_usd": mean([r["cost_usd"] or 0 for r in rs]), "turns": mean([r["turns"] or 0 for r in rs]), "wall_s": mean([r["wall_s"] for r in rs])}
-    json.dump(out, open(os.path.join(RESULTS, "summary.json"), "w"), indent=1)
+    json.dump(out, open(args.summary_path, "w"), indent=1)
     print(f"{'task':<16}{'needs':<58}{'score E':>9}{'score N':>9}{'$ E':>8}{'$ N':>8}{'steps E':>9}{'steps N':>9}")
-    for t in TASKS:
+    for t in args.sc["tasks"]:
         d = out["tasks"][t["id"]]
         e, n = d["engram"], d["none"]
         f = lambda v, p=2: "—" if v is None else f"{v:.{p}f}"  # noqa: E731
@@ -494,7 +527,17 @@ def main():
         p.add_argument("--workers", type=int, default=4)
         p.add_argument("--tasks", nargs="*")
         p.add_argument("--keep", action="store_true", help="keep each run's directory")
+        p.add_argument("--scenario", default="tally")
+        p.add_argument("--runs", default="runs", help="results file name (without .jsonl)")
+        p.add_argument("--conditions", nargs="*", default=["engram", "none"])
+        p.add_argument("--store-src", default=None, help="store to restore for the Engram condition")
+        p.add_argument("--distill-model", default=None, help="model Engram distills the history with (default: --model)")
     args = ap.parse_args()
+    args.sc = load_scenario(args.scenario)
+    if args.sc["sub"]:
+        args.work = os.path.join(args.work, args.sc["sub"])
+    args.runs_path = os.path.join(args.sc["results"], f"{args.runs}.jsonl")
+    args.summary_path = os.path.join(args.sc["results"], "summary.json" if args.runs == "runs" else f"summary_{args.runs}.json")
     if args.cmd in ("history", "run") and not args.model:
         sys.exit("--model is required")
     {"history": cmd_history, "run": cmd_run, "report": cmd_report}[args.cmd](args)

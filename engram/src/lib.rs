@@ -10,6 +10,7 @@
 pub mod benchdata;
 pub mod capture;
 pub mod daemon;
+pub mod distill;
 pub mod embed;
 pub mod hook;
 pub mod install;

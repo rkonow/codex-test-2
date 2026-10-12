@@ -137,7 +137,7 @@ pub fn search(store: &Store, query: &str, filter: &Filter, p: &RankParams) -> Re
     // knowing match a repeated question best and carry nothing: they would
     // inflate the gate and repeat the failure.
     let qterms: HashSet<String> = terms.iter().cloned().collect();
-    let useful = |r: &Record| r.tag != "uncertain" && !same_question(r, &qterms);
+    let useful = |r: &Record| r.tag != "uncertain" && r.tag != "superseded" && !same_question(r, &qterms);
     let mut bm = bm;
     bm.retain(|(r, _)| useful(r));
     dv.retain(|(r, _)| useful(r));
@@ -407,22 +407,99 @@ pub fn fmt_more(hits: &[Hit], shown: &HashSet<String>, n: usize) -> String {
     }
 }
 
-/// The `SessionStart` briefing: preferences, decisions, open tasks and where
-/// the last session left off.
-pub fn briefing(store: &Store, current_session: &str, max_chars: usize, now: i64) -> Result<String> {
+/// When a prompt gets the knowledge written down earlier (decisions, rules,
+/// requirements, facts) that bears on it, independently of the gate.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default)]
+pub struct KnowledgeParams {
+    pub enabled: bool,
+    /// At most this many records per prompt.
+    pub max_records: usize,
+    /// A record qualifies with this cosine similarity to the prompt…
+    pub min_cos: f64,
+    /// …or with this share of the prompt's IDF weight among its terms.
+    pub min_cov: f64,
+    /// Candidates per search.
+    pub n: usize,
+}
+
+impl Default for KnowledgeParams {
+    fn default() -> Self {
+        KnowledgeParams { enabled: true, max_records: 4, min_cos: 0.40, min_cov: 0.30, n: 20 }
+    }
+}
+
+pub const KNOWLEDGE: [Kind; 5] = [Kind::Preference, Kind::Decision, Kind::Fact, Kind::Todo, Kind::Note];
+
+/// Knowledge records that match a prompt well enough on their own text,
+/// best first, leaving out `skip` and records closed as done or superseded.
+pub fn knowledge(store: &Store, query: &str, filter: &Filter, skip: &HashSet<String>, p: &KnowledgeParams) -> Result<Vec<(Record, f64, f64)>> {
+    let mut f = filter.clone();
+    f.kinds = KNOWLEDGE.to_vec();
+    let terms = strata::text::analyze_query(query);
+    let mut by: HashMap<String, (Record, f64)> = HashMap::new();
+    for (r, c) in store.vector_top(&store.embedder.embed_query(query), p.n, &f)? {
+        by.insert(r.id.clone(), (r, c));
+    }
+    if !terms.is_empty() {
+        for (r, _) in store.bm25_top(query, p.n, &f)? {
+            by.entry(r.id.clone()).or_insert((r, 0.0));
+        }
+    }
+    let idf = if terms.is_empty() { Vec::new() } else { store.idf(&terms).unwrap_or_else(|_| vec![1.0; terms.len()]) };
+    let total: f64 = idf.iter().sum();
+    let todo_open = |r: &Record| r.kind != Kind::Todo || r.tag == "planned";
+    let mut out: Vec<(Record, f64, f64)> = by
+        .into_values()
+        .filter(|(r, _)| !skip.contains(&r.id) && r.tag != "superseded" && r.tag != "done" && todo_open(r))
+        .map(|(r, c)| {
+            let have = analyzed(&r.text);
+            let got: f64 = terms.iter().zip(&idf).filter(|(t, _)| have.contains(*t)).map(|(_, w)| w).sum();
+            let cov = if total > 0.0 { got / total } else { 0.0 };
+            (r, c, cov)
+        })
+        .filter(|(_, c, cov)| *c >= p.min_cos || *cov >= p.min_cov)
+        .collect();
+    out.sort_by(|a, b| (b.1 + b.2).total_cmp(&(a.1 + a.2)));
+    out.truncate(p.max_records);
+    Ok(out)
+}
+
+/// The knowledge block of a prompt's context.
+pub fn fmt_knowledge(items: &[(Record, f64, f64)], now: i64) -> String {
+    let mut s = String::from("Engram notes from earlier sessions that may bear on this request (decisions, rules and requirements agreed before; check them before deciding):\n");
+    for (r, _, _) in items {
+        let label = match r.kind {
+            Kind::Todo => "planned",
+            Kind::Preference => "rule",
+            k => k.as_str(),
+        };
+        let t = r.text.split_whitespace().collect::<Vec<_>>().join(" ");
+        s += &format!("- [{label}] {t} ({}, {})\n", r.id, fmt_ago(r.ts, now));
+    }
+    s
+}
+
+/// The briefing given at the start of a session: the knowledge written
+/// down earlier (planned work, rules, decisions, facts), where the last
+/// session left off, and how to search the rest. Returns the text and the
+/// ids it shows, so that per-prompt recall does not repeat them.
+pub fn briefing(store: &Store, current_session: &str, max_chars: usize, now: i64) -> Result<(String, Vec<String>)> {
     let total = store.len();
     if total == 0 {
-        return Ok(String::new());
+        return Ok((String::new(), Vec::new()));
     }
     let none = Filter::default();
-    let mut s = String::new();
     let sessions = store.query("SELECT session, COUNT(*) FROM memory GROUP BY session ORDER BY 2 DESC LIMIT 1000")?.rows.len();
-    let last = store.latest(&[], 1, &Filter { exclude_window: Some((current_session.to_string(), 0)), ..Default::default() })?;
-    s += &format!("Engram memory for this project: {total} records from {sessions} session{}", if sessions == 1 { "" } else { "s" });
+    let prev = Filter { exclude_window: Some((current_session.to_string(), 0)), ..Default::default() };
+    let last = store.latest(&[], 1, &prev)?;
+    let mut s = format!("Engram memory for this project: {total} records from {sessions} session{}", if sessions == 1 { "" } else { "s" });
     if let Some(r) = last.first() {
         s += &format!(", last activity {}", fmt_ago(r.ts, now));
     }
-    s += ". The memory_search, memory_timeline and memory_sql tools query it; memory_remember stores decisions and facts.\n";
+    s += ". Requirements, decisions and conventions agreed in earlier conversations are often not in the code: \
+          before a design decision, and whenever a task refers to earlier work, search memory (memory_search; memory_timeline \
+          shows a record's surroundings, memory_sql runs structured queries). memory_remember stores a new decision or fact.\n";
     let clip = |t: &str, n: usize| -> String {
         let t = t.split_whitespace().collect::<Vec<_>>().join(" ");
         if t.chars().count() > n {
@@ -431,33 +508,48 @@ pub fn briefing(store: &Store, current_session: &str, max_chars: usize, now: i64
             t
         }
     };
-    let section = |title: &str, recs: Vec<Record>, n: usize, s: &mut String| {
-        let recs: Vec<Record> = recs.into_iter().filter(|r| r.tag != "superseded").collect();
-        if recs.is_empty() {
-            return;
-        }
-        *s += &format!("\n{title}\n");
+    let norm = |t: &str| t.split_whitespace().map(|w| w.to_lowercase()).collect::<Vec<_>>().join(" ");
+    // Once knowledge is distilled, the cue-word preferences (sentences
+    // picked from prompts by their wording) only repeat it in fragments.
+    let distilled = !store.query("SELECT id FROM memory WHERE tag = 'distilled' LIMIT 1")?.rows.is_empty();
+    let mut seen: HashSet<String> = HashSet::new();
+    let mut ids = Vec::new();
+    // Most recent first, oldest shown first; one line per record, while the budget lasts.
+    let mut section = |title: &str, recs: Vec<Record>, n: usize, keep: usize, s: &mut String| {
+        let mut lines = Vec::new();
         for r in recs {
-            *s += &format!("- {} ({}, {})\n", clip(&r.text, n), r.id, fmt_ago(r.ts, now));
+            if r.tag == "superseded" || r.tag == "done" || (distilled && r.tag == "cue") || !seen.insert(norm(&r.text)) {
+                continue;
+            }
+            lines.push((r.id.clone(), format!("- {} ({}, {})\n", clip(&r.text, n), r.id, fmt_ago(r.ts, now))));
+            if lines.len() == keep {
+                break;
+            }
+        }
+        lines.reverse();
+        let head = format!("\n{title}\n");
+        let mut added = false;
+        for (id, line) in lines {
+            if s.len() + line.len() + if added { 0 } else { head.len() } > max_chars {
+                continue;
+            }
+            if !added {
+                *s += &head;
+                added = true;
+            }
+            *s += &line;
+            ids.push(id);
         }
     };
-    section("Preferences and rules stated earlier:", store.latest(&[Kind::Preference], 8, &none)?, 220, &mut s);
-    section("Recorded decisions and facts:", store.latest(&[Kind::Decision, Kind::Fact, Kind::Note], 6, &none)?, 220, &mut s);
-    let todos = store.latest(&[Kind::Todo], 2, &none)?;
-    section("Open tasks at the last checkpoint:", todos, 500, &mut s);
-    let prev = Filter { exclude_window: Some((current_session.to_string(), 0)), ..Default::default() };
-    let mut eps = store.latest(&[Kind::Episode], 3, &prev)?;
-    eps.reverse();
-    section("Where the most recent earlier session left off:", eps, 300, &mut s);
-    if s.len() > max_chars {
-        let mut cut = max_chars;
-        while !s.is_char_boundary(cut) {
-            cut -= 1;
-        }
-        s.truncate(cut);
-        s += "…";
-    }
-    Ok(s)
+    let planned: Vec<Record> = store.latest(&[Kind::Todo], 40, &none)?.into_iter().filter(|r| r.tag == "planned").collect();
+    section("Planned work, with the requirements agreed for it:", planned, 400, 10, &mut s);
+    section("Rules and conventions:", store.latest(&[Kind::Preference], 30, &none)?, 260, 12, &mut s);
+    section("Decisions:", store.latest(&[Kind::Decision], 30, &none)?, 260, 10, &mut s);
+    section("Facts about the project:", store.latest(&[Kind::Fact, Kind::Note], 30, &none)?, 260, 10, &mut s);
+    let checkpoint: Vec<Record> = store.latest(&[Kind::Todo], 10, &none)?.into_iter().filter(|r| r.tag != "planned" && r.tag != "done").take(1).collect();
+    section("Open tasks at the last checkpoint:", checkpoint, 500, 1, &mut s);
+    section("Where the most recent earlier session left off:", store.latest(&[Kind::Episode], 3, &prev)?, 300, 3, &mut s);
+    Ok((s, ids))
 }
 
 #[cfg(test)]

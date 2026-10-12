@@ -223,6 +223,14 @@ impl Store {
         Ok(())
     }
 
+    /// Changes a record's tag (e.g. planned work that is now done).
+    pub fn retag(&self, id: &str, tag: &str) -> Result<bool> {
+        let Some(mut r) = self.get(&[id.to_string()])?.pop() else { return Ok(false) };
+        r.tag = tag.to_string();
+        self.insert(&[r])?;
+        Ok(true)
+    }
+
     /// Deletes a record.
     pub fn delete(&self, id: &str) -> Result<bool> {
         let _w = self.write.lock().unwrap();

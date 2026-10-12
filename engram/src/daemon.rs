@@ -35,9 +35,12 @@ pub struct Config {
     pub pack: PackParams,
     pub gate: Gate,
     pub briefing_chars: usize,
+    pub knowledge: recall::KnowledgeParams,
     /// Notes about a file before Edit/Write.
     pub file_notes: bool,
     pub sync: bool,
+    /// Knowledge written down by a small model after each turn.
+    pub distill: crate::distill::DistillConfig,
 }
 
 impl Default for Config {
@@ -48,9 +51,11 @@ impl Default for Config {
             rank: RankParams::default(),
             pack: PackParams::default(),
             gate: Gate::default(),
-            briefing_chars: 2500,
+            briefing_chars: 6000,
+            knowledge: Default::default(),
             file_notes: true,
             sync: true,
+            distill: Default::default(),
         }
     }
 }
@@ -102,6 +107,10 @@ pub struct Daemon {
     /// The state changed since it was last written (it is written after
     /// the response, off the hook's critical path).
     dirty: std::sync::atomic::AtomicBool,
+    /// Background work still running (distillation); shutdown waits for it.
+    pending: std::sync::atomic::AtomicUsize,
+    /// Distillations run one at a time, so each sees what the last wrote.
+    distilling: Mutex<()>,
     last_activity: AtomicI64,
 }
 
@@ -116,7 +125,8 @@ impl Daemon {
         let embedder: Arc<dyn embed::Embedder> = Arc::from(embed::open(&cfg.embedder)?);
         let store = Arc::new(Store::open(&paths.db, embedder, StoreOptions { sync: cfg.sync, ..Default::default() })?);
         let state: State = std::fs::read_to_string(&paths.state).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default();
-        Ok(Daemon { paths, project: project.to_string(), store, cfg, state: Mutex::new(state), dirty: Default::default(), last_activity: AtomicI64::new(now()) })
+        Ok(Daemon { paths, project: project.to_string(), store, cfg, state: Mutex::new(state), dirty: Default::default(), pending: Default::default(),
+            distilling: Mutex::new(()), last_activity: AtomicI64::new(now()) })
     }
 
     fn save_state(&self, st: &State) {
@@ -163,9 +173,10 @@ impl Daemon {
             "forget" => self.op_forget(req).map(|r| (r, None)),
             "append" => self.op_append(req).map(|r| (r, None)),
             "stats" => self.op_stats().map(|r| (r, None)),
+            "distill_backfill" => self.distill_backfill().map(|(t, n)| (json!({"turns": t, "items": n}), None)),
             "briefing" => {
                 let sid = req.get("session").and_then(|v| v.as_str()).unwrap_or("");
-                recall::briefing(&self.store, sid, self.cfg.briefing_chars, now()).map(|t| (json!({"text": t}), None))
+                recall::briefing(&self.store, sid, self.cfg.briefing_chars, now()).map(|(t, _)| (json!({"text": t}), None))
             }
             "shutdown" => {
                 let me = self.clone();
@@ -180,6 +191,10 @@ impl Daemon {
     }
 
     pub fn shutdown(&self) {
+        let until = Instant::now() + Duration::from_secs(self.cfg.distill.timeout_secs + 30);
+        while self.pending.load(Ordering::Acquire) > 0 && Instant::now() < until {
+            std::thread::sleep(Duration::from_millis(200));
+        }
         let _ = self.store.flush();
         let st = self.state.lock().unwrap();
         self.save_state(&st);
@@ -234,7 +249,8 @@ impl Daemon {
                     }
                     s.last_prompts.clone()
                 });
-                let mut text = recall::briefing(&self.store, &sid, self.cfg.briefing_chars, now())?;
+                let (mut text, shown) = recall::briefing(&self.store, &sid, self.cfg.briefing_chars, now())?;
+                self.with_session(&sid, |s| s.injected.extend(shown));
                 if source == "compact" && !last_prompts.is_empty() {
                     let q: Vec<String> = last_prompts.iter().rev().take(2).cloned().collect();
                     if let Some(r) = self.recall_for(&sid, &q.join("\n"), true)? {
@@ -334,6 +350,7 @@ impl Daemon {
                             me.log(&json!({"ts": now(), "error": e.to_string(), "event": "Stop"}));
                         }
                         me.store.warm();
+                        me.distill_turn(&sid, turn, now(), &ep.prompt, &answer, &ep.commands);
                     })),
                 ))
             }
@@ -375,6 +392,111 @@ impl Daemon {
         }
     }
 
+    /// Writes down what a turn decided, ruled or announced (see
+    /// [`crate::distill`]): new items that are not near-copies of what is
+    /// already noted, replacements (the old item is marked superseded), and
+    /// planned work it completed (marked done).
+    pub fn distill_turn(&self, sid: &str, turn: i64, ts: i64, prompt: &str, answer: &str, commands: &[String]) {
+        if !self.cfg.distill.active() || (prompt.trim().is_empty() && answer.trim().is_empty()) {
+            return;
+        }
+        self.pending.fetch_add(1, Ordering::AcqRel);
+        let _one = self.distilling.lock().unwrap_or_else(|e| e.into_inner());
+        let known: Vec<Record> = self
+            .store
+            .latest(&recall::KNOWLEDGE, 80, &Filter::default())
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|r| r.tag != "superseded" && r.tag != "done" && (r.kind != Kind::Todo || r.tag == "planned"))
+            .take(40)
+            .collect();
+        let listed: Vec<(String, Kind, String)> = known.iter().rev().map(|r| (r.id.clone(), r.kind, r.text.clone())).collect();
+        let t0 = Instant::now();
+        match crate::distill::distill(&self.cfg.distill, prompt, answer, commands, &listed) {
+            Ok(d) => {
+                let is_known = |id: &String| known.iter().any(|r| &r.id == id);
+                let replaced: Vec<String> = d.replaced.into_iter().filter(|id| is_known(id)).collect();
+                let done: Vec<String> = d.done.into_iter().filter(|id| known.iter().any(|r| &r.id == id && r.kind == Kind::Todo)).collect();
+                // Near-copies of what is noted (other than what they replace) add nothing.
+                let terms = |t: &str| -> HashSet<String> { strata::text::analyze(t).into_iter().collect() };
+                let mut seen: Vec<HashSet<String>> = known.iter().filter(|r| !replaced.contains(&r.id)).map(|r| terms(&r.text)).collect();
+                let ctx = format!("Turn {turn} request: {}", prompt.chars().take(200).collect::<String>());
+                let n = d.drafts.len();
+                let mut drafts = Vec::new();
+                for x in d.drafts {
+                    let t = terms(&x.text);
+                    let dup = seen.iter().any(|s| {
+                        let inter = s.intersection(&t).count() as f64;
+                        let union = (s.len() + t.len()) as f64 - inter;
+                        union > 0.0 && inter / union >= 0.6
+                    });
+                    if !dup {
+                        seen.push(t);
+                        drafts.push(x.ctx(ctx.clone()));
+                    }
+                }
+                let kept = drafts.len();
+                if !drafts.is_empty() {
+                    if let Err(e) = self.store.append(sid, turn, ts, drafts) {
+                        self.log(&json!({"ts": now(), "error": e.to_string(), "event": "distill"}));
+                    }
+                }
+                for id in &replaced {
+                    let _ = self.store.retag(id, "superseded");
+                }
+                for id in &done {
+                    let _ = self.store.retag(id, "done");
+                }
+                self.store.warm();
+                self.log(&json!({"ts": now(), "event": "distill", "session": sid, "turn": turn, "items": n, "kept": kept,
+                    "replaced": replaced, "done": done, "cost_usd": d.cost_usd, "ms": t0.elapsed().as_millis() as u64}));
+            }
+            Err(e) => self.log(&json!({"ts": now(), "event": "distill", "session": sid, "turn": turn, "error": e.to_string()})),
+        }
+        self.pending.fetch_sub(1, Ordering::AcqRel);
+    }
+
+    /// Distills every past turn of the store that has a prompt (for stores
+    /// recorded before distillation existed). Returns (turns, items).
+    fn distill_backfill(&self) -> Result<(usize, usize)> {
+        let rs = self.store.query(&format!("SELECT {} FROM memory WHERE kind IN ('prompt', 'answer', 'episode') ORDER BY seq ASC LIMIT 1000000", crate::record::COLUMNS))?;
+        let recs: Vec<Record> = rs.rows.iter().filter_map(|r| crate::store::row_record(r)).collect();
+        // (session, turn) -> (prompt, answer, commands)
+        let mut turns: Vec<((String, i64), (String, String, Vec<String>, i64))> = Vec::new();
+        for r in recs {
+            let key = (r.session.clone(), r.turn);
+            if turns.last().map_or(true, |(k, _)| *k != key) {
+                turns.push((key.clone(), Default::default()));
+            }
+            let (_, (p, a, c, ts)) = turns.last_mut().unwrap();
+            *ts = (*ts).max(r.ts);
+            match r.kind {
+                Kind::Prompt => {
+                    p.push_str(&r.text);
+                    p.push('\n');
+                }
+                Kind::Answer if r.tag != "narration" => {
+                    a.push_str(&r.text);
+                    a.push('\n');
+                }
+                Kind::Episode => {
+                    if let Some(line) = r.text.lines().find(|l| l.starts_with("Ran: ")) {
+                        c.extend(line[5..].split(" ; ").map(String::from));
+                    }
+                }
+                _ => {}
+            }
+        }
+        let before = self.store.len();
+        let n = turns.len();
+        for ((sid, turn), (p, a, c, ts)) in turns {
+            if !p.trim().is_empty() {
+                self.distill_turn(&sid, turn, ts, p.trim(), a.trim(), &c);
+            }
+        }
+        Ok((n, (self.store.len() - before) as usize))
+    }
+
     /// Stores assistant text written between tool calls since the last scan
     /// of the transcript (hooks only see the final message of a turn).
     fn sync_narration(&self, sid: &str, turn: i64, path: &str, final_answer: &str, ctx: &str) {
@@ -397,7 +519,7 @@ impl Daemon {
 
     /// Gated recall for a prompt in a session; `force` skips the gate.
     fn recall_for(&self, sid: &str, prompt: &str, force: bool) -> Result<Option<String>> {
-        let (w, skip) = {
+        let (w, mut skip) = {
             let st = self.state.lock().unwrap();
             let s = st.sessions.get(sid).cloned().unwrap_or_default();
             (s.window_start, s.injected)
@@ -405,27 +527,37 @@ impl Daemon {
         let query: String = prompt.chars().take(2000).collect();
         let filter = Filter { exclude_window: Some((sid.to_string(), w)), ..Default::default() };
         let t0 = Instant::now();
+        // Knowledge that matches the prompt on its own text is shown even
+        // when the gate holds back the rest: a request that does not sound
+        // like earlier work can still be bound by what was agreed.
+        let known = if self.cfg.knowledge.enabled { recall::knowledge(&self.store, &query, &filter, &skip, &self.cfg.knowledge)? } else { Vec::new() };
+        let mut ids: Vec<String> = known.iter().map(|(r, _, _)| r.id.clone()).collect();
+        skip.extend(ids.iter().cloned());
         let (hits, ev) = recall::search(&self.store, &query, &filter, &self.cfg.rank)?;
         let g = self.cfg.gate.score(&ev);
         let decision = if force && !hits.is_empty() { Decision::Inject } else { self.cfg.gate.decide(&ev) };
-        let (text, ids) = match decision {
-            _ if hits.is_empty() => (None, Vec::new()),
+        let mut parts = Vec::new();
+        if !known.is_empty() {
+            parts.push(recall::fmt_knowledge(&known, now()));
+        }
+        match decision {
+            _ if hits.is_empty() => {}
             Decision::Inject | Decision::Brief => {
                 let weak = decision == Decision::Brief;
                 let params = if weak { PackParams::brief() } else { self.cfg.pack.clone() };
                 let items = recall::pack(&hits, &query, &skip, &params);
-                let ids: Vec<String> = items.iter().map(|(r, _)| r.id.clone()).collect();
-                if items.is_empty() {
-                    (None, ids)
-                } else {
-                    let shown: HashSet<String> = ids.iter().cloned().chain(skip.iter().cloned()).collect();
+                if !items.is_empty() {
+                    let packed: Vec<String> = items.iter().map(|(r, _)| r.id.clone()).collect();
+                    let shown: HashSet<String> = packed.iter().cloned().chain(skip.iter().cloned()).collect();
                     let mut t = recall::fmt_recall_as(&items, now(), weak);
                     t += &recall::fmt_more(&hits, &shown, if weak { 5 } else { 3 });
-                    (Some(t), ids)
+                    parts.push(t);
+                    ids.extend(packed);
                 }
             }
-            Decision::Skip => (None, Vec::new()),
-        };
+            Decision::Skip => {}
+        }
+        let text = if parts.is_empty() { None } else { Some(parts.join("\n")) };
         if !ids.is_empty() {
             let mut st = self.state.lock().unwrap();
             if let Some(s) = st.sessions.get_mut(sid) {
@@ -433,9 +565,10 @@ impl Daemon {
             }
             self.dirty.store(true, Ordering::Release);
         }
+        let known: Vec<Json> = known.iter().map(|(r, c, v)| json!({"id": r.id, "cos": c, "cov": v})).collect();
         self.log(&json!({
             "ts": now(), "event": "recall", "session": sid, "decision": format!("{decision:?}"), "gate": g,
-            "evidence": ev, "candidates": hits.len(), "injected": ids, "chars": text.as_ref().map_or(0, |t| t.len()),
+            "evidence": ev, "candidates": hits.len(), "injected": ids, "knowledge": known, "chars": text.as_ref().map_or(0, |t| t.len()),
             "ms": t0.elapsed().as_secs_f64() * 1e3,
         }));
         Ok(text)

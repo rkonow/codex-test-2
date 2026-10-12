@@ -63,6 +63,9 @@ enum Cmd {
     Stats,
     /// Print the session-start briefing.
     Briefing,
+    /// Write down the decisions, rules, requirements and facts of every
+    /// stored turn (for a store recorded before distillation existed).
+    Distill,
     /// Stop the daemon.
     Stop,
     /// Back-fill records from a Claude Code transcript.
@@ -124,6 +127,7 @@ fn main() {
         Cmd::Remember { kind, text: t } => text(&send(&project, json!({"op": "remember", "kind": kind, "text": t}), 30)),
         Cmd::Stats => println!("{}", serde_json::to_string_pretty(&send(&project, json!({"op": "stats"}), 30)).unwrap()),
         Cmd::Briefing => text(&send(&project, json!({"op": "briefing", "session": ""}), 30)),
+        Cmd::Distill => println!("{}", send(&project, json!({"op": "distill_backfill"}), 6 * 3600)),
         Cmd::Stop => {
             send(&project, json!({"op": "shutdown"}), 10);
         }
