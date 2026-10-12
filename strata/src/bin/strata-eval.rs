@@ -41,7 +41,7 @@ use strata::workload::{generate, Kind, Workload, WorkloadConfig, WorkloadQuery};
 struct Args {
     #[arg(long, value_delimiter = ',', default_value = "scifact")]
     collections: Vec<String>,
-    #[arg(long, value_delimiter = ',', default_value = "workload,hybrid,planner")]
+    #[arg(long, value_delimiter = ',', default_value = "workload,hybrid,planner,showcase")]
     studies: Vec<String>,
     /// Vector index: hnsw, ivf or flat.
     #[arg(long, default_value = "hnsw")]
@@ -290,6 +290,10 @@ fn run_collection(args: &Args, name: &str) -> Result<()> {
         let doc = hybrid_study(args, &sys, &coll)?;
         write_json(&out_dir.join(format!("hybrid{suffix}_{name}.json")), &doc)?;
     }
+    if args.studies.iter().any(|s| s == "showcase") {
+        let doc = showcase(&sys, &coll)?;
+        write_json(&out_dir.join(format!("showcase{suffix}_{name}.json")), &doc)?;
+    }
     if args.studies.iter().any(|s| s == "planner") {
         let doc = planner_study(args, &sys, &coll, &w)?;
         write_json(&out_dir.join(format!("planner{suffix}_{name}.json")), &doc)?;
@@ -514,4 +518,39 @@ fn planner_study(args: &Args, sys: &StrataSys, coll: &Collection, w: &Workload) 
         );
     }
     Ok(json!({"collection": coll.name, "kinds": per_kind}))
+}
+
+/// Compound queries that exercise the dialect end to end: their latency,
+/// result counts and the plan each segment ran.
+const SHOWCASE: &[(&str, &str)] = &[
+    ("phrase, boolean and negation", "SELECT id, title FROM docs WHERE MATCH(body, '\"how do i\" AND (learn OR study) -money') LIMIT 10"),
+    ("prefix and conjunction", "SELECT COUNT(*) FROM docs WHERE MATCH(body, 'progr* AND language')"),
+    ("ranked text, OR / NOT filter", "SELECT id, score() FROM docs WHERE (category IN ('c01', 'c02') OR rating > 4.5) AND NOT topic = 't03' ORDER BY bm25(body, 'best programming language to learn first') DESC LIMIT 10"),
+    ("filtered vector, OR filter", "SELECT id, score() FROM docs WHERE year < 1995 OR category = 'c40' ORDER BY similarity(emb, :q) DESC LIMIT 10"),
+    ("filtered hybrid, weighted", "SELECT id, score() FROM docs WHERE rating >= 3 AND year BETWEEN 2005 AND 2020 ORDER BY 0.2 * bm25(body, :t) + 0.8 * similarity(emb, :q) DESC LIMIT 10"),
+    ("hybrid, RRF on a correlated filter", "SELECT id, score() FROM docs WHERE topic IN ('t05', 't06', 't07') ORDER BY rrf(bm25(body, :t), similarity(emb, :q)) DESC LIMIT 10"),
+    ("facets over a text match", "SELECT topic, COUNT(*) FROM docs WHERE MATCH(body, 'india') AND year BETWEEN 2000 AND 2010 GROUP BY topic ORDER BY 2 DESC, 1 LIMIT 5"),
+    ("text filter, ordered by a column", "SELECT id, rating FROM docs WHERE MATCH(body, 'travel AND visa') ORDER BY rating DESC, id LIMIT 5"),
+    ("count over a boolean and a range", "SELECT COUNT(*) FROM docs WHERE MATCH(body, 'iphone OR android') AND rating BETWEEN 2 AND 3"),
+    ("nearest by distance, exact", "SELECT id FROM docs WHERE category IN ('c00', 'c01', 'c02', 'c03') ORDER BY distance(emb, :q, strategy => 'prefilter') LIMIT 10"),
+];
+
+fn showcase(sys: &StrataSys, coll: &Collection) -> Result<Json> {
+    let db = sys.db();
+    let q = &coll.queries[0];
+    let params = Params::new().set("q", Value::Vector(q.vector.clone())).set("t", Value::Str(q.text.clone()));
+    let mut rows = Vec::new();
+    for (label, sql) in SHOWCASE {
+        let rs = db.query(sql, &params)?;
+        let (ms, _) = timed(5, || Ok(ids(&db.query(sql, &params)?.rows)))?;
+        let first = rs.rows.first().map(|r| r.iter().map(|v| match v {
+            Value::Str(s) => s.chars().take(60).collect::<String>(),
+            Value::Int(x) => x.to_string(),
+            Value::Float(x) => format!("{x:.4}"),
+            _ => String::new(),
+        }).collect::<Vec<_>>().join(" · "));
+        eprintln!("   showcase {label}: {ms:.3} ms, {} rows", rs.rows.len());
+        rows.push(json!({"label": label, "sql": sql, "ms": ms, "rows": rs.rows.len(), "first": first, "plan": rs.stats.plan}));
+    }
+    Ok(json!({"collection": coll.name, "query_text": q.text, "queries": rows}))
 }
