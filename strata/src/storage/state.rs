@@ -47,12 +47,17 @@ pub(crate) struct SegHandle {
 }
 
 impl SegHandle {
-    pub fn open(map: &OwnedBytes, meta: &SegmentMeta) -> Result<SegHandle> {
+    /// `random_hints`: advise the segment's random-access sections
+    /// `MADV_RANDOM` ([`SegmentFile::advise_random_sections`]).
+    pub fn open(map: &OwnedBytes, meta: &SegmentMeta, random_hints: bool) -> Result<SegHandle> {
         let within = |e: &Extent| e.range().end <= map.len();
         if !within(&meta.extent) || meta.deletes.as_ref().is_some_and(|e| !within(e)) {
             return Err(corrupt(format!("segment {} lies outside the file", meta.id)));
         }
         let file = SegmentFile::open(map.slice(meta.extent.range()))?;
+        if random_hints {
+            file.advise_random_sections();
+        }
         let pk = PkIndex::open(&file)?;
         if file.n_docs() != meta.n_docs as usize || pk.as_ref().is_some_and(|p| p.len() != file.n_docs()) {
             return Err(corrupt(format!("segment {} document count disagrees with manifest", meta.id)));

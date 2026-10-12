@@ -140,6 +140,19 @@ impl SegmentWriter {
     }
 }
 
+/// Whether a section is read at random positions: graph hops, float32
+/// re-ranking, per-document lengths, dictionary blocks, doc store and key
+/// lookups. Everything else (postings, codes, columns, IVF clusters) is read
+/// a run at a time and benefits from the kernel's read-ahead.
+pub fn random_access(name: &str) -> bool {
+    name == "pk"
+        || name.starts_with("store.")
+        || name.ends_with(".norms")
+        || name.ends_with(".dict")
+        || name.ends_with(".f32")
+        || name.contains(".hnsw")
+}
+
 /// A read-only segment: zero-copy views of its sections.
 #[derive(Clone, Debug)]
 pub struct SegmentFile {
@@ -199,6 +212,26 @@ impl SegmentFile {
 
     pub fn image(&self) -> &OwnedBytes {
         &self.bytes
+    }
+
+    /// Advises the kernel to read the [`random_access`] sections of a mapped
+    /// segment without read-ahead (`MADV_RANDOM`), so a cold page fault there
+    /// reads one page instead of up to 32. Only whole pages inside a section
+    /// are advised.
+    pub fn advise_random_sections(&self) {
+        let base = self.bytes.as_ptr() as usize;
+        for (name, &(o, l)) in &self.sections {
+            if !random_access(name) || l < PAGE {
+                continue;
+            }
+            let start = (base + o).next_multiple_of(PAGE);
+            let end = (base + o + l) / PAGE * PAGE;
+            if end > start {
+                // SAFETY: the range lies inside this segment's mapped bytes;
+                // MADV_RANDOM only changes read-ahead, never the contents.
+                unsafe { libc::madvise(start as *mut libc::c_void, end - start, libc::MADV_RANDOM) };
+            }
+        }
     }
 }
 

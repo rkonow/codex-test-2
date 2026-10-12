@@ -70,6 +70,10 @@ pub struct DbOptions {
     /// access (dictionary probes, graph hops, doc store fetches) when the
     /// data is not cached.
     pub read_ahead: bool,
+    /// With read-ahead on, advise the sections that are read at random
+    /// positions (graph, float32 vectors, norms, dictionaries, doc store,
+    /// keys) `MADV_RANDOM`, keeping read-ahead for scanned sections.
+    pub random_hints: bool,
 }
 
 impl Default for DbOptions {
@@ -82,6 +86,7 @@ impl Default for DbOptions {
             sync: true,
             doc_source: None,
             read_ahead: true,
+            random_hints: true,
         }
     }
 }
@@ -186,7 +191,7 @@ impl Database {
             file.set_len(meta.page_count * PAGE)?;
         }
         let map = pager::map_file(&file, opts.read_ahead)?;
-        let handles = manifest.segments.iter().map(|m| SegHandle::open(&map, m).map(Arc::new)).collect::<Result<_>>()?;
+        let handles = manifest.segments.iter().map(|m| SegHandle::open(&map, m, opts.read_ahead && opts.random_hints).map(Arc::new)).collect::<Result<_>>()?;
         let wal_path = wal_path(path);
         let (mut wal, txns) = Wal::open(&wal_path, meta.db_id, opts.sync)?;
         let schema = Arc::new(manifest.schema.clone());
@@ -618,7 +623,7 @@ impl Database {
             .iter()
             .map(|m| match old.iter().find(|h| h.meta == *m) {
                 Some(h) => Ok(h.clone()),
-                None => SegHandle::open(&map, m).map(Arc::new),
+                None => SegHandle::open(&map, m, self.opts.read_ahead && self.opts.random_hints).map(Arc::new),
             })
             .collect::<Result<Vec<_>>>()
             .map_err(|e| self.poison(e))?;
