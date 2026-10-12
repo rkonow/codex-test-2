@@ -362,6 +362,7 @@ impl<'a> Executor<'a> {
             set = DocSet::from_sorted(set.iter().filter(|&d| live.contains(d)).collect(), s.r.n_docs);
         }
         self.stats.filter_docs += set.len() as u64;
+        self.stats.plan.push(format!("seg {}: filter materialised, {} docs", s.ord, set.len()));
         let set = Arc::new(set);
         self.sets.insert(s.ord, set.clone());
         Ok(set)
@@ -472,6 +473,7 @@ impl<'a> Executor<'a> {
                 (Pred::True, None) => s.r.n_docs as u64,
                 (Pred::Range { field, lo, hi }, None) => {
                     let num = self.numeric(s, *field)?;
+                    self.stats.plan.push(format!("seg {}: count from the range index", s.ord));
                     forward::count_range(num.col(), num.index(), *lo, *hi, self.opts.range) as u64
                 }
                 _ => self.filter_set(s, p)?.len() as u64,
