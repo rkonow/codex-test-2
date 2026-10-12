@@ -7,6 +7,7 @@
 //! and returns it as context the model sees. An MCP server ([`mcp`]) gives
 //! the model search, timeline and SQL tools over the same store.
 
+pub mod benchdata;
 pub mod capture;
 pub mod daemon;
 pub mod embed;

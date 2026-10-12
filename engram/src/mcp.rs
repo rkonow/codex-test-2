@@ -32,7 +32,7 @@ fn tools() -> Json {
             "name": "memory_timeline",
             "description": "The records just before and after a record id in its session, with full text: what was asked, what was run, what came out.",
             "inputSchema": {"type": "object", "properties": {
-                "id": {"type": "string"}, "before": {"type": "integer", "default": 4}, "after": {"type": "integer", "default": 4}
+                "id": {"type": "string"}, "before": {"type": "integer", "default": 8}, "after": {"type": "integer", "default": 8}
             }, "required": ["id"]}
         },
         {

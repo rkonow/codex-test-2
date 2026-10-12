@@ -19,6 +19,7 @@ use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value as Json};
 
+use engram::benchdata::{parse_time, Question, Unit};
 use engram::capture::chunk;
 use engram::embed::{self, Embedder};
 use engram::recall::{self, PackParams, RankParams};
@@ -81,6 +82,26 @@ enum Cmd {
         #[arg(long, default_value_t = 200)]
         hook_gap_ms: u64,
     },
+    /// Where a prompt's time goes, the write-then-query stall under memtable
+    /// settings, and hooks through a process against an in-process client.
+    Latency {
+        #[arg(long)]
+        data: PathBuf,
+        #[arg(long, value_delimiter = ',', default_value = "10000,100000,1000000")]
+        sizes: Vec<usize>,
+        #[arg(long, default_value = "static")]
+        embedder: String,
+        #[arg(long, default_value = "results/latency")]
+        out: PathBuf,
+        #[arg(long, default_value_t = 94)]
+        queries: usize,
+        /// Append-then-query rounds per memtable configuration.
+        #[arg(long, default_value_t = 600)]
+        rounds: usize,
+        /// Hook invocations per path.
+        #[arg(long, default_value_t = 100)]
+        hooks: usize,
+    },
     /// Prints embeddings (JSON lines) for comparing implementations.
     EmbedCheck {
         #[arg(long)]
@@ -115,6 +136,11 @@ enum Cmd {
         dump_missing: Option<PathBuf>,
         #[arg(long, value_delimiter = ',')]
         dump_probes: Vec<PathBuf>,
+        /// Override the packing caps (records per turn, records in all).
+        #[arg(long)]
+        per_turn: Option<usize>,
+        #[arg(long)]
+        max_records: Option<usize>,
     },
 }
 
@@ -184,66 +210,6 @@ fn open_embedder(spec: &str) -> Arc<dyn Embedder> {
         return Arc::new(CachedOnly { dim: dim.parse().expect("cached:<dim>:<name>"), name: format!("cached:{name}") });
     }
     Arc::from(embed::open(spec).expect("embedder"))
-}
-
-#[derive(Clone, Debug, Deserialize)]
-struct Turn {
-    turn_id: String,
-    session_id: String,
-    role: String,
-    text: String,
-    timestamp: Option<String>,
-    #[serde(default)]
-    image_caption: Option<String>,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-struct Question {
-    qid: String,
-    question: String,
-    question_type: String,
-    evidence_turn_ids: Vec<String>,
-    evidence_session_ids: Vec<String>,
-    abstention: bool,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-struct Unit {
-    dataset: String,
-    unit_id: String,
-    turns: Vec<Turn>,
-    questions: Vec<Question>,
-}
-
-/// Unix seconds of a LongMemEval ("2023/05/20 (Sat) 02:21") or LoCoMo
-/// ("1:56 pm on 8 May, 2023") timestamp; 0 when unparseable.
-fn parse_time(s: &str) -> i64 {
-    let civil = |y: i64, m: i64, d: i64| -> i64 {
-        let y2 = if m <= 2 { y - 1 } else { y };
-        let era = y2.div_euclid(400);
-        let yoe = y2 - era * 400;
-        let doy = (153 * ((m + 9) % 12) + 2) / 5 + d - 1;
-        era * 146_097 + yoe * 365 + yoe / 4 - yoe / 100 + doy - 719_468
-    };
-    let digits: Vec<i64> = s.split(|c: char| !c.is_ascii_digit()).filter(|x| !x.is_empty()).filter_map(|x| x.parse().ok()).collect();
-    if s.contains('/') && digits.len() >= 5 {
-        return civil(digits[0], digits[1], digits[2]) * 86_400 + digits[3] * 3600 + digits[4] * 60;
-    }
-    const MONTHS: [&str; 12] = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
-    let low = s.to_lowercase();
-    if let Some(m) = MONTHS.iter().position(|m| low.contains(&format!(" {m}"))) {
-        if digits.len() >= 4 {
-            let (mut h, mi, d, y) = (digits[0], digits[1], digits[2], digits[3]);
-            if low.contains("pm") && h < 12 {
-                h += 12;
-            }
-            if low.contains("am") && h == 12 {
-                h = 0;
-            }
-            return civil(y, m as i64 + 1, d) * 86_400 + h * 3600 + mi * 60;
-        }
-    }
-    0
 }
 
 fn clip(s: &str, n: usize) -> String {
@@ -416,7 +382,8 @@ fn metrics(hits: &[engram::store::Hit], q: &Question, query: &str) -> QMetrics {
     let brief = recall::pack(hits, query, &HashSet::new(), &PackParams::brief());
     m.pack_brief = brief.iter().any(|(r, _)| ev.contains(r.tag.as_str())) as u8 as f64;
     for (budget, slot) in [(4000usize, 0), (8000, 1)] {
-        let p = PackParams { budget_chars: budget, max_records: budget / 500, ..PackParams::default() };
+        // As many records per character as the product default (10 per 4,000).
+        let p = PackParams { budget_chars: budget, max_records: budget * PackParams::default().max_records / PackParams::default().budget_chars, ..PackParams::default() };
         let items = recall::pack(hits, query, &HashSet::new(), &p);
         let cov = items.iter().any(|(r, _)| ev.contains(r.tag.as_str())) as u8 as f64;
         if slot == 0 {
@@ -525,8 +492,11 @@ fn main() {
             eprintln!("{} texts in {:.1} ms", texts.len(), t0.elapsed().as_secs_f64() * 1e3);
         }
         Cmd::Scale { data, sizes, embedder, out, queries, hooks, hook_gap_ms } => scale_cmd(&data, &sizes, &embedder, &out, queries, hooks, hook_gap_ms),
-        Cmd::Probes { transcript, probes, points, embedder, project, out, cache, dump_missing, dump_probes } => {
-            probes_cmd(&transcript, &probes, &points, &embedder, &project, &out, cache.as_deref(), dump_missing.as_deref(), &dump_probes)
+        Cmd::Latency { data, sizes, embedder, out, queries, rounds, hooks } => latency_cmd(&data, &sizes, &embedder, &out, queries, rounds, hooks),
+        Cmd::Probes { transcript, probes, points, embedder, project, out, cache, dump_missing, dump_probes, per_turn, max_records } => {
+            let d = PackParams::default();
+            let pack = PackParams { per_turn: per_turn.unwrap_or(d.per_turn), max_records: max_records.unwrap_or(d.max_records), ..d };
+            probes_cmd(&transcript, &probes, &points, &embedder, &project, &out, cache.as_deref(), dump_missing.as_deref(), &dump_probes, &pack)
         }
         Cmd::Retrieval { data, embedder, ctx, out, every, limit, threads, cache, tag, dump_missing } => {
             let t0 = Instant::now();
@@ -683,7 +653,7 @@ struct Probe {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn probes_cmd(transcript: &Path, probes: &Path, points: &[String], embedder: &str, project: &str, out: &Path, cache: Option<&Path>, dump: Option<&Path>, dump_probes: &[PathBuf]) {
+fn probes_cmd(transcript: &Path, probes: &Path, points: &[String], embedder: &str, project: &str, out: &Path, cache: Option<&Path>, dump: Option<&Path>, dump_probes: &[PathBuf], pack: &PackParams) {
     use engram::recall::Gate;
     use engram::transcript as tr;
     let probes: Vec<Probe> = serde_json::from_str(&std::fs::read_to_string(probes).expect("probes")).expect("probes json");
@@ -762,7 +732,7 @@ fn probes_cmd(transcript: &Path, probes: &Path, points: &[String], embedder: &st
                 let (hits, ev) = recall::search(&store, &p.q, &filter, &rank).unwrap();
                 let ms = t1.elapsed().as_secs_f64() * 1e3;
                 let hit = |t: &str| pats[i].iter().any(|r| r.is_match(t));
-                let items = recall::pack(&hits, &p.q, &HashSet::new(), &PackParams::default());
+                let items = recall::pack(&hits, &p.q, &HashSet::new(), pack);
                 let inject = recall::fmt_recall(&items, 0);
                 let decision = gate.decide(&ev);
                 let auto = match decision {
@@ -801,6 +771,87 @@ fn probes_cmd(transcript: &Path, probes: &Path, points: &[String], embedder: &st
 
 // ---------------------------------------------------------------- scale
 
+/// Needle in a haystack: the evidence ("answer_") sessions of every fifth
+/// unit's question, mixed at random positions into generic filler sessions
+/// (no evidence) repeated until there are `n` records. Returns the records,
+/// the questions with their evidence texts, and the evidence record count.
+#[allow(clippy::type_complexity)]
+fn haystack(units: &[Unit], n: usize, n_queries: usize) -> (Vec<Record>, Vec<(Question, HashSet<String>)>, usize) {
+    let mut evidence: Vec<Vec<Record>> = Vec::new();
+    let mut qs: Vec<(Question, HashSet<String>)> = Vec::new();
+    let mut filler: Vec<Vec<Record>> = Vec::new();
+    let mut seen_sessions: HashSet<String> = HashSet::new();
+    for (ui, u) in units.iter().enumerate() {
+        let ur = records(u, "round");
+        let mut by_session: Vec<(String, Vec<Record>)> = Vec::new();
+        for r in ur {
+            match by_session.last_mut() {
+                Some((sid, v)) if *sid == r.session => v.push(r),
+                _ => by_session.push((r.session.clone(), vec![r])),
+            }
+        }
+        if ui % 5 == 0 {
+            if let Some(q) = u.questions.iter().find(|q| !q.abstention && !q.evidence_turn_ids.is_empty()) {
+                let ids: HashSet<&str> = q.evidence_turn_ids.iter().map(|s| s.as_str()).collect();
+                let mut ev = HashSet::new();
+                for (sid, v) in &by_session {
+                    if q.evidence_session_ids.contains(sid) {
+                        ev.extend(v.iter().filter(|r| ids.contains(r.tag.as_str())).map(|r| r.text.clone()));
+                        let mut v = v.clone();
+                        v.iter_mut().for_each(|r| r.session = format!("u{ui}:{}", r.session));
+                        evidence.push(v);
+                    }
+                }
+                if !ev.is_empty() {
+                    qs.push((q.clone(), ev));
+                }
+            }
+        }
+        for (sid, v) in by_session {
+            if !sid.starts_with("answer_") && seen_sessions.insert(sid) {
+                filler.push(v);
+            }
+        }
+    }
+    qs.truncate(n_queries);
+    let ev_records: usize = evidence.iter().map(|v| v.len()).sum();
+    // Deterministic shuffle of session order (evidence among filler).
+    let mut sessions: Vec<Vec<Record>> = evidence;
+    let mut copy = 0usize;
+    let mut total = ev_records;
+    'fill: loop {
+        for f in &filler {
+            if total >= n {
+                break 'fill;
+            }
+            let mut v = f.clone();
+            if copy > 0 {
+                v.iter_mut().for_each(|r| r.session = format!("c{copy}:{}", r.session));
+            }
+            total += v.len();
+            sessions.push(v);
+        }
+        copy += 1;
+    }
+    let mut rng: u64 = 0x9e3779b97f4a7c15;
+    for i in (1..sessions.len()).rev() {
+        rng ^= rng << 13;
+        rng ^= rng >> 7;
+        rng ^= rng << 17;
+        sessions.swap(i, (rng % (i as u64 + 1)) as usize);
+    }
+    let mut recs: Vec<Record> = Vec::with_capacity(total);
+    for v in sessions {
+        for mut r in v {
+            let seq = recs.len() as i64 + 1;
+            r.seq = seq;
+            r.id = format!("r{seq}");
+            recs.push(r);
+        }
+    }
+    (recs, qs, ev_records)
+}
+
 fn pct(v: &mut [f64], p: f64) -> f64 {
     if v.is_empty() {
         return 0.0;
@@ -817,81 +868,7 @@ fn scale_cmd(data: &Path, sizes: &[usize], embedder: &str, out: &Path, n_queries
     let mut results = Vec::new();
     for &n in sizes {
         eprintln!("== {n} records");
-        // Needle in a haystack: the evidence ("answer_") sessions of every
-        // fifth unit's question, mixed at random positions into generic
-        // filler sessions (no evidence) repeated until the store has n records.
-        let mut evidence: Vec<Vec<Record>> = Vec::new();
-        let mut qs: Vec<(Question, HashSet<String>)> = Vec::new();
-        let mut filler: Vec<Vec<Record>> = Vec::new();
-        let mut seen_sessions: HashSet<String> = HashSet::new();
-        for (ui, u) in units.iter().enumerate() {
-            let ur = records(u, "round");
-            let mut by_session: Vec<(String, Vec<Record>)> = Vec::new();
-            for r in ur {
-                match by_session.last_mut() {
-                    Some((sid, v)) if *sid == r.session => v.push(r),
-                    _ => by_session.push((r.session.clone(), vec![r])),
-                }
-            }
-            if ui % 5 == 0 {
-                if let Some(q) = u.questions.iter().find(|q| !q.abstention && !q.evidence_turn_ids.is_empty()) {
-                    let ids: HashSet<&str> = q.evidence_turn_ids.iter().map(|s| s.as_str()).collect();
-                    let mut ev = HashSet::new();
-                    for (sid, v) in &by_session {
-                        if q.evidence_session_ids.contains(sid) {
-                            ev.extend(v.iter().filter(|r| ids.contains(r.tag.as_str())).map(|r| r.text.clone()));
-                            let mut v = v.clone();
-                            v.iter_mut().for_each(|r| r.session = format!("u{ui}:{}", r.session));
-                            evidence.push(v);
-                        }
-                    }
-                    if !ev.is_empty() {
-                        qs.push((q.clone(), ev));
-                    }
-                }
-            }
-            for (sid, v) in by_session {
-                if !sid.starts_with("answer_") && seen_sessions.insert(sid) {
-                    filler.push(v);
-                }
-            }
-        }
-        qs.truncate(n_queries);
-        let ev_records: usize = evidence.iter().map(|v| v.len()).sum();
-        // Deterministic shuffle of session order (evidence among filler).
-        let mut sessions: Vec<Vec<Record>> = evidence;
-        let mut copy = 0usize;
-        let mut total = ev_records;
-        'fill: loop {
-            for f in &filler {
-                if total >= n {
-                    break 'fill;
-                }
-                let mut v = f.clone();
-                if copy > 0 {
-                    v.iter_mut().for_each(|r| r.session = format!("c{copy}:{}", r.session));
-                }
-                total += v.len();
-                sessions.push(v);
-            }
-            copy += 1;
-        }
-        let mut rng: u64 = 0x9e3779b97f4a7c15;
-        for i in (1..sessions.len()).rev() {
-            rng ^= rng << 13;
-            rng ^= rng >> 7;
-            rng ^= rng << 17;
-            sessions.swap(i, (rng % (i as u64 + 1)) as usize);
-        }
-        let mut recs: Vec<Record> = Vec::with_capacity(total);
-        for v in sessions {
-            for mut r in v {
-                let seq = recs.len() as i64 + 1;
-                r.seq = seq;
-                r.id = format!("r{seq}");
-                recs.push(r);
-            }
-        }
+        let (recs, qs, ev_records) = haystack(&units, n, n_queries);
         let n = recs.len();
         let chars: usize = recs.iter().map(|r| r.text.len() + r.ctx.len()).sum();
 
@@ -1014,5 +991,245 @@ fn scale_cmd(data: &Path, sizes: &[usize], embedder: &str, out: &Path, n_queries
         let _ = std::fs::remove_dir_all(&home);
         std::fs::create_dir_all(out).unwrap();
         std::fs::write(out.join(format!("scale_{}.json", embedder.split(':').next().unwrap_or("x"))), serde_json::to_string_pretty(&results).unwrap()).unwrap();
+    }
+}
+
+// ---------------------------------------------------------------- latency
+
+fn ms_since(t: Instant) -> f64 {
+    t.elapsed().as_secs_f64() * 1e3
+}
+
+fn stats(v: &[f64]) -> Json {
+    let mut v = v.to_vec();
+    let mean = v.iter().sum::<f64>() / v.len().max(1) as f64;
+    json!({"p50": pct(&mut v, 0.5), "p90": pct(&mut v, 0.9), "p99": pct(&mut v, 0.99), "mean": mean, "n": v.len()})
+}
+
+/// The IDF lookup Engram used before: one COUNT query per term.
+fn idf_by_count(store: &Store, terms: &[String]) -> Vec<f64> {
+    let n = store.len().max(1) as f64;
+    terms
+        .iter()
+        .map(|t| {
+            let rs = store.query(&format!("SELECT COUNT(*) FROM memory WHERE MATCH(body, '{}')", t.replace(['\'', '"', '*', '(', ')', '-'], "")));
+            let df = rs.ok().and_then(|r| r.rows.first().and_then(|x| x[0].as_i64())).unwrap_or(0).max(0) as f64;
+            (1.0 + (n - df + 0.5) / (df + 0.5)).ln()
+        })
+        .collect()
+}
+
+fn run_hook(exe: &Path, home: &Path, project: &Path, event: &str, payload: &Json) -> f64 {
+    let t = Instant::now();
+    let mut child = std::process::Command::new(exe)
+        .args(["hook", event])
+        .env("ENGRAM_HOME", home)
+        .env("CLAUDE_PROJECT_DIR", project)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .unwrap();
+    {
+        use std::io::Write;
+        child.stdin.take().unwrap().write_all(payload.to_string().as_bytes()).unwrap();
+    }
+    child.wait().unwrap();
+    ms_since(t)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn latency_cmd(data: &Path, sizes: &[usize], embedder: &str, out: &Path, n_queries: usize, rounds: usize, n_hooks: usize) {
+    let e = open_embedder(embedder);
+    let units = engram::benchdata::read_units(data, 1, None).expect("data");
+    let mut results = Vec::new();
+    std::fs::create_dir_all(out).unwrap();
+    for &n in sizes {
+        eprintln!("== {n} records");
+        let (recs, qs, _) = haystack(&units, n, n_queries);
+        let texts: Vec<String> = recs.iter().map(|r| r.embed_text()).collect();
+        let refs: Vec<&str> = texts.iter().map(|s| s.as_str()).collect();
+        let embs: Vec<Vec<f32>> = std::thread::scope(|s| {
+            let chunks: Vec<&[&str]> = refs.chunks((refs.len() / 4).max(1)).collect();
+            let hs: Vec<_> = chunks.into_iter().map(|c| { let e = e.clone(); s.spawn(move || e.embed(c)) }).collect();
+            hs.into_iter().flat_map(|h| h.join().unwrap()).collect()
+        });
+        drop(texts);
+        let home = std::env::temp_dir().join(format!("engram-latency-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&home);
+        let project = home.join("proj");
+        std::fs::create_dir_all(&project).unwrap();
+        std::env::set_var("ENGRAM_HOME", &home);
+        let dir = engram::paths::store_dir(&project);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("config.json"), serde_json::to_string(&json!({"embedder": embedder})).unwrap()).unwrap();
+        let db = dir.join("memory.strata");
+        {
+            let store = Store::open(&db, e.clone(), StoreOptions { sync: false, flush_docs: usize::MAX / 8, ..Default::default() }).unwrap();
+            store.bulk_insert(&recs, embs).unwrap();
+        }
+        let n = recs.len();
+        drop(recs);
+        let mut row = serde_json::Map::new();
+        row.insert("records".into(), json!(n));
+
+        // 0. What a daemon start pays for the embedder: opening it now (the
+        //    table is mapped), against reading and converting the whole
+        //    table as Engram did before.
+        if embedder == "static" {
+            let dir = embed::models_dir().join("potion-retrieval-32M");
+            let t = Instant::now();
+            let fresh = embed::open("static").unwrap();
+            let _ = fresh.embed_query("warm up the first rows");
+            let open_ms = ms_since(t);
+            let t = Instant::now();
+            let bytes = std::fs::read(dir.join("model.safetensors")).unwrap();
+            let floats: Vec<f32> = bytes[bytes.len() % 4..].chunks_exact(4).map(|c| f32::from_le_bytes(c.try_into().unwrap())).collect();
+            let read_ms = ms_since(t);
+            std::hint::black_box(floats.len());
+            eprintln!("  embedder open {open_ms:.1} ms (mapped); reading the table {read_ms:.1} ms");
+            row.insert("embedder_open_ms".into(), json!(open_ms));
+            row.insert("table_read_ms".into(), json!(read_ms));
+        }
+
+        // 1. Where a prompt's time goes (warm store, nothing pending).
+        {
+            let store = Store::open(&db, e.clone(), StoreOptions::default()).unwrap();
+            store.warm();
+            let filter = Filter { exclude_window: Some(("bench-live".into(), i64::MAX)), ..Default::default() };
+            let rank = RankParams::default();
+            let mut ph: HashMap<&str, Vec<f64>> = HashMap::new();
+            for (q, _) in qs.iter().cycle().take(qs.len() * 2) {
+                let terms = strata::text::analyze_query(&q.question);
+                let t = Instant::now();
+                let v = store.embedder.embed_query(&q.question);
+                ph.entry("embed_query").or_default().push(ms_since(t));
+                let t = Instant::now();
+                let bm = store.bm25_top(&q.question, rank.n, &filter).unwrap();
+                ph.entry("bm25_top50").or_default().push(ms_since(t));
+                let t = Instant::now();
+                let dv = store.vector_top(&v, rank.n, &filter).unwrap();
+                ph.entry("vector_top50").or_default().push(ms_since(t));
+                let t = Instant::now();
+                let _ = store.idf(&terms).unwrap();
+                ph.entry("idf_dictionary").or_default().push(ms_since(t));
+                let t = Instant::now();
+                let _ = idf_by_count(&store, &terms);
+                ph.entry("idf_count_queries").or_default().push(ms_since(t));
+                let t = Instant::now();
+                let (hits, _) = recall::fuse(&store, &q.question, &terms, bm, dv, &rank);
+                ph.entry("fuse").or_default().push(ms_since(t));
+                let t = Instant::now();
+                let items = recall::pack(&hits, &q.question, &HashSet::new(), &PackParams::default());
+                let _ = recall::fmt_recall(&items, 0);
+                ph.entry("pack_format").or_default().push(ms_since(t));
+                let t = Instant::now();
+                let _ = recall::search(&store, &q.question, &filter, &rank).unwrap();
+                ph.entry("search_total").or_default().push(ms_since(t));
+            }
+            let m: serde_json::Map<String, Json> = ph.iter().map(|(k, v)| (k.to_string(), stats(v))).collect();
+            eprintln!("  phases: {}", m.iter().map(|(k, v)| format!("{k} {:.2}", v["p50"].as_f64().unwrap_or(0.0))).collect::<Vec<_>>().join(", "));
+            row.insert("phases".into(), Json::Object(m));
+        }
+
+        // 2. A write, then a query right away (a tool call followed by the
+        //    next hook), under memtable settings. Each configuration starts
+        //    from the bulk-loaded file: its appends stay in the memtable and
+        //    the WAL (fewer than a flush's worth), and the WAL is deleted
+        //    afterwards, which leaves the file as it was.
+        let wal = { let mut w = db.as_os_str().to_owned(); w.push("-wal"); PathBuf::from(w) };
+        let mut stall = serde_json::Map::new();
+        for (name, chunk, flat) in [("chunk1024_hnsw", 1024usize, false), ("chunk1024_flat", 1024, true), ("chunk256_flat", 256, true), ("chunk64_flat", 64, true)] {
+            let _ = std::fs::remove_file(&wal);
+            assert!(rounds * 2 < StoreOptions::default().flush_docs, "the appends must stay below a flush");
+            let store = Store::open(&db, e.clone(), StoreOptions { sync: true, mem_chunk_docs: chunk, mem_flat: flat, ..Default::default() }).unwrap();
+            store.warm();
+            let filter = Filter { exclude_window: Some(("bench-live".into(), i64::MAX)), ..Default::default() };
+            let rank = RankParams::default();
+            let (mut app, mut first, mut second, mut rebuild) = (Vec::new(), Vec::new(), Vec::new(), Vec::new());
+            for i in 0..rounds {
+                let drafts = vec![
+                    engram::record::Draft::new(Kind::ToolCall, format!("$ cargo test --package p{i} -- --nocapture")).ctx("Turn 3 request: fix the parser"),
+                    engram::record::Draft::new(Kind::ToolResult, format!("running 12 tests\ntest parser::tests::case_{i} ... ok\ntest result: ok. {i} passed; 0 failed")).ctx("Turn 3 request: fix the parser"),
+                ];
+                let t = Instant::now();
+                store.append("bench-live", i as i64, 0, drafts).unwrap();
+                app.push(ms_since(t));
+                let q = &qs[i % qs.len()].0.question;
+                if i % 2 == 0 {
+                    // Back to back: the query pays for the rebuild.
+                    let t = Instant::now();
+                    let (hits, _) = recall::search(&store, q, &filter, &rank).unwrap();
+                    let _ = recall::pack(&hits, q, &HashSet::new(), &PackParams::default());
+                    first.push(ms_since(t));
+                } else {
+                    // With a pause: the rebuild alone, then a query.
+                    let t = Instant::now();
+                    store.warm();
+                    rebuild.push(ms_since(t));
+                    let t = Instant::now();
+                    let (hits, _) = recall::search(&store, q, &filter, &rank).unwrap();
+                    let _ = recall::pack(&hits, q, &HashSet::new(), &PackParams::default());
+                    second.push(ms_since(t));
+                }
+            }
+            drop(store);
+            let _ = std::fs::remove_file(&wal);
+            eprintln!(
+                "  {name}: append {:.2}, rebuild {:.2}, query after write {:.2} (p99 {:.2}), query after rebuild {:.2}",
+                pct(&mut app.clone(), 0.5),
+                pct(&mut rebuild.clone(), 0.5),
+                pct(&mut first.clone(), 0.5),
+                pct(&mut first.clone(), 0.99),
+                pct(&mut second.clone(), 0.5)
+            );
+            stall.insert(name.into(), json!({"chunk": chunk, "flat": flat, "append": stats(&app), "rebuild": stats(&rebuild), "query_after_write": stats(&first), "query_after_rebuild": stats(&second)}));
+        }
+        row.insert("stall".into(), Json::Object(stall));
+
+        // 3. Hooks: a process per event (command hook) against a request
+        //    from a client that is already running (what an HTTP hook pays,
+        //    less its TCP and HTTP framing).
+        {
+            let exe = std::env::current_exe().unwrap().with_file_name("engram");
+            // The first hook starts the daemon (through the engram binary, as
+            // in Claude Code).
+            let first = json!({"session_id": "bench-hook", "hook_event_name": "Notification", "cwd": project});
+            row.insert("daemon_start_ms".into(), json!(run_hook(&exe, &home, &project, "Notification", &first)));
+            let mut paths: HashMap<&str, Vec<f64>> = HashMap::new();
+            for i in 0..n_hooks {
+                let q = &qs[i % qs.len()].0.question;
+                let prompt = json!({"session_id": "bench-hook", "hook_event_name": "UserPromptSubmit", "prompt": q, "cwd": project});
+                let tool = json!({"session_id": "bench-hook", "hook_event_name": "PostToolUse", "tool_name": "Bash", "cwd": project,
+                    "tool_input": {"command": format!("cargo test case_{i}")}, "tool_response": {"stdout": format!("test result: ok. {i} passed"), "stderr": ""}});
+                let nothing = json!({"session_id": "bench-hook", "hook_event_name": "Notification", "cwd": project});
+                std::thread::sleep(std::time::Duration::from_millis(150));
+                paths.entry("process_noop").or_default().push(run_hook(&exe, &home, &project, "Notification", &nothing));
+                std::thread::sleep(std::time::Duration::from_millis(150));
+                paths.entry("process_prompt").or_default().push(run_hook(&exe, &home, &project, "UserPromptSubmit", &prompt));
+                std::thread::sleep(std::time::Duration::from_millis(150));
+                paths.entry("process_tool").or_default().push(run_hook(&exe, &home, &project, "PostToolUse", &tool));
+                std::thread::sleep(std::time::Duration::from_millis(150));
+                let t = Instant::now();
+                let _ = engram::daemon::request(&dir, &project.to_string_lossy(), &json!({"op": "hook", "event": "Notification", "payload": nothing}), std::time::Duration::from_secs(5));
+                paths.entry("client_noop").or_default().push(ms_since(t));
+                std::thread::sleep(std::time::Duration::from_millis(150));
+                let t = Instant::now();
+                let _ = engram::daemon::request(&dir, &project.to_string_lossy(), &json!({"op": "hook", "event": "UserPromptSubmit", "payload": prompt}), std::time::Duration::from_secs(5));
+                paths.entry("client_prompt").or_default().push(ms_since(t));
+                std::thread::sleep(std::time::Duration::from_millis(150));
+                let t = Instant::now();
+                let _ = engram::daemon::request(&dir, &project.to_string_lossy(), &json!({"op": "hook", "event": "PostToolUse", "payload": tool}), std::time::Duration::from_secs(5));
+                paths.entry("client_tool").or_default().push(ms_since(t));
+            }
+            let _ = engram::daemon::request(&dir, &project.to_string_lossy(), &json!({"op": "shutdown"}), std::time::Duration::from_secs(5));
+            std::thread::sleep(std::time::Duration::from_millis(300));
+            let m: serde_json::Map<String, Json> = paths.iter().map(|(k, v)| (k.to_string(), stats(v))).collect();
+            eprintln!("  hooks: {}", m.iter().map(|(k, v)| format!("{k} {:.2}", v["p50"].as_f64().unwrap_or(0.0))).collect::<Vec<_>>().join(", "));
+            row.insert("hooks".into(), Json::Object(m));
+        }
+        let _ = std::fs::remove_dir_all(&home);
+        results.push(Json::Object(row));
+        std::fs::write(out.join(format!("latency_{}.json", embedder.split(':').next().unwrap_or("x"))), serde_json::to_string_pretty(&results).unwrap()).unwrap();
     }
 }

@@ -10,9 +10,12 @@ use serde_json::Value as Json;
 use crate::record::{Draft, Kind};
 use crate::redact::redact;
 
-/// Largest chunk stored as one record.
-pub const CHUNK_CHARS: usize = 1500;
-/// Results longer than this keep only their head and tail chunks.
+/// Largest chunk stored as one record. Small records make precise keys and
+/// fill a context budget with more distinct evidence (results/structure).
+pub const CHUNK_CHARS: usize = 400;
+/// The unit long outputs are kept or dropped in (see [`head_tail_chunks`]).
+pub const SOURCE_CHARS: usize = 1500;
+/// Results longer than this many source units keep only their head and tail.
 pub const KEEP_HEAD_CHUNKS: usize = 3;
 
 fn char_floor(s: &str, mut i: usize) -> usize {
@@ -25,12 +28,27 @@ fn char_floor(s: &str, mut i: usize) -> usize {
 /// Splits `text` into chunks of at most `max` bytes, preferring line, then
 /// sentence, then word boundaries.
 pub fn chunk(text: &str, max: usize) -> Vec<String> {
-    let text = text.trim();
-    if text.is_empty() {
-        return Vec::new();
-    }
+    chunk_spans(text, max).into_iter().map(|(s, e)| text[s..e].to_string()).collect()
+}
+
+/// The byte ranges of [`chunk`]'s pieces in `text`.
+pub fn chunk_spans(text: &str, max: usize) -> Vec<(usize, usize)> {
+    let lead = text.len() - text.trim_start().len();
+    let trimmed = text.trim();
     let mut out = Vec::new();
-    let mut rest = text;
+    if trimmed.is_empty() {
+        return out;
+    }
+    // `rest` is text[base..base + rest.len()].
+    let mut base = lead;
+    let mut rest = trimmed;
+    let mut push = |s: usize, piece: &str| {
+        let t = piece.trim();
+        if !t.is_empty() {
+            let s = s + (piece.len() - piece.trim_start().len());
+            out.push((s, s + t.len()));
+        }
+    };
     while rest.len() > max {
         let cut = char_floor(rest, max);
         let window = &rest[..cut];
@@ -43,27 +61,28 @@ pub fn chunk(text: &str, max: usize) -> Vec<String> {
             .unwrap_or(cut);
         let at = if at == 0 { cut.max(1) } else { at };
         let at = char_floor(rest, at).max(rest.char_indices().nth(1).map_or(rest.len(), |(i, _)| i));
-        out.push(rest[..at].trim().to_string());
-        rest = rest[at..].trim_start();
+        push(base, &rest[..at]);
+        let next = rest[at..].trim_start();
+        base += rest.len() - next.len();
+        rest = next;
     }
     if !rest.is_empty() {
-        out.push(rest.to_string());
+        push(base, rest);
     }
-    out.retain(|c| !c.is_empty());
     out
 }
 
-/// Chunks of a long output: the first [`KEEP_HEAD_CHUNKS`] and the last,
-/// with a marker for what was dropped.
+/// Chunks of a long output: the first [`KEEP_HEAD_CHUNKS`] source units and
+/// the last, with a marker for what was dropped, cut into records.
 pub fn head_tail_chunks(text: &str) -> Vec<String> {
-    let mut c = chunk(text, CHUNK_CHARS);
+    let mut c = chunk(text, SOURCE_CHARS);
     if c.len() > KEEP_HEAD_CHUNKS + 1 {
         let dropped: usize = c[KEEP_HEAD_CHUNKS..c.len() - 1].iter().map(|x| x.len()).sum();
         let last = c.pop().unwrap();
         c.truncate(KEEP_HEAD_CHUNKS);
         c.push(format!("[… {dropped} characters omitted …]\n{last}"));
     }
-    c
+    c.iter().flat_map(|u| chunk(u, CHUNK_CHARS)).collect()
 }
 
 fn clip(s: &str, max: usize) -> String {
@@ -228,7 +247,9 @@ pub fn tool_drafts(tool: &str, input: &Json, resp: &Json, project: &str) -> Vec<
                 d.push(Draft::new(Kind::ToolCall, text).tag(tool).files(files.clone()));
             }
             if failed {
-                d.push(Draft::new(Kind::Error, clip(&out_text, CHUNK_CHARS)).tag(tool).files(files));
+                for c in chunk(&clip(&out_text, SOURCE_CHARS), CHUNK_CHARS) {
+                    d.push(Draft::new(Kind::Error, c).tag(tool).files(files.clone()));
+                }
             }
         }
         "Write" => {
@@ -413,9 +434,19 @@ mod tests {
         assert!(c.iter().all(|x| x.len() <= 300));
         assert!(c.iter().all(|x| x.starts_with("line ")));
         assert_eq!(c.join("\n"), text);
+        let padded = format!("  \n{text}\n\n");
+        let spans = chunk_spans(&padded, 300);
+        assert_eq!(spans.iter().map(|&(s, e)| &padded[s..e]).collect::<Vec<_>>(), c);
+        assert!(spans.windows(2).all(|w| w[0].1 < w[1].0));
+        // 200 lines of ~30 bytes: 5 source units, of which the first three
+        // and the last are kept, each cut into records.
         let ht = head_tail_chunks(&text);
-        assert_eq!(ht.len(), KEEP_HEAD_CHUNKS + 1);
-        assert!(ht[KEEP_HEAD_CHUNKS].contains("omitted"));
+        let units = chunk(&text, SOURCE_CHARS);
+        assert!(units.len() > KEEP_HEAD_CHUNKS + 1);
+        assert!(ht.iter().all(|x| x.len() <= CHUNK_CHARS));
+        assert!(ht.join("\n").starts_with(&units[..KEEP_HEAD_CHUNKS].join("\n")));
+        assert_eq!(ht.iter().filter(|x| x.contains("omitted")).count(), 1);
+        assert!(ht.join("\n").ends_with(units.last().unwrap().as_str()));
         assert_eq!(chunk("é".repeat(1000).as_str(), 301).concat(), "é".repeat(1000));
     }
 

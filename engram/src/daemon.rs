@@ -99,6 +99,9 @@ pub struct Daemon {
     pub store: Arc<Store>,
     pub cfg: Config,
     state: Mutex<State>,
+    /// The state changed since it was last written (it is written after
+    /// the response, off the hook's critical path).
+    dirty: std::sync::atomic::AtomicBool,
     last_activity: AtomicI64,
 }
 
@@ -113,7 +116,7 @@ impl Daemon {
         let embedder: Arc<dyn embed::Embedder> = Arc::from(embed::open(&cfg.embedder)?);
         let store = Arc::new(Store::open(&paths.db, embedder, StoreOptions { sync: cfg.sync, ..Default::default() })?);
         let state: State = std::fs::read_to_string(&paths.state).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default();
-        Ok(Daemon { paths, project: project.to_string(), store, cfg, state: Mutex::new(state), last_activity: AtomicI64::new(now()) })
+        Ok(Daemon { paths, project: project.to_string(), store, cfg, state: Mutex::new(state), dirty: Default::default(), last_activity: AtomicI64::new(now()) })
     }
 
     fn save_state(&self, st: &State) {
@@ -129,6 +132,14 @@ impl Daemon {
             if std::fs::write(&tmp, s).is_ok() {
                 let _ = std::fs::rename(tmp, &self.paths.state);
             }
+        }
+    }
+
+    /// Writes the session state if it changed.
+    pub fn persist(&self) {
+        if self.dirty.swap(false, Ordering::AcqRel) {
+            let st = self.state.lock().unwrap();
+            self.save_state(&st);
         }
     }
 
@@ -182,7 +193,7 @@ impl Daemon {
         let s = st.sessions.entry(sid.to_string()).or_default();
         s.last_seen = now();
         let out = f(s);
-        self.save_state(&st);
+        self.dirty.store(true, Ordering::Release);
         out
     }
 
@@ -420,7 +431,7 @@ impl Daemon {
             if let Some(s) = st.sessions.get_mut(sid) {
                 s.injected.extend(ids.iter().cloned());
             }
-            self.save_state(&st);
+            self.dirty.store(true, Ordering::Release);
         }
         self.log(&json!({
             "ts": now(), "event": "recall", "session": sid, "decision": format!("{decision:?}"), "gate": g,
@@ -496,8 +507,8 @@ impl Daemon {
 
     fn op_timeline(&self, req: &Json) -> Result<Json> {
         let id = req.get("id").and_then(|v| v.as_str()).unwrap_or("");
-        let before = req.get("before").and_then(|v| v.as_u64()).unwrap_or(4) as usize;
-        let after = req.get("after").and_then(|v| v.as_u64()).unwrap_or(4) as usize;
+        let before = req.get("before").and_then(|v| v.as_u64()).unwrap_or(8) as usize;
+        let after = req.get("after").and_then(|v| v.as_u64()).unwrap_or(8) as usize;
         let rec = self.store.get(&[id.to_string()])?.pop().ok_or_else(|| err(format!("no record {id}")))?;
         let near = self.store.range(&rec.session, rec.seq - 200, rec.seq + 200)?;
         let at = near.iter().position(|r| r.id == rec.id).unwrap_or(0);
@@ -642,6 +653,7 @@ pub fn serve(dir: &Path, project: &str) -> Result<()> {
             let _ = writeln!(w, "{resp}");
             let _ = w.flush();
             drop(w);
+            d.persist();
             if let Some(f) = deferred {
                 f();
             }

@@ -53,7 +53,14 @@ socket.
 - **Lazy start.** The first client to find no socket spawns the daemon under
   a spawn lock, and the daemon exits after 30 idle minutes.
 - **Warm state.** The embedder, segment readers and the memtable stay in
-  memory between hooks.
+  memory between hooks. The embedding table is memory-mapped, so a daemon
+  starts without reading it.
+- **Cheap writes.** A write makes the next query rebuild the last memtable
+  chunk's in-memory segment. Chunks hold 256 records and scan their vectors
+  instead of building a graph (Strata's `mem_build` option), so a query right
+  after a tool call no longer waits tens of milliseconds for that rebuild.
+  IDF for the gate comes from the segments' term dictionaries, not from a
+  `COUNT` query per term.
 - **Never in the way.** A client that cannot reach the daemon within its
   deadline prints nothing and exits 0. A memory failure never blocks a
   prompt or a tool call.
@@ -78,13 +85,26 @@ One Strata table, `memory`:
 | `ts` | INT | Unix seconds |
 | `importance` | FLOAT | salience prior in [0, 1] |
 | `files` | TEXT | paths the record touches (path components are terms) |
-| `text` | TEXT, stored, positions | the content (one chunk, at most about 1,500 characters) |
-| `emb` | VECTOR(d), HNSW | embedding of `text` |
+| `text` | TEXT, stored | the value: one chunk of at most 400 bytes, injected as is |
+| `ctx` | TEXT, stored | the turn's request (≤ 200 characters) or a summary's section: part of the lexical key, never shown |
+| `body` | TEXT, generated from `text` and `ctx`, positions | the lexical key that `bm25` and `MATCH` search |
+| `emb` | VECTOR(d), HNSW | the dense key: embedding of `text` alone |
+
+Each record is one key–value pair with attributes. The keys are small and
+precise: a 400-byte window matches a question better than a 1,500-byte
+chunk in which the answer is one fact among many, and a context budget holds
+about ten such windows instead of five snippets. The turn's request joins
+the lexical key, so that a terse tool result ("test result: ok") is found by
+the words of the task it served; it stays out of the vector, where it would
+pull every response towards its request and crowd out the request itself.
+`report/structure.html` has the comparison of layouts behind these choices.
 
 Records come in three levels:
 
 - **L0, events.** User prompts, assistant answers, tool calls and results.
-  Long results are chunked, and large ones keep only their head and tail.
+  Text is cut into records of at most 400 bytes at line, sentence or word
+  boundaries. Large results keep only their head (three units of 1,500
+  bytes) and tail (one unit), then are cut the same way.
   `Read` results are stored as stubs, since the file is on disk and may
   have changed. Edits keep the new text, because the history of a file's
   changes is the valuable part.
@@ -139,7 +159,7 @@ There are three push points and one pull path:
 2. **`UserPromptSubmit`: gated recall.** Search with the prompt, then
    apply a three-way gate:
    - strong evidence: inject the top records, at most 4,000 characters;
-   - weak evidence: inject the top two records, at most 1,200 characters,
+   - weak evidence: inject the top three records, at most 1,200 characters,
      marked as a weak match;
    - otherwise: nothing.
 3. **`PreToolUse` on `Edit`/`Write`: file notes.** Inject up to two older
@@ -170,9 +190,10 @@ Priors then break near-ties without overriding relevance:
 Candidates exclude answers that admitted not knowing (tagged `uncertain`
 at capture) and stored prompts that are the same question again; both match
 a repeated question best and would only replay a failure. Packing is greedy
-by \(S\). At most two chunks are taken per episode, so
-that more distinct pieces of evidence fit. Each record is trimmed to the
-window of at most 600 characters with the most query terms. Each injected
+by \(S\), at most twelve records and eight per user turn (a coding turn
+spans many records; a tighter cap dropped answers that were a fourth
+record of a turn already shown). Records are at most 400 bytes, so each is
+shown whole. Each injected
 line carries its provenance: kind, session, turn, relative time and id. Up to five further
 candidates follow as one line each (id and opening words), for the model to
 open with `memory_timeline`.
@@ -189,7 +210,7 @@ the top record, and whether the prompt refers back:
 
 Past-reference cues include "earlier", "we decided", "last time", "again"
 and "remember". The full budget is injected when \(G \ge \theta_{\text{hi}}\),
-and two records when \(\theta_{\text{lo}} \le G < \theta_{\text{hi}}\). The
+and three records when \(\theta_{\text{lo}} \le G < \theta_{\text{hi}}\). The
 weights come from a logistic fit on LongMemEval-S (`scripts/fit_gate.py`):
 - **positives:** questions whose evidence the packed injection contains;
 - **negatives:** questions asked against another conversation's store,
@@ -206,7 +227,7 @@ differ.
 | `PostToolUse`, `Stop` client | < 10 ms (queued, embedded and committed in the background) |
 | `UserPromptSubmit` | < 100 ms p99 at 1M records |
 | `SessionStart` | < 150 ms (daemon already up), < 1 s with daemon spawn |
-| background | after each write, the daemon rebuilds the in-memory segment so the next query does not |
+| background | after each write, the daemon rebuilds the in-memory segment (at most 256 records, no graph) so the next query does not |
 | ingest | > 1,000 records per second with the static embedder |
 
 The default embedder is static (Model2Vec potion-retrieval-32M: token

@@ -1,0 +1,173 @@
+"""Assemble report/structure.html (what a memory record should be) from
+report/structure/, the shared style and chart helpers of posting_bench's
+reports, and results/.
+Usage: python3 scripts/build_structure_report.py"""
+import datetime
+import gzip
+import json
+import pathlib
+from collections import defaultdict
+
+root = pathlib.Path(__file__).resolve().parent.parent
+results = root / "results"
+src = root / "report" / "structure"
+shared = root.parent / "posting_bench" / "report"
+
+
+def load(path):
+    p = results / path
+    return json.loads(p.read_text()) if p.exists() else None
+
+
+def structure(name):
+    d = load(f"structure/{name}.json")
+    if not d:
+        return None
+    a = d["all"]
+    by_type = {t: {"n": v["n"], "pack": {k: m for k, m in v["pack"].items() if k.endswith("|4000")}, "rank": v["rank"]} for t, v in d.get("by_type", {}).items()}
+    return {
+        "units": d["units"], "questions": d["questions"], "budgets": d["budgets"], "layouts": d["layouts"], "presentations": d["presentations"],
+        "rows_per_unit": d["rows_per_unit"], "n": a["n"], "n_verbatim": a["n_verbatim"], "n_multi": a["n_multi"],
+        "pack": a["pack"], "rank": a["rank"], "by_type": by_type,
+    }
+
+
+def transcript():
+    d = load("structure/transcript.json")
+    if not d:
+        return None
+    # Pool the three probe sets per (point, fresh): weighted by eligible probes.
+    pooled = defaultdict(lambda: defaultdict(lambda: [0.0, 0]))
+    sets = defaultdict(dict)
+    for r in d["results"]:
+        key = f"{r['point']}|{'fresh' if r['fresh'] else 'compacted'}"
+        n = r["eligible"]
+        for k, v in r["pack"].items():
+            acc = pooled[key][k]
+            acc[0] += v * n
+            acc[1] += n
+        rank = pooled[key][f"{r['layout']}|rank10"]
+        rank[0] += r["rank10"] * n
+        rank[1] += n
+        sets[key][f"{r['set']}|{r['layout']}"] = {"eligible": n, "rank1": r["rank1"], "rank10": r["rank10"], "pack": {k: v for k, v in r["pack"].items() if k.endswith(("|2000", "|4000"))}}
+    out = {k: {kk: vv[0] / max(1, vv[1]) for kk, vv in v.items()} for k, v in pooled.items()}
+    n = {}
+    for r in d["results"]:
+        key = f"{r['point']}|{'fresh' if r['fresh'] else 'compacted'}"
+        n.setdefault(key, {})[r["set"]] = r["eligible"]
+    return {"pooled": out, "eligible": n, "sets": sets, "budgets": d["budgets"]}
+
+
+def reader(out_dir, judge="haiku"):
+    base = results / out_dir
+    if not (base / "answers.jsonl").exists():
+        return None
+    answers = {}
+    for line in (base / "answers.jsonl").read_text().splitlines():
+        r = json.loads(line)
+        answers[(r["config"], r["qid"])] = r
+    verdicts = {}
+    vpath = base / f"verdicts_{judge}.jsonl"
+    if vpath.exists():
+        for line in vpath.read_text().splitlines():
+            v = json.loads(line)
+            verdicts[(v["config"], v["qid"])] = v["correct"]
+    rows = defaultdict(list)
+    for k, r in answers.items():
+        if k in verdicts:
+            rows[k[0]].append({"qid": k[1], "type": "abstention" if r["abstention"] else r["qtype"], "ok": verdicts[k], "chars": r["context_chars"], "tokens": r["reader_tokens"], "cost": r["cost_reader"]})
+    return rows
+
+
+def summarize(rows, qids=None):
+    out = {}
+    for cfg, rs in rows.items():
+        if qids is not None:
+            rs = [r for r in rs if r["qid"] in qids]
+        if not rs:
+            continue
+        by = defaultdict(list)
+        for r in rs:
+            by[r["type"]].append(r["ok"])
+        out[cfg] = {
+            "n": len(rs), "acc": sum(r["ok"] for r in rs) / len(rs),
+            "by_type": {t: {"n": len(v), "acc": sum(v) / len(v)} for t, v in by.items()},
+            "chars": sum(r["chars"] for r in rs) / len(rs), "tokens": sum(r["tokens"] for r in rs) / len(rs),
+            "cost": sum(r["cost"] for r in rs) / len(rs),
+        }
+    return out
+
+
+main = reader("reader", judge="sonnet") or {}
+full = reader("reader_full", judge="sonnet") or {}
+facts = reader("reader_facts", judge="sonnet") or {}
+full_q = {r["qid"] for r in full.get("full", [])}
+facts_q = {r["qid"] for rs in facts.values() for r in rs}
+# The small judge against the large one, on every answer graded by both.
+agree = None
+pairs = []
+for d in ("reader", "reader_facts", "reader_full"):
+    small, large = reader(d, judge="haiku") or {}, reader(d, judge="sonnet") or {}
+    for cfg, rs in large.items():
+        sm = {r["qid"]: r["ok"] for r in small.get(cfg, [])}
+        pairs += [(sm[r["qid"]], r["ok"]) for r in rs if r["qid"] in sm]
+if pairs:
+    agree = {"n": len(pairs), "agree": sum(a == b for a, b in pairs) / len(pairs), "small_acc": sum(a for a, _ in pairs) / len(pairs), "large_acc": sum(b for _, b in pairs) / len(pairs)}
+
+# Accuracy when the packed context does or does not hold the evidence.
+conditional = {}
+rows_path = results / "structure" / "longmemeval_s.rows.jsonl.gz"
+if rows_path.exists():
+    qrows = {json.loads(l)["qid"]: json.loads(l) for l in gzip.open(rows_path, "rt")}
+    for cfg, key in [("today", "turn+req|snip600|4000"), ("turn", "turn|snip600|4000"), ("win400", "win400+req/vec-text|snip600|4000")]:
+        ok = {r["qid"]: r["ok"] for r in main.get(cfg, [])}
+        out = {}
+        for metric in ("ev", "ans"):
+            g = defaultdict(list)
+            for q, r in qrows.items():
+                m = r["pack"].get(key, {})
+                if q in ok and m.get(metric) is not None:
+                    g[int(m[metric])].append(ok[q])
+            out[metric] = {str(k): {"n": len(v), "acc": sum(v) / len(v)} for k, v in g.items()}
+        conditional[cfg] = out
+
+data = {
+    "generated": datetime.date.today().isoformat(),
+    "lme": structure("longmemeval_s"),
+    "locomo": structure("locomo"),
+    "facts": structure("longmemeval_s_facts"),
+    "coding": transcript(),
+    "reader": summarize(main),
+    "reader_full_subset": {**summarize(main, full_q), **summarize(full)},
+    "reader_facts_subset": {**summarize(main, facts_q), **summarize(facts)},
+    "judge_agreement": agree,
+    "conditional": conditional,
+    # Before: 1,500-byte records. LoCoMo's "round" context is the previous
+    # turn for every turn, the same as Engram's request context there.
+    "retrieval": {k: load(f"retrieval/{k}.json") for k in ["longmemeval_s_static_request", "longmemeval_s_static_request_c400", "locomo_static_round", "locomo_static_request_c400"]},
+    "gate_before": load("gate_static.json"),
+    "gate_after": load("gate_static_c400.json"),
+    "probes_before": {k: load(f"{k}/merged_static.json") for k in ["probes", "probes_lost", "probes_vague"]},
+    "probes_after": {k: load(f"probes_after/{k}/merged_static.json") for k in ["probes", "probes_lost", "probes_vague"]},
+    "latency": load("latency/latency_static.json"),
+    # The same run before the daemon moved its state write after the reply.
+    "latency_pre": load("latency/latency_static_pre_persist.json"),
+    "facts_cost": load("structure/facts_cost.json"),
+}
+for k in ("longmemeval_s_static_request", "longmemeval_s_static_request_c400", "locomo_static_round", "locomo_static_request_c400"):
+    d = data["retrieval"][k]
+    if d:
+        data["retrieval"][k] = {"all": d["all"], "eligible": d["eligible"]}
+
+style = (shared / "template.html").read_text()
+style = style[style.index("<style>") + len("<style>"):style.index("</style>")]
+page = (src / "template.html").read_text().replace("/*__STYLE__*/", style)
+page = page.replace("/*__DATA__*/null", json.dumps(data, separators=(",", ":")))
+page = page.replace("/*__CHARTS__*/", (shared / "charts.js").read_text() + "\n" + (src / "diagrams.js").read_text())
+page = page.replace("/*__SCRIPT__*/", (src / "report.js").read_text())
+for marker, fragment in [("<!--FINDINGS-->", "findings.html"), ("<!--RESULTS-->", "results.html"), ("<!--DESIGN-->", "design.html")]:
+    f = src / fragment
+    page = page.replace(marker, f.read_text() if f.exists() else "")
+out = root / "report" / "structure.html"
+out.write_text(page)
+print(f"wrote {out} ({len(page) / 1024:.0f} KiB)")

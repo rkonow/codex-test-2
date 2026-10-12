@@ -22,7 +22,7 @@ model remembering to save. The design is in [DESIGN.md](DESIGN.md).
 | when | Engram |
 |---|---|
 | session start, resume, clear, compaction | injects a briefing: stated preferences, decisions, open tasks, where the last session stopped |
-| every prompt | stores it; searches older history (never what is still in context); injects the best records when the evidence is strong (up to 4,000 characters), two records when it is weak (1,200), nothing otherwise |
+| every prompt | stores it; searches older history (never what is still in context); injects the best records when the evidence is strong (up to 4,000 characters), three records when it is weak (1,200), nothing otherwise |
 | before `Edit`/`Write` of a file | injects up to two earlier errors or decisions about that file, once per context window |
 | every tool call | stores the call and its result (errors flagged, long output trimmed to head and tail, secrets redacted) |
 | end of a turn | stores the answer, the commentary written between tool calls, and an episode card (prompt, files changed, commands, errors, outcome) |
@@ -71,11 +71,26 @@ relocate the store and the models.
 
 ```sh
 python3 scripts/download_memory_benchmarks.py && python3 scripts/convert_memory_benchmarks.py
-target/release/engram-bench retrieval --data /home/user/data/memory/longmemeval_s.jsonl --embedder static
-target/release/engram-bench retrieval --data /home/user/data/memory/locomo.jsonl --embedder static
+target/release/engram-bench retrieval --data /home/user/data/memory/longmemeval_s.jsonl --embedder static --ctx request
+target/release/engram-bench retrieval --data /home/user/data/memory/locomo.jsonl --embedder static --ctx request
 target/release/engram-bench probes --transcript <session.jsonl> --probes probes/lost_probes.json --points 1952:4632,4633:5392
 target/release/engram-bench scale --data /home/user/data/memory/longmemeval_s.jsonl --sizes 10000,100000,1000000
-python3 scripts/fit_gate.py results/retrieval/longmemeval_s_static_round.rows.jsonl results/retrieval/locomo_static_round.rows.jsonl
+target/release/engram-bench latency --data /home/user/data/memory/longmemeval_s.jsonl --sizes 10000,100000,1000000
+python3 scripts/fit_gate.py results/retrieval/longmemeval_s_static_request_c400.rows.jsonl --out results/gate_static_c400.json
 ```
 
-Results are in `results/`, and the report covers them.
+What a record should be (keys, values, presentation, model-written facts)
+and whether it changes the answers a model gives:
+
+```sh
+target/release/engram-structure --data /home/user/data/memory/longmemeval_s.jsonl --out results/structure
+target/release/engram-structure --transcript <session.jsonl> --probes probes/session_probes.json,probes/lost_probes.json \
+    --points 1952:4632,4633:5392 --out results/structure
+python3 scripts/extract_facts.py --data /home/user/data/memory/longmemeval_s.jsonl --every 5 --out facts.jsonl
+python3 scripts/reader_eval.py --data /home/user/data/memory/longmemeval_s.jsonl --judge sonnet \
+    --config today=results/structure/context_<...>.jsonl --config oracle=oracle --out results/reader
+```
+
+Results are in `results/`. `report/engram.html` covers the system and
+`report/structure.html` the record structure (`scripts/build_report.py`,
+`scripts/build_structure_report.py`).

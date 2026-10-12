@@ -59,7 +59,7 @@ pub fn open(spec: &str) -> Result<Box<dyn Embedder>> {
 /// Model2Vec: the embedding of a text is the mean of its tokens' rows.
 pub struct StaticEmbedder {
     tokenizer: tokenizers::Tokenizer,
-    table: Vec<f32>,
+    table: Table,
     dim: usize,
     unk: Option<u32>,
     name: String,
@@ -70,7 +70,8 @@ impl StaticEmbedder {
     pub fn open(dir: &Path) -> Result<StaticEmbedder> {
         let tokenizer = tokenizers::Tokenizer::from_file(dir.join("tokenizer.json"))
             .map_err(|e| err(format!("{}: {e} (run `engram fetch-model`)", dir.join("tokenizer.json").display())))?;
-        let (table, rows, dim) = read_safetensors_matrix(&dir.join("model.safetensors"), "embeddings")?;
+        let table = Table::open(&dir.join("model.safetensors"), "embeddings")?;
+        let (rows, dim) = (table.rows, table.dim);
         if rows < tokenizer.get_vocab_size(true) {
             return Err(err(format!("embedding table has {rows} rows, tokenizer {} tokens", tokenizer.get_vocab_size(true))));
         }
@@ -83,9 +84,9 @@ impl StaticEmbedder {
         let mut v = vec![0f32; self.dim];
         let mut n = 0usize;
         for &id in ids.iter().filter(|&&id| Some(id) != self.unk).take(self.max_tokens) {
-            let row = &self.table[id as usize * self.dim..(id as usize + 1) * self.dim];
-            v.iter_mut().zip(row).for_each(|(a, b)| *a += b);
-            n += 1;
+            if self.table.add_row(id as usize, &mut v) {
+                n += 1;
+            }
         }
         if n > 0 {
             v.iter_mut().for_each(|x| *x /= n as f32);
@@ -113,27 +114,54 @@ impl Embedder for StaticEmbedder {
     }
 }
 
-/// Reads one F32 tensor of a safetensors file as a row-major matrix.
-fn read_safetensors_matrix(path: &Path, tensor: &str) -> Result<(Vec<f32>, usize, usize)> {
-    let bytes = std::fs::read(path).map_err(|e| err(format!("{}: {e} (run `engram fetch-model`)", path.display())))?;
-    if bytes.len() < 8 {
-        return Err(err(format!("{}: not a safetensors file", path.display())));
+/// One F32 tensor of a safetensors file, mapped rather than read: a daemon
+/// starts without loading the table, and only the rows of tokens it meets
+/// are paged in.
+struct Table {
+    map: memmap2::Mmap,
+    /// Byte offset of row 0 in the file.
+    start: usize,
+    rows: usize,
+    dim: usize,
+}
+
+impl Table {
+    fn open(path: &Path, tensor: &str) -> Result<Table> {
+        let file = std::fs::File::open(path).map_err(|e| err(format!("{}: {e} (run `engram fetch-model`)", path.display())))?;
+        // SAFETY: the model file is not modified while mapped (it is only
+        // ever replaced by `engram fetch-model`, which writes a new file).
+        let map = unsafe { memmap2::Mmap::map(&file) }.map_err(|e| err(format!("{}: {e}", path.display())))?;
+        if map.len() < 8 {
+            return Err(err(format!("{}: not a safetensors file", path.display())));
+        }
+        let hlen = u64::from_le_bytes(map[..8].try_into().unwrap()) as usize;
+        let header: serde_json::Value = serde_json::from_slice(map.get(8..8 + hlen).ok_or_else(|| err(format!("{}: truncated header", path.display())))?)
+            .map_err(|e| err(format!("{}: {e}", path.display())))?;
+        let t = header.get(tensor).ok_or_else(|| err(format!("{}: no tensor {tensor}", path.display())))?;
+        if t["dtype"] != "F32" {
+            return Err(err(format!("{tensor}: dtype {} (need F32)", t["dtype"])));
+        }
+        let shape: Vec<usize> = t["shape"].as_array().into_iter().flatten().filter_map(|x| x.as_u64()).map(|x| x as usize).collect();
+        let offs: Vec<usize> = t["data_offsets"].as_array().into_iter().flatten().filter_map(|x| x.as_u64()).map(|x| x as usize).collect();
+        let [rows, dim] = shape[..] else { return Err(err(format!("{tensor}: shape {shape:?}"))) };
+        let (a, b) = (8 + hlen + offs.first().copied().unwrap_or(0), 8 + hlen + offs.get(1).copied().unwrap_or(0));
+        if b > map.len() || b - a != rows * dim * 4 {
+            return Err(err(format!("{tensor}: {} bytes for shape {rows}x{dim}", b.saturating_sub(a))));
+        }
+        Ok(Table { map, start: a, rows, dim })
     }
-    let hlen = u64::from_le_bytes(bytes[..8].try_into().unwrap()) as usize;
-    let header: serde_json::Value = serde_json::from_slice(&bytes[8..8 + hlen]).map_err(|e| err(format!("{}: {e}", path.display())))?;
-    let t = header.get(tensor).ok_or_else(|| err(format!("{}: no tensor {tensor}", path.display())))?;
-    if t["dtype"] != "F32" {
-        return Err(err(format!("{tensor}: dtype {} (need F32)", t["dtype"])));
+
+    /// Adds row `id` to `acc`; false if there is no such row.
+    fn add_row(&self, id: usize, acc: &mut [f32]) -> bool {
+        if id >= self.rows {
+            return false;
+        }
+        let off = self.start + id * self.dim * 4;
+        for (a, c) in acc.iter_mut().zip(self.map[off..off + self.dim * 4].chunks_exact(4)) {
+            *a += f32::from_le_bytes(c.try_into().unwrap());
+        }
+        true
     }
-    let shape: Vec<usize> = t["shape"].as_array().into_iter().flatten().filter_map(|x| x.as_u64()).map(|x| x as usize).collect();
-    let offs: Vec<usize> = t["data_offsets"].as_array().into_iter().flatten().filter_map(|x| x.as_u64()).map(|x| x as usize).collect();
-    let [rows, dim] = shape[..] else { return Err(err(format!("{tensor}: shape {shape:?}"))) };
-    let data = &bytes[8 + hlen + offs[0]..8 + hlen + offs[1]];
-    let table = data.chunks_exact(4).map(|c| f32::from_le_bytes(c.try_into().unwrap())).collect::<Vec<_>>();
-    if table.len() != rows * dim {
-        return Err(err(format!("{tensor}: {} values for shape {rows}x{dim}", table.len())));
-    }
-    Ok((table, rows, dim))
 }
 
 // ---------------------------------------------------------------- hash

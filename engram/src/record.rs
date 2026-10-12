@@ -85,8 +85,9 @@ pub struct Draft {
     pub tag: String,
     pub files: Vec<String>,
     pub text: String,
-    /// Context indexed with the text but not shown as its content: the
-    /// turn's prompt for tool records, the section for summaries.
+    /// Context in the record's lexical key (BM25) but not in its vector nor
+    /// shown as its content: the turn's prompt for tool records, the section
+    /// for summaries.
     pub ctx: String,
     /// Overrides the kind's prior.
     pub importance: Option<f64>,
@@ -166,13 +167,12 @@ impl Record {
         ]
     }
 
-    /// What the embedding is computed from: context first, then the text.
+    /// What the embedding is computed from: the text alone. The context
+    /// joins the lexical key only; in a vector it pulls a response towards
+    /// its request, which then crowds out the request itself
+    /// (results/structure: MRR 0.60 → 0.66 on LongMemEval-S).
     pub fn embed_text(&self) -> String {
-        if self.ctx.is_empty() {
-            self.text.clone()
-        } else {
-            format!("{}\n{}", self.ctx, self.text)
-        }
+        self.text.clone()
     }
 }
 

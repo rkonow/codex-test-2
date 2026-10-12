@@ -1,6 +1,5 @@
 //! The memory table in a Strata file: appends, hybrid search, SQL.
 
-use std::collections::HashMap;
 use std::path::Path;
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -81,11 +80,16 @@ pub struct StoreOptions {
     pub flush_docs: usize,
     /// fsync every commit.
     pub sync: bool,
+    /// Records per memtable chunk. The first query after a write rebuilds
+    /// the last chunk's in-memory segment, so this bounds that work.
+    pub mem_chunk_docs: usize,
+    /// Memtable segments scan their vectors instead of building a graph.
+    pub mem_flat: bool,
 }
 
 impl Default for StoreOptions {
     fn default() -> Self {
-        StoreOptions { vector_index: VectorIndexKind::Hnsw { m: 16, ef_construction: 100 }, flush_docs: 4096, sync: true }
+        StoreOptions { vector_index: VectorIndexKind::Hnsw { m: 16, ef_construction: 100 }, flush_docs: 4096, sync: true, mem_chunk_docs: 256, mem_flat: true }
     }
 }
 
@@ -96,7 +100,6 @@ pub struct Store {
     /// Strata takes one writer at a time and fails the others; this queues them.
     write: Mutex<()>,
     opts: StoreOptions,
-    df: Mutex<(u64, HashMap<String, u64>)>,
 }
 
 impl Store {
@@ -105,6 +108,10 @@ impl Store {
         let mut dbo = DbOptions::default();
         dbo.sync = opts.sync;
         dbo.memtable_max_docs = opts.flush_docs * 4;
+        dbo.memtable_chunk_docs = opts.mem_chunk_docs.max(64);
+        if opts.mem_flat {
+            dbo.mem_build = Some(dbo.build.clone().set("vector.index", "flat"));
+        }
         let db = if path.exists() {
             Db::open(path, dbo)?
         } else {
@@ -119,7 +126,7 @@ impl Store {
                 return Err(err(format!("{} holds {dim}-dimension vectors; the embedder {} makes {want}", path.display(), embedder.name())));
             }
         }
-        let store = Store { db, embedder, next_seq: AtomicI64::new(0), write: Mutex::new(()), opts, df: Mutex::new((u64::MAX, HashMap::new())) };
+        let store = Store { db, embedder, next_seq: AtomicI64::new(0), write: Mutex::new(()), opts };
         let last = store.query("SELECT seq FROM memory ORDER BY seq DESC LIMIT 1")?;
         let next = last.rows.first().and_then(|r| r[0].as_i64()).map_or(1, |s| s + 1);
         store.next_seq.store(next, Ordering::SeqCst);
@@ -276,27 +283,24 @@ impl Store {
         Ok(rs.rows.iter().filter_map(|r| Some((row_record(r)?, r.last()?.as_f64()?))).collect())
     }
 
-    /// Inverse document frequency of each analysed query term over `body`.
+    /// Inverse document frequency of each analysed query term over `body`,
+    /// from the segments' term dictionaries (deleted records still count).
     pub fn idf(&self, terms: &[String]) -> Result<Vec<f64>> {
-        let n = self.len().max(1);
-        let mut cache = self.df.lock().unwrap();
-        if cache.0 != n {
-            *cache = (n, HashMap::new());
-        }
-        let mut out = Vec::with_capacity(terms.len());
-        for t in terms {
-            let df = match cache.1.get(t) {
-                Some(&d) => d,
-                None => {
-                    let rs = self.query(&format!("SELECT COUNT(*) FROM memory WHERE MATCH(body, '{}')", quote(&t.replace(['"', '*', '(', ')', '-'], ""))));
-                    let d = rs.ok().and_then(|r| r.rows.first().and_then(|x| x[0].as_i64())).unwrap_or(0).max(0) as u64;
-                    cache.1.insert(t.clone(), d);
-                    d
+        let snap = self.db.snapshot();
+        let readers = self.db.readers(&snap)?;
+        let field = self.db.schema().field_index("body").ok_or_else(|| err("no body field"))?;
+        let mut n = 0u64;
+        let mut df = vec![0u64; terms.len()];
+        for r in &readers {
+            n += r.n_docs as u64;
+            if let Some(t) = r.text(field)? {
+                for (d, term) in df.iter_mut().zip(terms) {
+                    *d += t.doc_freq(term) as u64;
                 }
-            };
-            out.push((1.0 + (n as f64 - df as f64 + 0.5) / (df as f64 + 0.5)).ln());
+            }
         }
-        Ok(out)
+        let n = n.max(1) as f64;
+        Ok(df.into_iter().map(|d| (1.0 + (n - d as f64 + 0.5) / (d as f64 + 0.5)).ln()).collect())
     }
 }
 

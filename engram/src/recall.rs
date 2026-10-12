@@ -70,9 +70,10 @@ pub struct Gate {
 
 impl Default for Gate {
     fn default() -> Self {
-        // Logistic fit on LongMemEval-S with the static embedder
-        // (scripts/fit_gate.py): hi holds precision 0.9, lo precision 0.7.
-        Gate { a: 4.936, b: 3.920, c: 0.317, d: 1.099, e: 1.968, f: 1.042, hi: 7.658, lo: 5.329 }
+        // Logistic fit on LongMemEval-S with the static embedder and
+        // 400-byte records (scripts/fit_gate.py, results/gate_static_c400.json):
+        // hi holds precision 0.9, lo precision 0.7.
+        Gate { a: 4.868, b: 4.794, c: 0.595, d: 0.981, e: 1.959, f: -1.448, hi: 6.650, lo: 4.508 }
     }
 }
 
@@ -203,8 +204,17 @@ pub fn fuse(store: &Store, query: &str, terms: &[String], bm: Vec<(Record, f64)>
 
 /// The part of `text` (at most `max` bytes) with the most query terms.
 pub fn snippet(text: &str, terms: &HashSet<String>, max: usize) -> String {
-    if text.len() <= max {
+    let (s, e) = snippet_range(text, terms, max);
+    if s == 0 && e == text.len() {
         return text.to_string();
+    }
+    format!("{}{}{}", if s > 0 { "…" } else { "" }, text[s..e].trim(), if e < text.len() { "…" } else { "" })
+}
+
+/// The byte range [`snippet`] shows.
+pub fn snippet_range(text: &str, terms: &HashSet<String>, max: usize) -> (usize, usize) {
+    if text.len() <= max {
+        return (0, text.len());
     }
     let mut hits = Vec::new();
     let mut pos = 0;
@@ -233,8 +243,7 @@ pub fn snippet(text: &str, terms: &HashSet<String>, max: usize) -> String {
         }
         i
     };
-    let (s, e) = (floor(best.0), floor(best.0 + max));
-    format!("{}{}{}", if s > 0 { "…" } else { "" }, text[s..e].trim(), if e < text.len() { "…" } else { "" })
+    (floor(best.0), floor(best.0 + max))
 }
 
 /// How retrieved records become injected text.
@@ -250,14 +259,18 @@ pub struct PackParams {
 
 impl Default for PackParams {
     fn default() -> Self {
-        PackParams { budget_chars: 4000, snippet_chars: 600, per_turn: 2, max_records: 8 }
+        // Records are at most CHUNK_CHARS (400) bytes, so about ten fit the
+        // budget with their headers. A coding turn spans many records (each
+        // tool call and result), so the per-turn cap is loose: at 3, the
+        // answer was often a fourth record of a turn already shown.
+        PackParams { budget_chars: 4000, snippet_chars: 600, per_turn: 8, max_records: 12 }
     }
 }
 
 impl PackParams {
-    /// The weak-evidence tier: two records, about 300 tokens.
+    /// The weak-evidence tier: three records, about 300 tokens.
     pub fn brief() -> PackParams {
-        PackParams { budget_chars: 1200, snippet_chars: 500, per_turn: 1, max_records: 2 }
+        PackParams { budget_chars: 1200, snippet_chars: 500, per_turn: 1, max_records: 3 }
     }
 }
 
