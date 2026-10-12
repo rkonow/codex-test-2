@@ -127,3 +127,24 @@
     <li><b>Storage:</b> 400-byte records double the record count of a session, and so the file. This repository's session, up to where the probes are asked, goes from 1,835 records to 3,849. A million records (3.5 GB, mostly vectors) is now about 200 sessions of that size instead of 450.</li>
   </ul>
 </div>
+
+<div class="col" id="ab">
+  <h2>With and without Engram</h2>
+  <p>Everything above measures what reaches the model. The direct test is Claude Code itself, with and without Engram, on work that depends on earlier sessions.</p>
+  <ul>
+    <li><b>History:</b> two headless working sessions on a small Python library, ten user turns, recorded by Engram, for $0.035. In the first, the user states rules (integer cents, leftover cents go to the payer, CHF formatting, a changelog line for every API change) and decisions with their reasons (no third-party dependencies because the client's machines are air-gapped; JSON storage because admins edit the files by hand). The user also announces a future requirement: the accountant's CSV export, with semicolons, DD.MM.YYYY dates and a fixed file name. The agent fixes a bug and commits. The second session is unrelated work (a command-line interface). The decisions and the CSV requirements were acknowledged but never written into any file.</li>
+    <li><b>Follow-up tasks:</b> ten, each in a fresh headless session on a clone of the repository as the history left it. Each runs three times with Engram (its store restored to the end of the history) and three times without. Both conditions have every normal tool: files, shell and git history. A script grades each result, so 60 runs in all, with a small, fast model.</li>
+  </ul>
+</div>
+<div class="wide" id="ab-table"></div>
+<div class="col">
+  <p>Engram solved 26 of 30 runs and the same agent without it 25. The difference is one task: building the accountant's export. With Engram, the prompt's recall brought back the requirements and all three runs built it to specification. Without it, all three built a reasonable CSV with commas, ISO dates and the wrong file name. Where the rule was visible in the repository (integer cents and CHF formatting in the code, the leftover-cent rule in a docstring, earlier changelog entries), both conditions solved the task. A typical run cost about the same: $0.006, seven steps and 16 seconds at the median, about 10% more with Engram for the briefing and injected records.</p>
+  <p>The test also shows where Engram falls short. Its gate injected something on only four of the ten tasks, and the model called the memory tools twice in 30 runs. For "should we move storage to SQLite and use pandas?", the decision and its reason were in memory, and a search ranks that record first. But the gate scored the prompt 3.4 against a threshold of 4.5: the record is one long user message about several things, so its similarity to the question is moderate. Nothing was injected, the model did not search, and its answers were no better than without Engram. The same happened for "make saving faster" and the exchange-rate task. There, both conditions mostly did the right thing anyway, keeping JSON and using the standard library, though one Engram run dropped the pretty-printing.</p>
+  <p>So Engram helps exactly when it injects something that exists only in the conversation. Three changes follow from this run:</p>
+  <ul>
+    <li>Store decisions and announced future work as their own <code>decision</code> and <code>todo</code> records, so the session-start briefing, which reached every session, carries them.</li>
+    <li>Calibrate the gate on questions about decisions in coding sessions, not only on the chat benchmark.</li>
+    <li>Tell the model to search memory before design decisions.</li>
+  </ul>
+  <p>The limits: one small project, one history, one model, three repeats per task, and tasks written by the same author as the history, each aimed at one fact.</p>
+</div>

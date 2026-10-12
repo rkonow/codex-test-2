@@ -401,6 +401,23 @@
     }
   }
 
+  function abTable() {
+    const el = $("#ab-table");
+    const A = D.ab;
+    if (!el || !A) return;
+    const order = ["csv_export", "exchange_rates", "faster_save", "advice", "weighted_split", "rename_api", "discount", "summary", "run_tests", "slugify"];
+    const TN = { csv_export: "build the accountant's CSV export", exchange_rates: "fetch exchange rates", faster_save: "make saving faster", advice: "SQLite and pandas?", weighted_split: "split by weights", rename_api: "rename a public method", discount: "apply a discount", summary: "balance report", run_tests: "run the tests", slugify: "slugify helper (control)" };
+    const gate = (g) => { const c = {}; (g || []).forEach((d) => { c[d] = (c[d] || 0) + 1; }); return Object.entries(c).map(([k, v]) => `${k === "Skip" ? "nothing" : k === "Brief" ? "brief" : "full"} ×${v}`).join(", "); };
+    const rows = order.filter((k) => A.tasks[k]).map((k) => {
+      const t = A.tasks[k], e = t.engram, n = t.none;
+      const cls = e.score > n.score ? "sys" : "";
+      return [{ v: TN[k], cls }, t.needs, `${e.solved} of ${e.n}`, `${n.solved} of ${n.n}`, num(e.score, 2), num(n.score, 2), gate(e.gate), "$" + num(e.cost, 4), "$" + num(n.cost, 4), msf(e.steps), msf(n.steps)];
+    });
+    const o = A.overall;
+    rows.push([{ v: "all", cls: "sys" }, "", `${o.engram.solved} of ${o.engram.n}`, `${o.none.solved} of ${o.none.n}`, num(o.engram.score, 2), num(o.none.score, 2), "", "$" + num(o.engram.cost, 4), "$" + num(o.none.cost, 4), msf(o.engram.steps), msf(o.none.steps)]);
+    table(el, ["follow-up task", "what it needs from earlier sessions", "solved, Engram", "solved, without", "score, Engram", "score, without", "Engram injected", "cost, Engram (median)", "cost, without", "steps, Engram", "steps, without"], rows, [2, 3, 4, 5, 7, 8, 9, 10], { cls: "wrap-head compact" });
+  }
+
   function meta() {
     const el = $("#meta-line");
     if (el) el.textContent = `Generated ${D.generated} · static embedder (Model2Vec potion-retrieval-32M) · results in engram/results/structure, reader, latency`;
@@ -419,6 +436,7 @@
   condTable();
   probesTable();
   latencyTables();
+  abTable();
   let last = window.innerWidth;
   window.addEventListener("resize", () => {
     if (Math.abs(window.innerWidth - last) < 40) return;

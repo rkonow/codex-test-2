@@ -131,6 +131,36 @@ if rows_path.exists():
             out[metric] = {str(k): {"n": len(v), "acc": sum(v) / len(v)} for k, v in g.items()}
         conditional[cfg] = out
 
+def ab_summary():
+    """The with/without Engram test (scripts/ab_eval.py): per task and condition."""
+    path = results / "ab" / "runs.jsonl"
+    if not path.exists():
+        return None
+    rows = [json.loads(l) for l in path.read_text().splitlines()]
+    hist = load("ab/history.json") or {}
+    summ = load("ab/summary.json") or {}
+    med = lambda xs: sorted(xs)[len(xs) // 2] if xs else None  # noqa: E731
+    tasks = {}
+    for r in rows:
+        t = tasks.setdefault(r["task"], {"needs": summ.get("tasks", {}).get(r["task"], {}).get("needs"), "engram": [], "none": []})
+        t[r["condition"]].append(r)
+    out = {}
+    for name, t in tasks.items():
+        o = {"needs": t["needs"]}
+        for c in ("engram", "none"):
+            rs = t[c]
+            o[c] = {"n": len(rs), "solved": sum(r["solved"] for r in rs), "score": sum(r["score"] for r in rs) / max(1, len(rs)),
+                    "cost": med([r["cost_usd"] or 0 for r in rs]), "steps": med([r["turns"] or 0 for r in rs]), "wall": med([r["wall_s"] for r in rs]),
+                    "memory_tools": sum(r["memory_tool_calls"] for r in rs)}
+            if c == "engram":
+                o[c]["gate"] = [d for r in rs for d in (r["engram"] or {}).get("decisions", [])]
+        out[name] = o
+    allr = {c: [r for r in rows if r["condition"] == c] for c in ("engram", "none")}
+    overall = {c: {"n": len(rs), "solved": sum(r["solved"] for r in rs), "score": sum(r["score"] for r in rs) / max(1, len(rs)),
+                   "cost": med([r["cost_usd"] or 0 for r in rs]), "steps": med([r["turns"] or 0 for r in rs]), "wall": med([r["wall_s"] for r in rs])} for c, rs in allr.items()}
+    return {"tasks": out, "overall": overall, "history_cost": sum(t.get("cost") or 0 for t in hist.get("turns", [])), "history_turns": len(hist.get("turns", []))}
+
+
 data = {
     "generated": datetime.date.today().isoformat(),
     "lme": structure("longmemeval_s"),
@@ -153,6 +183,7 @@ data = {
     # The same run before the daemon moved its state write after the reply.
     "latency_pre": load("latency/latency_static_pre_persist.json"),
     "facts_cost": load("structure/facts_cost.json"),
+    "ab": ab_summary(),
 }
 for k in ("longmemeval_s_static_request", "longmemeval_s_static_request_c400", "locomo_static_round", "locomo_static_request_c400"):
     d = data["retrieval"][k]
