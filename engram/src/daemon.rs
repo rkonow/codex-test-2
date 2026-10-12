@@ -530,10 +530,17 @@ impl Daemon {
         // Knowledge that matches the prompt on its own text is shown even
         // when the gate holds back the rest: a request that does not sound
         // like earlier work can still be bound by what was agreed.
-        let known = if self.cfg.knowledge.enabled { recall::knowledge(&self.store, &query, &filter, &skip, &self.cfg.knowledge)? } else { Vec::new() };
+        // The two searches are independent (only packing needs both), so
+        // they run side by side.
+        let (known, searched) = std::thread::scope(|sc| {
+            let k = sc.spawn(|| if self.cfg.knowledge.enabled { recall::knowledge(&self.store, &query, &filter, &skip, &self.cfg.knowledge) } else { Ok(Vec::new()) });
+            let m = recall::search(&self.store, &query, &filter, &self.cfg.rank);
+            (k.join().unwrap_or_else(|_| Err(crate::err("knowledge search panicked"))), m)
+        });
+        let known = known?;
+        let (hits, ev) = searched?;
         let mut ids: Vec<String> = known.iter().map(|(r, _, _)| r.id.clone()).collect();
         skip.extend(ids.iter().cloned());
-        let (hits, ev) = recall::search(&self.store, &query, &filter, &self.cfg.rank)?;
         let g = self.cfg.gate.score(&ev);
         let decision = if force && !hits.is_empty() { Decision::Inject } else { self.cfg.gate.decide(&ev) };
         let mut parts = Vec::new();

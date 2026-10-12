@@ -131,13 +131,47 @@ missed record cannot be recovered later. Each hook's payload is the source:
 | `SessionStart` | session registered; live window opened |
 | `UserPromptSubmit` | `prompt`, plus `preference` records for cue sentences (stored after recall, off the critical path) |
 | `PostToolUse` | `tool_call` and `tool_result` (or `error`), asynchronously |
-| `Stop` | `answer` (from `last_assistant_message`), the commentary written between tool calls (read from the transcript tail since the last offset), and the turn's `episode` |
+| `Stop` | `answer` (from `last_assistant_message`), the commentary written between tool calls (read from the transcript tail since the last offset), the turn's `episode`, then the distilled knowledge (below) |
 | `PreCompact` | the commentary not yet captured, before the context is summarised |
 | `PostCompact` | `summary` sections; the live window restarts here |
 | `SessionEnd` | flush |
 
 `engram ingest-transcript` back-fills from Claude Code's JSONL transcripts
 on a best-effort basis; the format is internal and versioned.
+
+### Distilled knowledge
+
+Raw records hold what was said, but a later session needs what was
+*agreed*: a decision and its reason, a client's rule, the requirements of
+work announced for later. Much of it never reaches the code, and a
+request that depends on it rarely sounds like earlier work (a request to
+make saving faster says nothing about why storage is JSON), so search
+alone misses it. After each `Stop`, once the hook has answered, the
+daemon gives the turn (request, commands run, reply) to a small model
+through the `claude` CLI in print mode, with no tools, from a scratch
+directory and with Engram disabled for that call. The model also sees the
+knowledge already noted (the latest 40 items, with ids) and returns JSON
+lines:
+
+| item | stored as | tag |
+|---|---|---|
+| decision, with the reason | `decision` | `distilled` |
+| rule, constraint, convention (kept even if the code already follows it) | `preference` | `distilled` |
+| requirement of work planned but not done | `todo` | `planned` |
+| fact about the project or its environment, failed approaches | `fact` | `distilled` |
+| `replaces: id` on any of the above | the old item is retagged | `superseded` |
+| `done: id` for a planned item completed | the item is retagged | `done` |
+
+It is told to leave out what is already noted, status that goes stale
+(test counts, branches, what is committed) and the assistant's own
+working conventions. An item whose analysed terms overlap an existing
+one by a Jaccard index of 0.6 or more is dropped. Distillations run one
+at a time, so each sees the last one's notes, and shutdown waits for any
+in flight. On the Tally history, ten turns gave 25 items at about $0.001
+and 8 s each (before the prompt saw existing notes, it wrote 71, most of
+them repeats). `engram distill` back-fills a store recorded before;
+`ENGRAM_DISTILL=0` or `"distill": {"enabled": false}` turns it off, and
+`distill.model` or `ENGRAM_DISTILL_MODEL` picks the model.
 
 ## 5. When to load
 
@@ -151,13 +185,23 @@ where \(\text{injected}_s\) is the set of records already injected since \(w_s\)
 
 There are three push points and one pull path:
 
-1. **`SessionStart`: briefing, always, at most 2,500 characters.** Pinned
-   preferences and decisions, the open tasks from the latest compaction
-   summary, and where the previous session left off. After a compaction
-   (`source = compact`), the briefing also recalls the records most relevant
-   to the last two prompts, which the summary just squeezed out.
-2. **`UserPromptSubmit`: gated recall.** Search with the prompt, then
-   apply a three-way gate:
+1. **`SessionStart`: briefing, always, at most 6,000 characters.** In
+   order: planned work with its requirements, rules and conventions,
+   decisions, facts (the latest of each, deduplicated, never superseded or
+   done items), the open tasks of the latest checkpoint, and where the
+   previous session left off. It opens with an instruction to search
+   memory before a design decision and whenever a task refers to earlier
+   work. Sections fill in that order while the budget lasts; the ids shown
+   join \(\text{injected}_s\). After a compaction (`source = compact`), the
+   briefing also recalls the records most relevant to the last two
+   prompts, which the summary just squeezed out.
+2. **`UserPromptSubmit`: knowledge, then gated recall.** First, up to four
+   knowledge records (decision, preference, fact, note, planned todo) not
+   yet shown that match the prompt on their own text, with
+   \(\cos \ge 0.40\) or \(\mathrm{cov} \ge 0.30\), labelled as what was
+   agreed before. These bypass the gate: a request can be bound by an
+   earlier decision without sounding like earlier work. Then the search
+   with the prompt and a three-way gate:
    - strong evidence: inject the top records, at most 4,000 characters;
    - weak evidence: inject the top three records, at most 1,200 characters,
      marked as a weak match;
@@ -225,7 +269,7 @@ differ.
 | path | target |
 |---|---|
 | `PostToolUse`, `Stop` client | < 10 ms (queued, embedded and committed in the background) |
-| `UserPromptSubmit` | < 100 ms p99 at 1M records |
+| `UserPromptSubmit` | < 100 ms p99 at 1M records (measured: 14.7 ms p50, 29.8 ms p99 as a hook process, with 1% knowledge records; the knowledge query runs beside the main search) |
 | `SessionStart` | < 150 ms (daemon already up), < 1 s with daemon spawn |
 | background | after each write, the daemon rebuilds the in-memory segment (at most 256 records, no graph) so the next query does not |
 | ingest | > 1,000 records per second with the static embedder |

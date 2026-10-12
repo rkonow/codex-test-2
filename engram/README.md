@@ -21,11 +21,11 @@ model remembering to save. The design is in [DESIGN.md](DESIGN.md).
 
 | when | Engram |
 |---|---|
-| session start, resume, clear, compaction | injects a briefing: stated preferences, decisions, open tasks, where the last session stopped |
-| every prompt | stores it; searches older history (never what is still in context); injects the best records when the evidence is strong (up to 4,000 characters), three records when it is weak (1,200), nothing otherwise |
+| session start, resume, clear, compaction | injects a briefing: planned work and its requirements, rules, decisions, facts, where the last session stopped, and a reminder to search memory before design decisions |
+| every prompt | stores it; injects the earlier decisions, rules and requirements that match it; searches older history (never what is still in context) and injects the best records when the evidence is strong (up to 4,000 characters), three records when it is weak (1,200), nothing otherwise |
 | before `Edit`/`Write` of a file | injects up to two earlier errors or decisions about that file, once per context window |
 | every tool call | stores the call and its result (errors flagged, long output trimmed to head and tail, secrets redacted) |
-| end of a turn | stores the answer, the commentary written between tool calls, and an episode card (prompt, files changed, commands, errors, outcome) |
+| end of a turn | stores the answer, the commentary written between tool calls, and an episode card (prompt, files changed, commands, errors, outcome); then a small model writes down the decisions, rules, planned work and facts the turn stated, updating or closing earlier ones |
 | compaction | stores the summary by section; the live window restarts |
 
 The model also gets five MCP tools:
@@ -61,11 +61,19 @@ engram search "why did the planner pick post-filtering"
 engram sql "SELECT ts, text FROM memory WHERE kind = 'error' AND MATCH(files, 'exec') ORDER BY ts DESC LIMIT 5"
 engram remember decision "Prices are integer cents"
 engram ingest-transcript ~/.claude/projects/<project>/<session>.jsonl   # back-fill old sessions
+engram distill                                                          # write down knowledge for turns stored before distillation existed
 engram stats | briefing | stop
 ```
 
 `ENGRAM_DISABLE=1` turns the hooks off. `ENGRAM_HOME` and `ENGRAM_MODELS`
 relocate the store and the models.
+
+Distillation calls the `claude` CLI in print mode after each turn, off the
+prompt's path; a small, fast model is enough (about $0.001 and 8 s per
+turn with one). Choose it with `ENGRAM_DISTILL_MODEL` or `"distill":
+{"model": ...}` in the store's `config.json`; without one, the CLI's
+default model is used. `ENGRAM_DISTILL=0` or `"distill": {"enabled":
+false}` turns it off.
 
 ## Evaluation
 
@@ -87,8 +95,18 @@ target/release/engram-structure --data /home/user/data/memory/longmemeval_s.json
 target/release/engram-structure --transcript <session.jsonl> --probes probes/session_probes.json,probes/lost_probes.json \
     --points 1952:4632,4633:5392 --out results/structure
 python3 scripts/extract_facts.py --data /home/user/data/memory/longmemeval_s.jsonl --every 5 --out facts.jsonl
-python3 scripts/reader_eval.py --data /home/user/data/memory/longmemeval_s.jsonl --judge sonnet \
+python3 scripts/reader_eval.py --data /home/user/data/memory/longmemeval_s.jsonl --judge <model> \
     --config today=results/structure/context_<...>.jsonl --config oracle=oracle --out results/reader
+```
+
+Claude Code with and without Engram, on a project whose earlier sessions
+stated rules, decisions and planned work (`eval/ab`; the held-out
+scenarios are in `eval/ab/scenarios`):
+
+```sh
+python3 scripts/ab_eval.py history --scenario stockroom --model <model>   # record the earlier sessions
+python3 scripts/ab_eval.py run --scenario stockroom --model <model> --repeats 5
+python3 scripts/ab_stats.py stockroom=results/ab/stockroom/runs.jsonl slotwise=results/ab/slotwise/runs.jsonl --out results/ab/stats.json
 ```
 
 Results are in `results/`. `report/engram.html` covers the system and

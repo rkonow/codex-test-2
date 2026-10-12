@@ -14,6 +14,12 @@ For each scenario (and pooled over the scenarios given):
   controls shows.
 
   python3 scripts/ab_stats.py results/ab/stockroom/runs.jsonl results/ab/slotwise/runs.jsonl [--out stats.json]
+  python3 scripts/ab_stats.py tally-dev=results/ab/runs_v2.jsonl:engram,results/ab/runs.jsonl:none \
+      stockroom=results/ab/stockroom/runs.jsonl slotwise=results/ab/slotwise/runs.jsonl --pool stockroom,slotwise
+
+An argument is a runs file (named by its directory) or NAME=SPEC, where SPEC
+lists files, each optionally limited to one condition (FILE:engram). The
+scenario whose task kinds apply is NAME up to the first '-'.
 
 Standard library only.
 """
@@ -126,26 +132,36 @@ def analyse(rows, iters, rng):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("runs", nargs="+", help="runs.jsonl files, one per scenario (name from the directory)")
+    ap.add_argument("runs", nargs="+", help="runs.jsonl files (named by directory) or NAME=FILE[:condition],...")
+    ap.add_argument("--pool", default=None, help="comma-separated names to pool (default: all, if more than one)")
     ap.add_argument("--iters", type=int, default=20000)
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
     rng = random.Random(args.seed)
     rows = []
-    for path in args.runs:
-        scen = path.rstrip("/").split("/")[-2]
-        scen = "tally" if scen == "ab" else scen
-        kinds = {t["id"]: t.get("kind") for t in ab_eval.load_scenario(scen)["tasks"]}
-        for line in open(path):
-            r = json.loads(line)
-            r["scenario"] = scen
-            r["kind"] = r.get("kind") or kinds.get(r["task"])
-            rows.append(r)
+    names = []
+    for arg in args.runs:
+        if "=" in arg:
+            name, spec = arg.split("=", 1)
+        else:
+            name = arg.rstrip("/").split("/")[-2]
+            name, spec = ("tally" if name == "ab" else name), arg
+        names.append(name)
+        kinds = {t["id"]: t.get("kind") for t in ab_eval.load_scenario(name.split("-")[0])["tasks"]}
+        for part in spec.split(","):
+            path, _, cond = part.partition(":")
+            for line in open(path):
+                r = json.loads(line)
+                if cond and r["condition"] != cond:
+                    continue
+                r["scenario"] = name
+                r["kind"] = r.get("kind") or kinds.get(r["task"])
+                rows.append(r)
     out = {}
-    groups = sorted({r["scenario"] for r in rows})
-    for g in groups + (["pooled"] if len(groups) > 1 else []):
-        rs = rows if g == "pooled" else [r for r in rows if r["scenario"] == g]
+    pool = [p for p in args.pool.split(",") if p] if args.pool is not None else (names if len(names) > 1 else [])
+    for g in names + (["pooled"] if pool else []):
+        rs = [r for r in rows if r["scenario"] in pool] if g == "pooled" else [r for r in rows if r["scenario"] == g]
         out[g] = {"all": analyse(rs, args.iters, rng)}
         for kind in sorted({r.get("kind") or "?" for r in rs}):
             out[g][kind] = analyse([r for r in rs if (r.get("kind") or "?") == kind], args.iters, rng)

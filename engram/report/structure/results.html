@@ -130,21 +130,72 @@
 
 <div class="col" id="ab">
   <h2>With and without Engram</h2>
-  <p>Everything above measures what reaches the model. The direct test is Claude Code itself, with and without Engram, on work that depends on earlier sessions.</p>
+  <p>Everything above measures what reaches the model. The direct test is Claude Code itself, with and without Engram, on work that depends on earlier sessions. Each test has two parts:</p>
   <ul>
-    <li><b>History:</b> two headless working sessions on a small Python library, ten user turns, recorded by Engram, for $0.035. In the first, the user states rules (integer cents, leftover cents go to the payer, CHF formatting, a changelog line for every API change) and decisions with their reasons (no third-party dependencies because the client's machines are air-gapped; JSON storage because admins edit the files by hand). The user also announces a future requirement: the accountant's CSV export, with semicolons, DD.MM.YYYY dates and a fixed file name. The agent fixes a bug and commits. The second session is unrelated work (a command-line interface). The decisions and the CSV requirements were acknowledged but never written into any file.</li>
-    <li><b>Follow-up tasks:</b> ten, each in a fresh headless session on a clone of the repository as the history left it. Each runs three times with Engram (its store restored to the end of the history) and three times without. Both conditions have every normal tool: files, shell and git history. A script grades each result, so 60 runs in all, with a small, fast model.</li>
+    <li><b>History:</b> headless working sessions on a small Python project, recorded by Engram. Along the way the user states rules, decisions with their reasons, failed approaches, and requirements for work planned later. Some of these end up in the code; others are only said.</li>
+    <li><b>Follow-up tasks:</b> each runs in a fresh headless session on a clone of the repository as the history left it, with Engram (its store as the history left it) and without it (no hooks, no memory tools). Both conditions have every normal tool, including files, shell and git history. A script grades each result with one check per fact, so a task is solved only when every remembered requirement holds. The same small, fast model runs everything.</li>
   </ul>
+  <h3>The first test: almost no difference</h3>
+  <p>On the first project, Tally (an expense-splitting library), Engram solved 26 of 30 runs and the agent without it 25 (permutation test within tasks, \(p = 0.33\)). The difference was one task, the accountant's CSV export, whose requirements the prompt's recall brought back. The rest of what the history said reached the model only where it was also in the repository.</p>
+  <p>Replaying the prompts against the store showed why:</p>
+  <ul>
+    <li>For "should we move storage to SQLite and use pandas?", search ranked the record holding the decision and its reason first. But that record is one long user message about several things, so its similarity to the question is moderate, and the gate scored the prompt 3.4 against a threshold of 4.5.</li>
+    <li>The briefing at session start carried only sentences picked from prompts by cue words ("always", "never"). Decisions given with a reason, and requirements announced for later, were not among them.</li>
+    <li>The model called the memory tools twice in 30 runs.</li>
+  </ul>
+  <h3>What changed</h3>
+  <figure class="wide">
+    <div class="frame"><svg class="dg" id="knowledge-diagram" viewBox="0 0 760 256" role="img" aria-label="After each turn a small model writes decisions, rules, planned work and facts as knowledge records, which reach later sessions through the session-start briefing and a per-prompt knowledge block that bypasses the gate"></svg></div>
+    <figcaption><b>Knowledge records.</b> A small model writes down what a turn agreed. Later sessions get it through the briefing and, per prompt, through a knowledge block that does not wait for the gate.</figcaption>
+  </figure>
+  <ul>
+    <li><b>Distillation:</b> after each turn, off the prompt's path, a small model reads the request, the commands and the reply. It also sees the latest 40 knowledge records, and writes new ones (decision, rule, planned requirement, fact). An item that updates an older one retags it <code>superseded</code>; planned work the turn completed is retagged <code>done</code>. A new item whose analysed terms overlap an existing one by a Jaccard index \(J \ge 0.6\) is dropped.</li>
+    <li><b>Briefing:</b> it now leads with planned work, rules, decisions and facts, in that order, followed by where the last session left off. It opens with an instruction to search memory before design decisions, and it fills up to 6,000 characters.</li>
+    <li><b>Knowledge block:</b> each prompt gets up to four knowledge records not yet shown, whatever the gate decides. A record qualifies on its own text:</li>
+  </ul>
+  \[ \cos\bigl(\phi(q), \phi(r)\bigr) \ge 0.40 \quad\lor\quad \mathrm{cov}(q, r) = \frac{\sum_{t \in q \cap r} \mathrm{idf}(t)}{\sum_{t \in q} \mathrm{idf}(t)} \ge 0.30, \qquad r.\text{kind} \in \{\text{decision}, \text{preference}, \text{fact}, \text{note}, \text{todo}_{\text{planned}}\}. \]
+  <p>Strata needed no change. The knowledge query is the same hybrid search under a <code>kind IN (…)</code> predicate, which the planner already runs as a scan of the few matching rows. The briefing is a handful of structured queries.</p>
+  <p>These were developed on Tally. Its store was distilled after the fact (<code>engram distill</code>), and the Engram condition was rerun against the earlier runs without Engram, on the same repository snapshot. It solved 30 of 30, including the SQLite question it had failed every time, against 25 of 30 (\(p = 0.02\)). But Tally can separate the two conditions on only two tasks, and it was used for development, so it cannot be the verdict.</p>
+  <h3>Held out: two new projects</h3>
+  <p>Two new projects were written by a separate agent, which did not see Engram's code or design, before Engram's changes were tested on them:</p>
+  <ul>
+    <li><b>Stock keeping</b> for a hardware wholesaler: 3 sessions, 13 turns.</li>
+    <li><b>Appointment booking</b> for a physiotherapy practice: 3 sessions, 14 turns.</li>
+  </ul>
+  <p>Each has ten follow-up tasks:</p>
+  <ul>
+    <li><b>Six</b> need something said only in conversation, such as FIFO valuation and why, a planned count sheet in walking order, the client's Python 3.8 machine, a 42-character receipt printer, a cancellation-fee schedule, or an approach tried and abandoned.</li>
+    <li><b>Two</b> need a convention that is in the repository.</li>
+    <li><b>Two</b> are controls that need nothing from earlier sessions.</li>
+  </ul>
+  <p>Engram was frozen first, at the commit the histories ran on. The histories were recorded live, with distillation on. The tasks then ran five times per condition, 200 runs in all, and nothing was changed after.</p>
 </div>
 <div class="wide" id="ab-table"></div>
 <div class="col">
-  <p>Engram solved 26 of 30 runs and the same agent without it 25. The difference is one task: building the accountant's export. With Engram, the prompt's recall brought back the requirements and all three runs built it to specification. Without it, all three built a reasonable CSV with commas, ISO dates and the wrong file name. Where the rule was visible in the repository (integer cents and CHF formatting in the code, the leftover-cent rule in a docstring, earlier changelog entries), both conditions solved the task. A typical run cost about the same: $0.006, seven steps and 16 seconds at the median, about 10% more with Engram for the briefing and injected records.</p>
-  <p>The test also shows where Engram falls short. Its gate injected something on only four of the ten tasks, and the model called the memory tools twice in 30 runs. For "should we move storage to SQLite and use pandas?", the decision and its reason were in memory, and a search ranks that record first. But the gate scored the prompt 3.4 against a threshold of 4.5: the record is one long user message about several things, so its similarity to the question is moderate. Nothing was injected, the model did not search, and its answers were no better than without Engram. The same happened for "make saving faster" and the exchange-rate task. There, both conditions mostly did the right thing anyway, keeping JSON and using the standard library, though one Engram run dropped the pretty-printing.</p>
-  <p>So Engram helps exactly when it injects something that exists only in the conversation. Three changes follow from this run:</p>
+  <p>With Engram, every one of the 100 held-out runs was solved; without it, 60. All of the difference is on the tasks that need something said only in conversation: 60 of 60 against 20 of 60. Where the fact was in the repository, and on the controls, both conditions solved all 40, so the 6,000-character briefing did no harm.</p>
+  <p>Without Engram, the failed checks are exactly the facts that were only said:</p>
   <ul>
-    <li>Store decisions and announced future work as their own <code>decision</code> and <code>todo</code> records, so the session-start briefing, which reached every session, carries them.</li>
-    <li>Calibrate the gate on questions about decisions in coding sessions, not only on the chat benchmark.</li>
-    <li>Tell the model to search memory before design decisions.</li>
+    <li>Purchase suggestions did not order up to three times the reorder point (5 of 5 runs), and the count sheet was not in walking order by bin (5 of 5).</li>
+    <li>Every answer recommended <code>tomllib</code>, which needs Python 3.11, without knowing that the client's machine runs 3.8.</li>
+    <li>The day plan overran the 42-character receipt printer (5 of 5), and the cancellation fee was wrong (5 of 5).</li>
+    <li>Online booking did not treat seven treatments a day as fully booked (5 of 5), and no answer knew that a calendar feed had been tried and stopped.</li>
   </ul>
-  <p>The limits: one small project, one history, one model, three repeats per task, and tasks written by the same author as the history, each aimed at one fact.</p>
+  <p>Three of these tasks were solved either way: the history had built the series booking and the SMS text, and the agent chose FIFO valuation on its own.</p>
+</div>
+<div class="wide" id="ab-stats"></div>
+<div class="col">
+  <p>The permutation test shuffles the condition labels within each task, 20,000 times, so a difference between tasks cannot pass for an effect. With no shuffle reaching the observed difference, \(p\) is below \(1/20{,}001\). Fisher's exact test on the pooled solved counts gives \(p \approx 10^{-14}\). The interval resamples tasks, then runs within each task.</p>
+  <p>The briefing did most of the work. It reached every Engram run, at its full 6,000 characters. The model called the memory tools in 9 of 100 runs, mostly for the two advice questions. The gate held back raw records on 4 of the 20 tasks, and all of those were still solved.</p>
+  <p>Engram runs took fewer steps: 6.3 against 7.5, and 7.0 against 9.0. They also read 5–6% fewer input tokens, and cost about the same ($0.007–0.009 a run) at the same wall time.</p>
+  <p>Distillation adds a small model call after every turn of real work. The table below covers the three histories, at about $0.0013 a turn. It never delays a prompt.</p>
+  <p>The knowledge query adds two filtered searches to every prompt. Run after the main search, they raised the prompt hook at a million records (1% of them knowledge) from 14.2 to 22.0 ms at the median, and from 32.0 to 43.0 ms at p99. They depend on nothing the main search computes, and only packing needs both results, so they now run side by side: 14.7 ms at the median and 29.8 ms at p99, the same as before within noise.</p>
+</div>
+<div class="wide" id="ab-distill"></div>
+<div class="col">
+  <p>The limits:</p>
+  <ul>
+    <li>Three small projects, one history each, and one small model for the work and for distillation.</li>
+    <li>The tasks were written alongside the histories, each aimed at facts the history states. Real work rarely depends on earlier sessions this often, so the 40-point gain is a gain on such tasks, not on work in general.</li>
+    <li>The histories are short. A project with more knowledge than 6,000 characters leaves the rest to the knowledge block and to search, which has not been tested here.</li>
+  </ul>
 </div>

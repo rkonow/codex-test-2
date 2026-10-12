@@ -104,7 +104,28 @@
     s("text", { x: x0 + 4000 * scale - 4, y: 178, class: "ts", "text-anchor": "end" }, g, "budget B = 4,000 chars (shaded: 80-char headers)");
   }
 
+  // What a turn agreed becomes knowledge records, which reach later sessions
+  // through the briefing and the per-prompt knowledge block.
+  function knowledgeLoop() {
+    const g = $("#knowledge-diagram");
+    if (!g) return;
+    box(g, 0, 70, 142, 92, "box", "end of a turn", ["Stop: the request,", "commands run, reply", "→ raw records,", "as before"]);
+    arrow(g, 142, 116, 170, 116);
+    box(g, 170, 52, 200, 128, "box-warm", "distill (small model)", ["after the hook has answered;", "sees the latest 40 notes:", "skips repeats, writes new;", "replaces: id → superseded;", "done: id → work closed;", "≈ $0.0013 and 8 s a turn"]);
+    arrow(g, 370, 116, 398, 116, "ln-acc");
+    [0, 1, 2].forEach((i) => s("rect", { x: 398 + i * 7, y: 62 + i * 7, width: 162, height: 98, rx: 6, class: i === 2 ? "box-acc" : "box" }, g));
+    s("text", { x: 422, y: 96, class: "tb" }, g, "knowledge records");
+    ["decision, with reason", "preference: a rule", "todo: planned work", "fact; near-copies dropped"].forEach((t, i) => s("text", { x: 422, y: 113 + i * 13, class: "ts" }, g, t));
+    arrow(g, 574, 92, 594, 50, "ln-acc");
+    arrow(g, 574, 140, 594, 182, "ln-acc");
+    box(g, 594, 0, 166, 96, "box-acc", "session start", ["briefing ≤ 6,000 chars:", "planned, rules, decisions,", "facts, where it left off;", "“search memory first”"]);
+    box(g, 594, 140, 166, 96, "box-acc", "every prompt", ["≤ 4 notes: cos ≥ 0.40", "or cov ≥ 0.30, not yet", "shown, whatever the gate;", "then gated raw recall"]);
+    s("text", { x: 0, y: 236, class: "ts" }, g, "Raw records stay the source of truth;");
+    s("text", { x: 0, y: 250, class: "ts" }, g, "knowledge records are keys a model writes over them.");
+  }
+
   anatomy();
   queryPath();
   budget();
+  knowledgeLoop();
 })();

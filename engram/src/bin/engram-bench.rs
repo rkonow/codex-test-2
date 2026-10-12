@@ -101,6 +101,10 @@ enum Cmd {
         /// Hook invocations per path.
         #[arg(long, default_value_t = 100)]
         hooks: usize,
+        /// Share of records stored as knowledge (decision, preference,
+        /// fact), which the per-prompt knowledge query searches.
+        #[arg(long, default_value_t = 0.01)]
+        knowledge: f64,
     },
     /// Prints embeddings (JSON lines) for comparing implementations.
     EmbedCheck {
@@ -492,7 +496,7 @@ fn main() {
             eprintln!("{} texts in {:.1} ms", texts.len(), t0.elapsed().as_secs_f64() * 1e3);
         }
         Cmd::Scale { data, sizes, embedder, out, queries, hooks, hook_gap_ms } => scale_cmd(&data, &sizes, &embedder, &out, queries, hooks, hook_gap_ms),
-        Cmd::Latency { data, sizes, embedder, out, queries, rounds, hooks } => latency_cmd(&data, &sizes, &embedder, &out, queries, rounds, hooks),
+        Cmd::Latency { data, sizes, embedder, out, queries, rounds, hooks, knowledge } => latency_cmd(&data, &sizes, &embedder, &out, queries, rounds, hooks, knowledge),
         Cmd::Probes { transcript, probes, points, embedder, project, out, cache, dump_missing, dump_probes, per_turn, max_records } => {
             let d = PackParams::default();
             let pack = PackParams { per_turn: per_turn.unwrap_or(d.per_turn), max_records: max_records.unwrap_or(d.max_records), ..d };
@@ -1039,14 +1043,24 @@ fn run_hook(exe: &Path, home: &Path, project: &Path, event: &str, payload: &Json
 }
 
 #[allow(clippy::too_many_arguments)]
-fn latency_cmd(data: &Path, sizes: &[usize], embedder: &str, out: &Path, n_queries: usize, rounds: usize, n_hooks: usize) {
+fn latency_cmd(data: &Path, sizes: &[usize], embedder: &str, out: &Path, n_queries: usize, rounds: usize, n_hooks: usize, knowledge: f64) {
     let e = open_embedder(embedder);
     let units = engram::benchdata::read_units(data, 1, None).expect("data");
     let mut results = Vec::new();
     std::fs::create_dir_all(out).unwrap();
     for &n in sizes {
         eprintln!("== {n} records");
-        let (recs, qs, _) = haystack(&units, n, n_queries);
+        let (mut recs, qs, _) = haystack(&units, n, n_queries);
+        // A share of the records as knowledge, spread evenly, so the
+        // per-prompt knowledge query has a realistic set to search.
+        if knowledge > 0.0 {
+            let every = (1.0 / knowledge).round().max(1.0) as usize;
+            let kinds = [Kind::Decision, Kind::Preference, Kind::Fact];
+            for (i, r) in recs.iter_mut().enumerate().filter(|(i, _)| i % every == 0) {
+                r.kind = kinds[(i / every) % 3];
+                r.tag = "distilled".into();
+            }
+        }
         let texts: Vec<String> = recs.iter().map(|r| r.embed_text()).collect();
         let refs: Vec<&str> = texts.iter().map(|s| s.as_str()).collect();
         let embs: Vec<Vec<f32>> = std::thread::scope(|s| {
@@ -1072,6 +1086,7 @@ fn latency_cmd(data: &Path, sizes: &[usize], embedder: &str, out: &Path, n_queri
         drop(recs);
         let mut row = serde_json::Map::new();
         row.insert("records".into(), json!(n));
+        row.insert("knowledge_share".into(), json!(knowledge));
 
         // 0. What a daemon start pays for the embedder: opening it now (the
         //    table is mapped), against reading and converting the whole

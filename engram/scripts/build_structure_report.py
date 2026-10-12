@@ -131,34 +131,53 @@ if rows_path.exists():
             out[metric] = {str(k): {"n": len(v), "acc": sum(v) / len(v)} for k, v in g.items()}
         conditional[cfg] = out
 
-def ab_summary():
-    """The with/without Engram test (scripts/ab_eval.py): per task and condition."""
-    path = results / "ab" / "runs.jsonl"
-    if not path.exists():
-        return None
-    rows = [json.loads(l) for l in path.read_text().splitlines()]
-    hist = load("ab/history.json") or {}
-    summ = load("ab/summary.json") or {}
+def ab_set(rows, tasks):
+    """Per task and condition, and overall, for one A/B run set."""
     med = lambda xs: sorted(xs)[len(xs) // 2] if xs else None  # noqa: E731
-    tasks = {}
-    for r in rows:
-        t = tasks.setdefault(r["task"], {"needs": summ.get("tasks", {}).get(r["task"], {}).get("needs"), "engram": [], "none": []})
-        t[r["condition"]].append(r)
+
+    def agg(rs):
+        return {"n": len(rs), "solved": sum(r["solved"] for r in rs), "score": sum(r["score"] for r in rs) / max(1, len(rs)),
+                "cost": med([r["cost_usd"] or 0 for r in rs]), "steps": med([r["turns"] or 0 for r in rs]), "wall": med([r["wall_s"] for r in rs]),
+                "memory_tools": sum(r["memory_tool_calls"] for r in rs)}
     out = {}
-    for name, t in tasks.items():
-        o = {"needs": t["needs"]}
+    for t in tasks:
+        rs = [r for r in rows if r["task"] == t["id"]]
+        if not rs:
+            continue
+        o = {"needs": t["needs"], "kind": t.get("kind")}
         for c in ("engram", "none"):
-            rs = t[c]
-            o[c] = {"n": len(rs), "solved": sum(r["solved"] for r in rs), "score": sum(r["score"] for r in rs) / max(1, len(rs)),
-                    "cost": med([r["cost_usd"] or 0 for r in rs]), "steps": med([r["turns"] or 0 for r in rs]), "wall": med([r["wall_s"] for r in rs]),
-                    "memory_tools": sum(r["memory_tool_calls"] for r in rs)}
-            if c == "engram":
-                o[c]["gate"] = [d for r in rs for d in (r["engram"] or {}).get("decisions", [])]
-        out[name] = o
-    allr = {c: [r for r in rows if r["condition"] == c] for c in ("engram", "none")}
-    overall = {c: {"n": len(rs), "solved": sum(r["solved"] for r in rs), "score": sum(r["score"] for r in rs) / max(1, len(rs)),
-                   "cost": med([r["cost_usd"] or 0 for r in rs]), "steps": med([r["turns"] or 0 for r in rs]), "wall": med([r["wall_s"] for r in rs])} for c, rs in allr.items()}
-    return {"tasks": out, "overall": overall, "history_cost": sum(t.get("cost") or 0 for t in hist.get("turns", [])), "history_turns": len(hist.get("turns", []))}
+            o[c] = agg([r for r in rs if r["condition"] == c])
+        o["engram"]["gate"] = [d for r in rs if r["condition"] == "engram" for d in (r.get("engram") or {}).get("decisions", [])]
+        # A grader that could not run the implementation reports {"error": ...}.
+        fails = lambda r: [k for k, v in (r.get("checks") or {}).items() if v is False] or (["crashed on the grader's input"] if "error" in (r.get("checks") or {}) else [])  # noqa: E731
+        o["failed_checks"] = {c: sorted({k for r in rs if r["condition"] == c and not r["solved"] for k in fails(r)}) for c in ("engram", "none")}
+        out[t["id"]] = o
+    order = [t["id"] for t in tasks if t["id"] in out]
+    return {"order": order, "tasks": out, "overall": {c: agg([r for r in rows if r["condition"] == c]) for c in ("engram", "none")}}
+
+
+def ab_summary():
+    """The with/without Engram tests (scripts/ab_eval.py): the first round and
+    the rerun on Tally, and the two held-out scenarios."""
+    import sys
+    sys.path.insert(0, str(root / "scripts"))
+    import ab_eval
+    rd = lambda p: [json.loads(l) for l in (results / "ab" / p).read_text().splitlines()] if (results / "ab" / p).exists() else []  # noqa: E731
+    first = rd("runs.jsonl")
+    if not first:
+        return None
+    sets = {"tally_r1": ab_set(first, ab_eval.TASKS),
+            "tally_dev": ab_set(rd("runs_v2.jsonl") + [r for r in first if r["condition"] == "none"], ab_eval.TASKS)}
+    hist = {"tally": load("ab/history.json") or {}}
+    for sc in ("stockroom", "slotwise"):
+        rows = rd(f"{sc}/runs.jsonl")
+        if rows:
+            sets[sc] = ab_set(rows, ab_eval.load_scenario(sc)["tasks"])
+            hist[sc] = load(f"ab/{sc}/history.json") or {}
+    # A resumed session reports its running total: a session costs its last turn's figure.
+    cost = lambda h: sum(max([t.get("cost") or 0 for t in h.get("turns", []) if t["session"] == k] or [0]) for k in range(len(h.get("sessions", []))))  # noqa: E731
+    history = {k: {"turns": len(h.get("turns", [])), "sessions": len(h.get("sessions", [])), "cost": cost(h)} for k, h in hist.items()}
+    return {"sets": sets, "stats": load("ab/stats.json"), "history": history, "distill": load("ab/distill_cost.json")}
 
 
 data = {

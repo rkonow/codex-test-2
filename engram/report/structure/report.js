@@ -401,21 +401,69 @@
     }
   }
 
+  const AB_SETS = [
+    ["stockroom", "held out: stock keeping"],
+    ["slotwise", "held out: appointments"],
+    ["tally_dev", "Tally, Engram now"],
+    ["tally_r1", "Tally, first Engram"],
+  ];
+  const AB_KIND = { conversation: "said only in conversation", repo: "in the repository", control: "control" };
+
   function abTable() {
     const el = $("#ab-table");
     const A = D.ab;
-    if (!el || !A) return;
-    const order = ["csv_export", "exchange_rates", "faster_save", "advice", "weighted_split", "rename_api", "discount", "summary", "run_tests", "slugify"];
-    const TN = { csv_export: "build the accountant's CSV export", exchange_rates: "fetch exchange rates", faster_save: "make saving faster", advice: "SQLite and pandas?", weighted_split: "split by weights", rename_api: "rename a public method", discount: "apply a discount", summary: "balance report", run_tests: "run the tests", slugify: "slugify helper (control)" };
-    const gate = (g) => { const c = {}; (g || []).forEach((d) => { c[d] = (c[d] || 0) + 1; }); return Object.entries(c).map(([k, v]) => `${k === "Skip" ? "nothing" : k === "Brief" ? "brief" : "full"} ×${v}`).join(", "); };
-    const rows = order.filter((k) => A.tasks[k]).map((k) => {
-      const t = A.tasks[k], e = t.engram, n = t.none;
-      const cls = e.score > n.score ? "sys" : "";
-      return [{ v: TN[k], cls }, t.needs, `${e.solved} of ${e.n}`, `${n.solved} of ${n.n}`, num(e.score, 2), num(n.score, 2), gate(e.gate), "$" + num(e.cost, 4), "$" + num(n.cost, 4), msf(e.steps), msf(n.steps)];
+    if (!el || !A || !A.sets) return;
+    const TN = { csv_export: "build the accountant's CSV export", exchange_rates: "fetch exchange rates", faster_save: "make saving faster", advice: "SQLite and pandas?", weighted_split: "split by weights", rename_api: "rename a public method", discount: "apply a discount", summary: "balance report", run_tests: "run the tests", slugify: "slugify helper" };
+    const name = (k) => TN[k] || k.replace(/_/g, " ");
+    const gate = (g) => { const c = {}; (g || []).forEach((d) => { c[d] = (c[d] || 0) + 1; }); return Object.entries(c).map(([k, v]) => `${k === "Skip" ? "none" : k === "Brief" ? "brief" : "full"} ×${v}`).join(", "); };
+    const draw = (key) => {
+      const S = A.sets[key];
+      const kinds = ["conversation", "repo", "control"];
+      const order = S.order.slice().sort((a, b) => kinds.indexOf(S.tasks[a].kind) - kinds.indexOf(S.tasks[b].kind));
+      const rows = order.map((k) => {
+        const t = S.tasks[k], e = t.engram, n = t.none;
+        const cls = e.score > n.score + 1e-9 ? "sys" : "";
+        const miss = (t.failed_checks.none || []).filter((c) => !(t.failed_checks.engram || []).includes(c));
+        return [{ v: name(k), cls }, AB_KIND[t.kind] || t.kind || "", `${e.solved} of ${e.n}`, `${n.solved} of ${n.n}`, num(e.score, 2), num(n.score, 2), miss.join(", ") || "—", gate(e.gate), "$" + num(e.cost, 4), "$" + num(n.cost, 4), msf(e.steps), msf(n.steps), t.needs];
+      });
+      const o = S.overall;
+      rows.push([{ v: "all", cls: "sys" }, "", `${o.engram.solved} of ${o.engram.n}`, `${o.none.solved} of ${o.none.n}`, num(o.engram.score, 2), num(o.none.score, 2), "", "", "$" + num(o.engram.cost, 4), "$" + num(o.none.cost, 4), msf(o.engram.steps), msf(o.none.steps), ""]);
+      table(el, ["follow-up task", "the fact is", "solved, Engram", "solved, without", "score, Engram", "score, without", "checks failed only without Engram", "recall gate (Engram)", "cost, Engram (median)", "cost, without", "steps, Engram", "steps, without", "what it needs from earlier sessions"], rows, [2, 3, 4, 5, 8, 9, 10, 11], { cls: "wrap-head compact" });
+    };
+    tabs(el, AB_SETS.filter(([k]) => A.sets[k]), draw);
+  }
+
+  function abStats() {
+    const el = $("#ab-stats");
+    const st = D.ab && D.ab.stats;
+    if (!el || !st) return;
+    const LABEL = { "tally-r1": "Tally, first Engram", "tally-dev": "Tally, Engram now", stockroom: "held out: stock keeping", slotwise: "held out: appointments", pooled: "held out, both" };
+    const p = (v) => (v == null ? "—" : v < 0.001 ? "< 0.001" : v.toFixed(3));
+    const rows = [];
+    ["pooled", "stockroom", "slotwise", "tally-dev", "tally-r1"].forEach((g) => {
+      if (!st[g]) return;
+      ["all", "conversation", "repo", "control"].forEach((k) => {
+        const a = st[g][k];
+        if (!a) return;
+        const cls = k === "all" ? "sys" : "";
+        rows.push([{ v: k === "all" ? LABEL[g] : "", cls }, { v: k === "all" ? "all tasks" : AB_KIND[k], cls }, `${a.solved.engram} of ${a.runs.engram}`, `${a.solved.none} of ${a.runs.none}`,
+          num(a.score.engram, 2), num(a.score.none, 2), (a.perm_score.diff >= 0 ? "+" : "") + num(a.perm_score.diff, 2), `${num(a.score_diff_ci95[0], 2)} to ${num(a.score_diff_ci95[1], 2)}`,
+          p(a.perm_solved.two_sided), p(a.perm_score.two_sided), p(a.fisher_solved.two_sided)]);
+      });
     });
-    const o = A.overall;
-    rows.push([{ v: "all", cls: "sys" }, "", `${o.engram.solved} of ${o.engram.n}`, `${o.none.solved} of ${o.none.n}`, num(o.engram.score, 2), num(o.none.score, 2), "", "$" + num(o.engram.cost, 4), "$" + num(o.none.cost, 4), msf(o.engram.steps), msf(o.none.steps)]);
-    table(el, ["follow-up task", "what it needs from earlier sessions", "solved, Engram", "solved, without", "score, Engram", "score, without", "Engram injected", "cost, Engram (median)", "cost, without", "steps, Engram", "steps, without"], rows, [2, 3, 4, 5, 7, 8, 9, 10], { cls: "wrap-head compact" });
+    table(el, ["runs", "tasks", "solved, Engram", "solved, without", "score, Engram", "score, without", "Δ score", "95% interval (tasks resampled)", "p, solved (permutation within tasks)", "p, score (permutation within tasks)", "p, solved (Fisher)"], rows, [2, 3, 4, 5, 6, 7, 8, 9, 10], { cls: "wrap-head compact" });
+  }
+
+  function abDistill() {
+    const el = $("#ab-distill");
+    const A = D.ab;
+    if (!el || !A || !A.distill) return;
+    const LABEL = { tally: "Tally (dev)", stockroom: "stock keeping (held out)", slotwise: "appointments (held out)" };
+    const rows = Object.entries(A.distill).map(([k, d]) => {
+      const h = (A.history || {})[k] || {};
+      return [{ v: LABEL[k] || k, cls: "sys" }, d.mode, int(d.turns), int(d.kept), int(d.replaced), int(d.done), "$" + num(d.cost_usd, 4), "$" + num(d.cost_usd / d.turns, 4), num(d.ms_median / 1000, 1) + " s", num(d.ms_max / 1000, 1) + " s", h.cost != null ? "$" + num(h.cost, 3) : "—"];
+    });
+    table(el, ["history", "distilled", "turns", "items written", "items replaced", "planned items closed", "distillation cost", "per turn", "median time", "slowest", "the history's own cost"], rows, [2, 3, 4, 5, 6, 7, 8, 9, 10], { cls: "wrap-head compact" });
   }
 
   function meta() {
@@ -437,6 +485,8 @@
   probesTable();
   latencyTables();
   abTable();
+  abStats();
+  abDistill();
   let last = window.innerWidth;
   window.addEventListener("resize", () => {
     if (Math.abs(window.innerWidth - last) < 40) return;

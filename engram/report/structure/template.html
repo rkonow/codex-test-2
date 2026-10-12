@@ -39,7 +39,7 @@ td.sys { font-weight: 600; }
 <header class="col">
   <div class="eyebrow">posting_bench · strata · engram</div>
   <h1>What a memory record should be: keys, values and queries for Engram</h1>
-  <p class="lede">Engram keeps a coding agent's running context in a Strata table and puts parts of it back into the prompt. Each stored record has a lexical key, a dense key, a value that gets injected, and attributes that queries filter on. This page compares ways to cut and key that context, on two long-conversation benchmarks, on the 26-hour session that built this repository, and by the answers a model gives from what is injected. It also covers where a prompt's time goes and what made it shorter, and ends with Claude Code itself, with and without Engram, on work that depends on earlier sessions. The structure that won is now Engram's.</p>
+  <p class="lede">Engram keeps a coding agent's running context in a Strata table and puts parts of it back into the prompt. Each stored record has a lexical key, a dense key, a value that gets injected, and attributes that queries filter on. This page compares ways to cut and key that context, on two long-conversation benchmarks, on the 26-hour session that built this repository, and by the answers a model gives from what is injected. It also covers where a prompt's time goes and what made it shorter. It ends with Claude Code itself, with and without Engram, on work that depends on earlier sessions. A first test found almost no difference; with the knowledge records added in response, Engram solved all 100 held-out runs against 60 without it. The structure that won is now Engram's.</p>
   <p class="meta" id="meta-line"></p>
   <div class="findings" id="findings"><!--FINDINGS--></div>
   <ul class="toc">
@@ -120,12 +120,20 @@ target/release/engram-structure --transcript SESSION.jsonl --probes probes/sessi
 python3 scripts/extract_facts.py --data longmemeval_s.jsonl --every 5 --out facts_every5.jsonl
 target/release/engram-structure --data longmemeval_s.jsonl --every 5 --facts facts_every5.jsonl --layouts "turn,facts,turn+facts,turn/fact-keys" --tag facts
 # answers from the injected context, graded with LongMemEval's prompts
-python3 scripts/reader_eval.py --data longmemeval_s.jsonl --judge sonnet --config today=CONTEXT.jsonl --config oracle=oracle --out results/reader
+python3 scripts/reader_eval.py --data longmemeval_s.jsonl --judge <model> --config today=CONTEXT.jsonl --config oracle=oracle --out results/reader
 # Engram itself, and time
 target/release/engram-bench retrieval --data longmemeval_s.jsonl --ctx request --tag c400
 python3 scripts/fit_gate.py results/retrieval/longmemeval_s_static_request_c400.rows.jsonl --out results/gate_static_c400.json
 target/release/engram-bench probes --transcript SESSION.jsonl --probes probes/lost_probes.json --points 1952:4632,4633:5392
 target/release/engram-bench latency --data longmemeval_s.jsonl --sizes 10000,100000,1000000
+# Claude Code with and without Engram: Tally (dev), then the two held-out projects
+python3 scripts/ab_eval.py history --model MODEL &amp;&amp; python3 scripts/ab_eval.py run --model MODEL --repeats 3
+target/release/engram distill --project /home/user/ab/s1/tally       # Tally's store, distilled after the fact
+python3 scripts/ab_eval.py run --model MODEL --runs runs_v2 --conditions engram --store-src STORE
+python3 scripts/ab_eval.py history --scenario stockroom --model MODEL   # and slotwise
+python3 scripts/ab_eval.py run --scenario stockroom --model MODEL --repeats 5
+python3 scripts/ab_stats.py tally-r1=results/ab/runs.jsonl tally-dev=results/ab/runs_v2.jsonl:engram,results/ab/runs.jsonl:none \
+    stockroom=results/ab/stockroom/runs.jsonl slotwise=results/ab/slotwise/runs.jsonl --pool stockroom,slotwise --out results/ab/stats.json
 python3 scripts/build_structure_report.py              # this page</pre>
 </section>
 <footer class="col" id="footer"></footer>
