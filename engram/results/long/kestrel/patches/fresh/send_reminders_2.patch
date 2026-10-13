@@ -1,0 +1,113 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index c8ee399..9a17375 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -2,6 +2,7 @@
+ 
+ ## Unreleased
+ 
++- `send_reminders(appointments, patients, client)` sends one SMS per booked appointment (date, time and clinic only, no treatment) and returns the number sent.
+ - `session_price(kind)`: assessment $95, follow-up $70, in cents.
+ - `BulkieClient.send_batch` splits messages into calls of at most 50 (Bulkie's limit) and returns one response per call.
+ - Code runs on Python 3.9 (the reception PCs' version).
+diff --git a/src/kestrel/reminders.py b/src/kestrel/reminders.py
+new file mode 100644
+index 0000000..d914bd3
+--- /dev/null
++++ b/src/kestrel/reminders.py
+@@ -0,0 +1,25 @@
++"""Appointment reminders sent by SMS."""
++
++from .calendar import CLINIC_TZ
++from .models import BOOKED, CLINICS
++
++
++def reminder_text(appointment):
++    """The SMS body: date, time and clinic only. It never says what the appointment is for."""
++    local = appointment.start.astimezone(CLINIC_TZ)
++    clinic = CLINICS[appointment.clinic].name
++    return f"{clinic}: reminder of your appointment on {local:%a %d %b %Y} at {local:%H:%M}."
++
++
++def send_reminders(appointments, patients, client):
++    """Send one SMS to the patient of each booked appointment. Returns the number of messages sent.
++
++    patients maps patient ID to Patient. Cancelled, attended and no-show appointments are skipped.
++    """
++    messages = [
++        (patients[a.patient_id].phone, reminder_text(a))
++        for a in appointments
++        if a.status == BOOKED
++    ]
++    client.send_batch(messages)
++    return len(messages)
+diff --git a/tests/test_reminders.py b/tests/test_reminders.py
+new file mode 100644
+index 0000000..a566354
+--- /dev/null
++++ b/tests/test_reminders.py
+@@ -0,0 +1,64 @@
++import unittest
++
++from helpers import appt, utc
++from kestrel.models import ATTENDED, CANCELLED, NO_SHOW, Patient
++from kestrel.reminders import reminder_text, send_reminders
++
++
++class FakeClient:
++    def __init__(self):
++        self.sent = []
++
++    def send_batch(self, messages):
++        self.sent.extend(messages)
++        return [{"ok": True}]
++
++
++PATIENTS = {
++    "KP-000001": Patient("KP-000001", "Aroha Test", "+64211111111"),
++    "KP-000002": Patient("KP-000002", "Ben Test", "+64222222222"),
++}
++
++
++class ReminderTextTest(unittest.TestCase):
++    def test_has_date_time_and_clinic_only(self):
++        # 2027-03-01 21:30 UTC is 2027-03-02 10:30 in Auckland (NZDT, UTC+13)
++        text = reminder_text(appt("A1", utc(2027, 3, 1, 21, 30), clinic="HB", treatment="lower back pain"))
++        self.assertEqual(text, "Kestrel Physio Harbour: reminder of your appointment on Tue 02 Mar 2027 at 10:30.")
++
++    def test_no_patient_name_or_treatment(self):
++        text = reminder_text(appt("A1", utc(2027, 3, 1, 9), treatment="lower back pain"))
++        self.assertNotIn("lower back", text)
++        self.assertNotIn("Aroha", text)
++
++
++class SendRemindersTest(unittest.TestCase):
++    def test_one_sms_per_booked_appointment(self):
++        client = FakeClient()
++        appointments = [
++            appt("A1", utc(2027, 3, 1, 9), patient="KP-000001"),
++            appt("A2", utc(2027, 3, 2, 9), patient="KP-000002"),
++        ]
++        self.assertEqual(send_reminders(appointments, PATIENTS, client), 2)
++        self.assertEqual([phone for phone, _ in client.sent], ["+64211111111", "+64222222222"])
++
++    def test_skips_appointments_that_are_not_booked(self):
++        client = FakeClient()
++        appointments = [
++            appt("A1", utc(2027, 3, 1, 9), patient="KP-000001", status=CANCELLED,
++                 cancelled_at=utc(2027, 2, 28, 9)),
++            appt("A2", utc(2027, 3, 1, 10), patient="KP-000001", status=ATTENDED),
++            appt("A3", utc(2027, 3, 1, 11), patient="KP-000002", status=NO_SHOW),
++            appt("A4", utc(2027, 3, 1, 12), patient="KP-000002"),
++        ]
++        self.assertEqual(send_reminders(appointments, PATIENTS, client), 1)
++        self.assertEqual([phone for phone, _ in client.sent], ["+64222222222"])
++
++    def test_no_appointments_sends_nothing(self):
++        client = FakeClient()
++        self.assertEqual(send_reminders([], PATIENTS, client), 0)
++        self.assertEqual(client.sent, [])
++
++
++if __name__ == "__main__":
++    unittest.main()

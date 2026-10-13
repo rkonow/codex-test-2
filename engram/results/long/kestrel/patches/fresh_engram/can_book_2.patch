@@ -1,0 +1,139 @@
+diff --git a/src/kestrel/booking.py b/src/kestrel/booking.py
+new file mode 100644
+index 0000000..73129e4
+--- /dev/null
++++ b/src/kestrel/booking.py
+@@ -0,0 +1,53 @@
++"""Checks run by the booking form before an appointment is saved."""
++
++import datetime
++
++from .calendar import CLINIC_TZ
++from .models import ASSESSMENT, CANCELLED
++
++MAX_PER_DAY = 8  # therapists' union agreement: patient appointments per therapist per day
++ASSESSMENT_GAP = datetime.timedelta(minutes=15)  # notes-writing time after an assessment
++DURATIONS = {
++    ASSESSMENT: datetime.timedelta(minutes=45),
++    "followup": datetime.timedelta(minutes=30),
++}
++
++
++def _end(appointment):
++    return appointment.start + DURATIONS[appointment.kind]
++
++
++def _buffer_after(appointment):
++    return ASSESSMENT_GAP if appointment.kind == ASSESSMENT else datetime.timedelta(0)
++
++
++def can_book(calendar, therapist, appointment):
++    """Whether the new appointment can be added to the calendar for this therapist."""
++    if appointment.therapist_id != therapist.id:
++        return False
++    try:
++        calendar.get(appointment.id)
++    except KeyError:
++        pass
++    else:
++        return False
++
++    existing = [a for a in calendar.for_therapist(therapist.id) if a.status != CANCELLED]
++
++    new_end = _end(appointment)
++    new_buffer = _buffer_after(appointment)
++    for other in existing:
++        # Each pair needs the new one to start after the other one's end and gap,
++        # or the other one to start after the new one's end and gap. This also
++        # refuses any overlap.
++        other_ok_first = appointment.start >= _end(other) + _buffer_after(other)
++        other_ok_second = other.start >= new_end + new_buffer
++        if not (other_ok_first or other_ok_second):
++            return False
++
++    day = appointment.start.astimezone(CLINIC_TZ).date()
++    on_day = [a for a in existing if a.start.astimezone(CLINIC_TZ).date() == day]
++    if len(on_day) >= MAX_PER_DAY:
++        return False
++
++    return True
+diff --git a/tests/test_booking.py b/tests/test_booking.py
+new file mode 100644
+index 0000000..39d3f09
+--- /dev/null
++++ b/tests/test_booking.py
+@@ -0,0 +1,74 @@
++import unittest
++
++from helpers import appt, utc
++from kestrel.booking import can_book
++from kestrel.calendar import Calendar
++from kestrel.models import ASSESSMENT, CANCELLED, Therapist
++
++T1 = Therapist("T1", "Ana", "HB")
++
++
++class CanBookTest(unittest.TestCase):
++    def test_empty_calendar(self):
++        self.assertTrue(can_book(Calendar(), T1, appt("new", utc(2027, 3, 1, 10))))
++
++    def test_overlapping_appointment_refused(self):
++        # Followup runs 10:00-10:30, so a 10:15 followup clashes.
++        cal = Calendar([appt("a1", utc(2027, 3, 1, 10))])
++        self.assertFalse(can_book(cal, T1, appt("new", utc(2027, 3, 1, 10, 15))))
++
++    def test_back_to_back_followups_allowed(self):
++        cal = Calendar([appt("a1", utc(2027, 3, 1, 10))])
++        self.assertTrue(can_book(cal, T1, appt("new", utc(2027, 3, 1, 10, 30))))
++        self.assertTrue(can_book(cal, T1, appt("new", utc(2027, 3, 1, 9, 0))))
++
++    def test_gap_needed_after_assessment(self):
++        # Assessment runs 10:00-10:45, then 15 minutes for notes.
++        cal = Calendar([appt("a1", utc(2027, 3, 1, 10), kind=ASSESSMENT)])
++        self.assertFalse(can_book(cal, T1, appt("new", utc(2027, 3, 1, 10, 50))))
++        self.assertTrue(can_book(cal, T1, appt("new", utc(2027, 3, 1, 11, 0))))
++
++    def test_gap_needed_before_new_assessment(self):
++        # A new assessment 10:00-10:45 needs 15 minutes free before the 10:50 followup.
++        cal = Calendar([appt("a1", utc(2027, 3, 1, 10, 50))])
++        self.assertFalse(can_book(cal, T1, appt("new", utc(2027, 3, 1, 10), kind=ASSESSMENT)))
++        cal = Calendar([appt("a1", utc(2027, 3, 1, 11))])
++        self.assertTrue(can_book(cal, T1, appt("new", utc(2027, 3, 1, 10), kind=ASSESSMENT)))
++
++    def test_no_gap_needed_after_followup(self):
++        cal = Calendar([appt("a1", utc(2027, 3, 1, 10))])
++        self.assertTrue(can_book(cal, T1, appt("new", utc(2027, 3, 1, 10, 30))))
++
++    def test_cancelled_appointment_does_not_block(self):
++        cal = Calendar([appt("a1", utc(2027, 3, 1, 10))])
++        cal.cancel("a1", utc(2027, 2, 28, 9))
++        self.assertTrue(can_book(cal, T1, appt("new", utc(2027, 3, 1, 10))))
++
++    def test_other_therapist_does_not_block(self):
++        cal = Calendar([appt("a1", utc(2027, 3, 1, 10), therapist="T2")])
++        self.assertTrue(can_book(cal, T1, appt("new", utc(2027, 3, 1, 10))))
++
++    def test_appointment_for_another_therapist_refused(self):
++        self.assertFalse(can_book(Calendar(), T1, appt("new", utc(2027, 3, 1, 10), therapist="T2")))
++
++    def test_duplicate_id_refused(self):
++        cal = Calendar([appt("a1", utc(2027, 3, 1, 10))])
++        self.assertFalse(can_book(cal, T1, appt("a1", utc(2027, 3, 1, 14))))
++
++    def test_eight_per_day_limit(self):
++        # Eight followups, one hour apart, from 13:00 local on 2027-03-01 (NZDT is UTC+13).
++        cal = Calendar([appt(f"a{h}", utc(2027, 3, 1, h)) for h in range(8)])
++        self.assertFalse(can_book(cal, T1, appt("new", utc(2027, 3, 1, 8))))
++
++    def test_eight_per_day_limit_per_day(self):
++        cal = Calendar([appt(f"a{h}", utc(2027, 3, 1, h)) for h in range(8)])
++        self.assertTrue(can_book(cal, T1, appt("new", utc(2027, 3, 1, 23))))  # 2027-03-02 locally
++
++    def test_cancelled_appointments_do_not_count_towards_limit(self):
++        cal = Calendar([appt(f"a{h}", utc(2027, 3, 1, h)) for h in range(8)])
++        cal.cancel("a0", utc(2027, 2, 28, 9))
++        self.assertTrue(can_book(cal, T1, appt("new", utc(2027, 3, 1, 8))))
++
++
++if __name__ == "__main__":
++    unittest.main()

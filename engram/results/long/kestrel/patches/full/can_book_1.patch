@@ -1,0 +1,148 @@
+diff --git a/src/kestrel/booking.py b/src/kestrel/booking.py
+new file mode 100644
+index 0000000..8d0f558
+--- /dev/null
++++ b/src/kestrel/booking.py
+@@ -0,0 +1,49 @@
++"""Checks the booking form runs before it saves an appointment."""
++
++import datetime
++
++from .calendar import LOCAL_TZ
++from .models import ASSESSMENT, BOOKED, CANCELLED, FOLLOWUP
++
++# Appointment lengths, in minutes.
++MINUTES = {ASSESSMENT: 45, FOLLOWUP: 30}
++# After an assessment the therapist writes notes for this many minutes before the next patient.
++ASSESSMENT_GAP_MINUTES = 15
++# Union agreement: at most this many patient appointments per therapist per day.
++DAILY_CAP = 8
++
++
++def _busy_until(appointment):
++    """When the therapist is free again after `appointment`, including any notes time."""
++    minutes = MINUTES[appointment.kind]
++    if appointment.kind == ASSESSMENT:
++        minutes += ASSESSMENT_GAP_MINUTES
++    return appointment.start + datetime.timedelta(minutes=minutes)
++
++
++def can_book(calendar, therapist, appointment):
++    """True if `appointment` can be added to `calendar` for `therapist`, else False.
++
++    Refuses if the time clashes with another live booking for the therapist (including
++    the notes gap after an assessment), if the therapist already has the daily cap of
++    patient appointments that local day, or if the id is already in the calendar.
++    Cancelled appointments do not count.
++    """
++    if appointment.therapist_id != therapist.id or appointment.status != BOOKED:
++        return False
++    try:
++        calendar.get(appointment.id)
++    except KeyError:
++        pass
++    else:
++        return False
++
++    live = [a for a in calendar.for_therapist(therapist.id) if a.status != CANCELLED]
++    new_end = _busy_until(appointment)
++    for other in live:
++        if appointment.start < _busy_until(other) and other.start < new_end:
++            return False
++
++    day = appointment.start.astimezone(LOCAL_TZ).date()
++    on_day = [a for a in live if a.start.astimezone(LOCAL_TZ).date() == day]
++    return len(on_day) < DAILY_CAP
+diff --git a/tests/test_booking.py b/tests/test_booking.py
+new file mode 100644
+index 0000000..9b39254
+--- /dev/null
++++ b/tests/test_booking.py
+@@ -0,0 +1,87 @@
++import datetime
++import unittest
++
++from helpers import appt, utc
++from kestrel.booking import can_book
++from kestrel.calendar import Calendar
++from kestrel.models import ASSESSMENT, FOLLOWUP, Therapist
++
++JO = Therapist("T1", "Jo Park", "HB")
++# Times are UTC; Auckland is UTC+13 in March, so 20:00 UTC on 1 March is 09:00 local on 2 March.
++NINE = utc(2027, 3, 1, 20)
++
++
++def cal_with(*appointments):
++    return Calendar(list(appointments))
++
++
++class CanBookTest(unittest.TestCase):
++    def test_free_slot(self):
++        self.assertTrue(can_book(cal_with(), JO, appt("n", NINE, kind=FOLLOWUP)))
++
++    def test_overlapping_booking_refused(self):
++        cal = cal_with(appt("a1", NINE, kind=FOLLOWUP))
++        self.assertFalse(can_book(cal, JO, appt("n", utc(2027, 3, 1, 20, 15), kind=FOLLOWUP)))
++
++    def test_back_to_back_followups_allowed(self):
++        cal = cal_with(appt("a1", NINE, kind=FOLLOWUP))  # 09:00-09:30
++        self.assertTrue(can_book(cal, JO, appt("n", utc(2027, 3, 1, 20, 30), kind=FOLLOWUP)))
++
++    def test_notes_gap_after_assessment_blocks(self):
++        cal = cal_with(appt("a1", NINE, kind=ASSESSMENT))  # 09:00-09:45, then notes until 10:00
++        self.assertFalse(can_book(cal, JO, appt("n", utc(2027, 3, 1, 20, 45), kind=FOLLOWUP)))  # 09:45
++        self.assertTrue(can_book(cal, JO, appt("n", utc(2027, 3, 1, 21), kind=FOLLOWUP)))  # 10:00
++
++    def test_new_assessment_counts_its_own_notes_gap(self):
++        cal = cal_with(appt("a1", utc(2027, 3, 1, 21), kind=FOLLOWUP))  # 10:00-10:30
++        # 09:30 assessment runs to 10:15 with its notes, so it clashes with the 10:00 follow-up.
++        self.assertFalse(can_book(cal, JO, appt("n", utc(2027, 3, 1, 20, 30), kind=ASSESSMENT)))
++        # 09:00 assessment runs to 09:45 and its notes end at 10:00, exactly when the follow-up starts.
++        self.assertTrue(can_book(cal, JO, appt("n", NINE, kind=ASSESSMENT)))
++
++    def test_new_followup_ending_as_next_starts(self):
++        cal = cal_with(appt("a1", utc(2027, 3, 1, 21), kind=FOLLOWUP))  # 10:00
++        self.assertTrue(can_book(cal, JO, appt("n", utc(2027, 3, 1, 20, 30), kind=FOLLOWUP)))  # 09:30-10:00
++        self.assertFalse(can_book(cal, JO, appt("n", utc(2027, 3, 1, 20, 31), kind=FOLLOWUP)))  # 09:31-10:01
++
++    def test_other_therapists_do_not_block(self):
++        cal = cal_with(appt("a1", NINE, therapist="T2", kind=FOLLOWUP))
++        self.assertTrue(can_book(cal, JO, appt("n", NINE, kind=FOLLOWUP)))
++
++    def test_cancelled_booking_does_not_block(self):
++        cal = cal_with(appt("a1", NINE, kind=FOLLOWUP, status="cancelled"))
++        self.assertTrue(can_book(cal, JO, appt("n", NINE, kind=FOLLOWUP)))
++
++    def test_daily_cap_of_eight(self):
++        seven = [appt(f"a{i}", NINE + _hours(i), kind=FOLLOWUP) for i in range(7)]
++        self.assertTrue(can_book(cal_with(*seven), JO, appt("n", NINE + _hours(7), kind=FOLLOWUP)))
++        eight = seven + [appt("a7", NINE + _hours(7), kind=FOLLOWUP)]
++        self.assertFalse(can_book(cal_with(*eight), JO, appt("n", NINE + _hours(8), kind=FOLLOWUP)))
++
++    def test_cap_is_per_local_day(self):
++        eight_on_day_one = [appt(f"a{i}", NINE + _hours(i), kind=FOLLOWUP) for i in range(8)]
++        next_day = NINE + _hours(24)  # 09:00 on 3 March, Auckland
++        self.assertTrue(can_book(cal_with(*eight_on_day_one), JO, appt("n", next_day, kind=FOLLOWUP)))
++
++    def test_cancelled_do_not_count_towards_cap(self):
++        eight = [appt(f"a{i}", NINE + _hours(i), kind=FOLLOWUP) for i in range(7)]
++        eight.append(appt("a7", NINE + _hours(7), kind=FOLLOWUP, status="cancelled"))
++        self.assertTrue(can_book(cal_with(*eight), JO, appt("n", NINE + _hours(8), kind=FOLLOWUP)))
++
++    def test_refuses_other_therapist(self):
++        self.assertFalse(can_book(cal_with(), JO, appt("n", NINE, therapist="T2", kind=FOLLOWUP)))
++
++    def test_refuses_duplicate_id(self):
++        cal = cal_with(appt("a1", NINE, kind=FOLLOWUP))
++        self.assertFalse(can_book(cal, JO, appt("a1", utc(2027, 3, 2, 3), kind=FOLLOWUP)))
++
++    def test_refuses_non_booked_appointment(self):
++        self.assertFalse(can_book(cal_with(), JO, appt("n", NINE, kind=FOLLOWUP, status="attended")))
++
++
++def _hours(n):
++    return datetime.timedelta(hours=n)
++
++
++if __name__ == "__main__":
++    unittest.main()

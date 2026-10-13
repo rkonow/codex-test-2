@@ -1,0 +1,69 @@
+diff --git a/src/kestrel/calendar.py b/src/kestrel/calendar.py
+index 2d90bbc..fe28daa 100644
+--- a/src/kestrel/calendar.py
++++ b/src/kestrel/calendar.py
+@@ -63,5 +63,12 @@ class Calendar:
+     def booked(self):
+         return [a for a in self.all() if a.status == BOOKED]
+ 
++    def upcoming(self, patient_id, now):
++        """A patient's booked appointments starting after `now`, soonest first."""
++        if now.tzinfo is None:
++            raise ValueError("now must be timezone-aware")
++        patient_id = normalize_patient_id(patient_id)
++        return [a for a in self.booked() if a.patient_id == patient_id and a.start > now]
++
+     def __len__(self):
+         return len(self._appointments)
+diff --git a/tests/test_calendar.py b/tests/test_calendar.py
+index c3cf5a4..efbb15d 100644
+--- a/tests/test_calendar.py
++++ b/tests/test_calendar.py
+@@ -124,6 +124,47 @@ class CalendarTest(unittest.TestCase):
+         cal = Calendar([appt("a1", utc(2027, 3, 1, 20)), appt("a2", utc(2027, 3, 1, 21), status="cancelled")])
+         self.assertEqual([a.id for a in cal.booked()], ["a1"])
+ 
++    def test_upcoming_is_soonest_first_and_after_now(self):
++        cal = Calendar([
++            appt("a2", utc(2027, 3, 3, 20), patient="KP-000001"),
++            appt("a1", utc(2027, 3, 2, 20), patient="KP-000001"),
++            appt("past", utc(2027, 3, 1, 20), patient="KP-000001"),
++        ])
++        self.assertEqual([a.id for a in cal.upcoming("KP-000001", utc(2027, 3, 2, 0))], ["a1", "a2"])
++
++    def test_upcoming_excludes_start_exactly_now(self):
++        cal = Calendar([appt("a1", utc(2027, 3, 2, 20), patient="KP-000001")])
++        self.assertEqual(cal.upcoming("KP-000001", utc(2027, 3, 2, 20)), [])
++        self.assertEqual([a.id for a in cal.upcoming("KP-000001", utc(2027, 3, 2, 19, 59))], ["a1"])
++
++    def test_upcoming_only_that_patient(self):
++        cal = Calendar([
++            appt("a1", utc(2027, 3, 2, 20), patient="KP-000001"),
++            appt("a2", utc(2027, 3, 2, 21), patient="KP-000002"),
++        ])
++        self.assertEqual([a.id for a in cal.upcoming("KP-000002", utc(2027, 3, 1))], ["a2"])
++
++    def test_upcoming_skips_cancelled_and_attended(self):
++        cal = Calendar([
++            appt("a1", utc(2027, 3, 2, 20), patient="KP-000001", status="cancelled"),
++            appt("a2", utc(2027, 3, 2, 21), patient="KP-000001", status="attended"),
++            appt("a3", utc(2027, 3, 2, 22), patient="KP-000001"),
++        ])
++        self.assertEqual([a.id for a in cal.upcoming("KP-000001", utc(2027, 3, 1))], ["a3"])
++
++    def test_upcoming_normalises_patient_id(self):
++        cal = Calendar([appt("a1", utc(2027, 3, 2, 20), patient="KP-004211")])
++        self.assertEqual([a.id for a in cal.upcoming(" kp4211 ", utc(2027, 3, 1))], ["a1"])
++
++    def test_upcoming_none_is_empty(self):
++        cal = Calendar([appt("a1", utc(2027, 3, 2, 20), patient="KP-000001")])
++        self.assertEqual(cal.upcoming("KP-000009", utc(2027, 3, 1)), [])
++
++    def test_upcoming_requires_aware_now(self):
++        cal = Calendar([appt("a1", utc(2027, 3, 2, 20), patient="KP-000001")])
++        with self.assertRaises(ValueError):
++            cal.upcoming("KP-000001", datetime.datetime(2027, 3, 1))
++
+ 
+ if __name__ == "__main__":
+     unittest.main()

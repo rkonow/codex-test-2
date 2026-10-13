@@ -1,0 +1,131 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index c8ee399..94e58ed 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -3,6 +3,7 @@
+ ## Unreleased
+ 
+ - `session_price(kind)`: assessment $95, follow-up $70, in cents.
++- `appointment_price(appointment, patient)`: what the patient pays, in cents. No-shows pay the full price; bookings cancelled under 48 hours before the start pay 50%. Raises `NotImplementedError` for CSC patients until their rate is set.
+ - `BulkieClient.send_batch` splits messages into calls of at most 50 (Bulkie's limit) and returns one response per call.
+ - Code runs on Python 3.9 (the reception PCs' version).
+ - `import_legacy(path)` reads the old booking system's CSV export into appointments.
+diff --git a/src/kestrel/pricing.py b/src/kestrel/pricing.py
+index db7dce2..d933610 100644
+--- a/src/kestrel/pricing.py
++++ b/src/kestrel/pricing.py
+@@ -1,12 +1,18 @@
+ """Session prices."""
+ 
+-from kestrel.models import ASSESSMENT, FOLLOWUP
++import datetime
++
++from kestrel.models import ASSESSMENT, CANCELLED, FOLLOWUP, NO_SHOW
+ 
+ _PRICES_CENTS = {
+     ASSESSMENT: 9500,
+     FOLLOWUP: 7000,
+ }
+ 
++# A cancellation this close to the appointment is "late" (board decision, 2026-10-11).
++LATE_CANCELLATION_WINDOW = datetime.timedelta(hours=48)
++LATE_CANCELLATION_PERCENT = 50
++
+ 
+ def session_price(kind):
+     """Return the price of a session of the given kind, in cents.
+@@ -17,3 +23,29 @@ def session_price(kind):
+         return _PRICES_CENTS[kind]
+     except KeyError:
+         raise ValueError(f"unknown session kind: {kind!r}") from None
++
++
++def appointment_price(appointment, patient):
++    """Return what the patient pays for the appointment, in cents.
++
++    A no-show pays the full session price. A booking cancelled less than
++    48 hours before its start pays 50% of it. Anything else pays the full
++    session price.
++
++    Raises NotImplementedError for Community Services Card holders: their
++    rate has not been set yet, and charging full price would overcharge them.
++    """
++    if patient.csc:
++        raise NotImplementedError("Community Services Card rate is not set")
++    price = session_price(appointment.kind)
++    if appointment.status == NO_SHOW:
++        return price
++    if appointment.status == CANCELLED and _is_late(appointment):
++        return price * LATE_CANCELLATION_PERCENT // 100
++    return price
++
++
++def _is_late(appointment):
++    if appointment.cancelled_at is None:
++        raise ValueError(f"appointment {appointment.id!r} is cancelled but has no cancelled_at")
++    return appointment.start - appointment.cancelled_at < LATE_CANCELLATION_WINDOW
+diff --git a/tests/test_pricing.py b/tests/test_pricing.py
+index 8fcfa3c..f75b9a9 100644
+--- a/tests/test_pricing.py
++++ b/tests/test_pricing.py
+@@ -1,6 +1,12 @@
++import datetime
+ import unittest
+ 
+-from kestrel.pricing import session_price
++from helpers import appt, utc
++from kestrel.models import ATTENDED, CANCELLED, NO_SHOW, ASSESSMENT, FOLLOWUP, Patient
++from kestrel.pricing import appointment_price, session_price
++
++PATIENT = Patient(id="KP-000001", name="Jane Example", phone="+64211234567")
++CSC_PATIENT = Patient(id="KP-000002", name="Sam Example", phone="+64211234568", csc=True)
+ 
+ 
+ class SessionPriceTest(unittest.TestCase):
+@@ -19,5 +25,46 @@ class SessionPriceTest(unittest.TestCase):
+             session_price(None)
+ 
+ 
++class AppointmentPriceTest(unittest.TestCase):
++    START = utc(2027, 3, 10, 9)
++
++    def test_booked_pays_full_session_price(self):
++        a = appt("a1", self.START, kind=ASSESSMENT)
++        self.assertEqual(appointment_price(a, PATIENT), 9500)
++
++    def test_attended_followup_pays_full_price(self):
++        a = appt("a1", self.START, kind=FOLLOWUP, status=ATTENDED)
++        self.assertEqual(appointment_price(a, PATIENT), 7000)
++
++    def test_no_show_pays_full_price(self):
++        a = appt("a1", self.START, kind=ASSESSMENT, status=NO_SHOW)
++        self.assertEqual(appointment_price(a, PATIENT), 9500)
++
++    def test_cancelled_within_48_hours_pays_half(self):
++        at = self.START - datetime.timedelta(hours=47, minutes=59)
++        a = appt("a1", self.START, kind=ASSESSMENT, status=CANCELLED, cancelled_at=at)
++        self.assertEqual(appointment_price(a, PATIENT), 4750)
++
++    def test_cancelled_exactly_48_hours_before_is_not_late(self):
++        at = self.START - datetime.timedelta(hours=48)
++        a = appt("a1", self.START, kind=FOLLOWUP, status=CANCELLED, cancelled_at=at)
++        self.assertEqual(appointment_price(a, PATIENT), 7000)
++
++    def test_cancelled_well_ahead_pays_nothing_extra(self):
++        at = self.START - datetime.timedelta(days=7)
++        a = appt("a1", self.START, kind=FOLLOWUP, status=CANCELLED, cancelled_at=at)
++        self.assertEqual(appointment_price(a, PATIENT), 7000)
++
++    def test_cancelled_without_cancelled_at_is_refused(self):
++        a = appt("a1", self.START, status=CANCELLED)
++        with self.assertRaises(ValueError):
++            appointment_price(a, PATIENT)
++
++    def test_csc_patient_is_refused_until_rate_is_set(self):
++        a = appt("a1", self.START, kind=ASSESSMENT)
++        with self.assertRaises(NotImplementedError):
++            appointment_price(a, CSC_PATIENT)
++
++
+ if __name__ == "__main__":
+     unittest.main()

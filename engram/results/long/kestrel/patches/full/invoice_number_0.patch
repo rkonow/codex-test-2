@@ -1,0 +1,54 @@
+diff --git a/src/kestrel/invoices.py b/src/kestrel/invoices.py
+index e51538d..a612256 100644
+--- a/src/kestrel/invoices.py
++++ b/src/kestrel/invoices.py
+@@ -54,10 +54,11 @@ def format_invoice_number(clinic, year, sequence):
+     return f"INV-{clinic}-{year:04d}-{sequence:05d}"
+ 
+ 
+-def next_invoice_number(existing, clinic, year):
+-    """The next number for `clinic` in `year`, given every number already issued.
++def next_invoice_number(clinic, year, existing):
++    """The next number for `clinic` in `year`, given the numbers issued so far.
+ 
+-    Each clinic counts separately and starts again at 00001 every year.
++    `existing` may hold numbers from any clinic and any year. Each clinic counts
++    separately and starts again at 00001 every year.
+     """
+     highest = 0
+     for number in existing:
+diff --git a/tests/test_invoices.py b/tests/test_invoices.py
+index 76648fb..d48fcfe 100644
+--- a/tests/test_invoices.py
++++ b/tests/test_invoices.py
+@@ -55,24 +55,24 @@ class InvoiceNumberTest(unittest.TestCase):
+                     format_invoice_number("HB", 2027, sequence)
+ 
+     def test_first_number_of_year(self):
+-        self.assertEqual(next_invoice_number([], "HB", 2027), "INV-HB-2027-00001")
++        self.assertEqual(next_invoice_number("HB", 2027, []), "INV-HB-2027-00001")
+ 
+     def test_continues_from_highest(self):
+         existing = ["INV-HB-2027-00001", "INV-HB-2027-00042", "INV-HB-2027-00007"]
+-        self.assertEqual(next_invoice_number(existing, "HB", 2027), "INV-HB-2027-00043")
++        self.assertEqual(next_invoice_number("HB", 2027, existing), "INV-HB-2027-00043")
+ 
+     def test_counts_each_clinic_separately(self):
+         existing = ["INV-NG-2027-00900", "INV-HB-2027-00003"]
+-        self.assertEqual(next_invoice_number(existing, "HB", 2027), "INV-HB-2027-00004")
+-        self.assertEqual(next_invoice_number(existing, "WK", 2027), "INV-WK-2027-00001")
++        self.assertEqual(next_invoice_number("HB", 2027, existing), "INV-HB-2027-00004")
++        self.assertEqual(next_invoice_number("WK", 2027, existing), "INV-WK-2027-00001")
+ 
+     def test_restarts_each_year(self):
+         existing = ["INV-HB-2026-00150"]
+-        self.assertEqual(next_invoice_number(existing, "HB", 2027), "INV-HB-2027-00001")
++        self.assertEqual(next_invoice_number("HB", 2027, existing), "INV-HB-2027-00001")
+ 
+     def test_ignores_unrelated_strings(self):
+         existing = ["not an invoice", "INV-HB-2027-1", "INV-HB-2027-00005 "]
+-        self.assertEqual(next_invoice_number(existing, "HB", 2027), "INV-HB-2027-00001")
++        self.assertEqual(next_invoice_number("HB", 2027, existing), "INV-HB-2027-00001")
+ 
+ 
+ if __name__ == "__main__":

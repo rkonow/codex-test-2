@@ -1,0 +1,62 @@
+diff --git a/src/kestrel/reminders.py b/src/kestrel/reminders.py
+new file mode 100644
+index 0000000..c003a97
+--- /dev/null
++++ b/src/kestrel/reminders.py
+@@ -0,0 +1,20 @@
++"""Text of the SMS reminders we send to patients."""
++
++from .calendar import CLINIC_TZ
++from .models import CLINICS
++
++
++def reminder_text(appointment):
++    """The SMS sent two days before an appointment.
++
++    Privacy rule: only the date, time and clinic name go in the text. The
++    treatment and the patient's name are never included.
++    """
++    local = appointment.start.astimezone(CLINIC_TZ)
++    clinic = CLINICS[appointment.clinic].name
++    when = local.strftime("%A %-d %B at %-I:%M %p")
++    return (
++        f"Hi there, this is a friendly reminder of your appointment at {clinic} "
++        f"on {when}. We look forward to seeing you! "
++        "If you need to change or cancel, please let us know as soon as you can."
++    )
+diff --git a/tests/test_reminders.py b/tests/test_reminders.py
+new file mode 100644
+index 0000000..5ebd91d
+--- /dev/null
++++ b/tests/test_reminders.py
+@@ -0,0 +1,30 @@
++import unittest
++
++from helpers import appt, utc
++from kestrel.reminders import reminder_text
++
++
++class ReminderTextTest(unittest.TestCase):
++    def test_gives_local_date_time_and_clinic(self):
++        # 22:30 UTC on 13 Oct is 11:30 on 14 Oct in Auckland (NZDT)
++        a = appt("a1", utc(2026, 10, 13, 22, 30), clinic="HB")
++        text = reminder_text(a)
++        self.assertIn("Kestrel Physio Harbour", text)
++        self.assertIn("Wednesday 14 October at 11:30 AM", text)
++
++    def test_no_leading_zero_on_day_or_hour(self):
++        a = appt("a1", utc(2026, 10, 4, 20, 5), clinic="NG")  # 9:05 on 5 Oct
++        text = reminder_text(a)
++        self.assertIn("Monday 5 October at 9:05 AM", text)
++
++    def test_does_not_mention_treatment_or_patient(self):
++        a = appt("a1", utc(2026, 10, 13, 22, 30), patient="KP-000001", clinic="WK", kind="followup")
++        a.treatment = "lower back pain"
++        text = reminder_text(a)
++        self.assertNotIn("lower back pain", text)
++        self.assertNotIn("KP-000001", text)
++        self.assertNotIn("followup", text)
++
++
++if __name__ == "__main__":
++    unittest.main()

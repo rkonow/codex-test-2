@@ -1,0 +1,70 @@
+diff --git a/src/kestrel/reminders.py b/src/kestrel/reminders.py
+new file mode 100644
+index 0000000..8c492b0
+--- /dev/null
++++ b/src/kestrel/reminders.py
+@@ -0,0 +1,22 @@
++"""Appointment reminder texts."""
++
++from .calendar import CLINIC_TZ
++from .models import CLINICS, Appointment
++
++
++def reminder_text(appointment: Appointment) -> str:
++    """The SMS sent two days before an appointment.
++
++    Privacy rules: the text gives only the date, time and clinic. It never includes
++    the patient's name or what the appointment is for.
++    """
++    local = appointment.start.astimezone(CLINIC_TZ)
++    hour = local.hour % 12 or 12
++    meridiem = "am" if local.hour < 12 else "pm"
++    when = f"{local:%A} {local.day} {local:%B} at {hour}:{local:%M}{meridiem}"
++    clinic = CLINICS[appointment.clinic].name
++    return (
++        f"Kia ora! This is a friendly reminder of your appointment at {clinic} "
++        f"on {when}. We look forward to seeing you. "
++        "If you can't make it, please let us know as soon as you can so we can offer the time to someone else."
++    )
+diff --git a/tests/test_reminders.py b/tests/test_reminders.py
+new file mode 100644
+index 0000000..0d9825c
+--- /dev/null
++++ b/tests/test_reminders.py
+@@ -0,0 +1,36 @@
++import unittest
++
++from helpers import appt, utc
++from kestrel.reminders import reminder_text
++
++
++class ReminderTextTest(unittest.TestCase):
++    def test_gives_local_date_and_time_and_clinic(self):
++        # 02:30 UTC on 3 Mar is 15:30 on 3 Mar in Auckland (NZDT, UTC+13)
++        a = appt("a1", utc(2027, 3, 3, 2, 30), clinic="HB", treatment="lower back pain")
++        text = reminder_text(a)
++        self.assertIn("Kia ora", text)
++        self.assertIn("Kestrel Physio Harbour", text)
++        self.assertIn("Wednesday 3 March at 3:30pm", text)
++
++    def test_morning_time_uses_am(self):
++        a = appt("a1", utc(2027, 3, 2, 21, 15), clinic="NG")  # 10:15 on 3 Mar NZDT
++        self.assertIn("at 10:15am", reminder_text(a))
++
++    def test_midnight_hour_is_twelve(self):
++        a = appt("a1", utc(2027, 3, 2, 12, 0), clinic="NG")  # 01:00 local, not midnight
++        self.assertIn("at 1:00am", reminder_text(a))
++        b = appt("a2", utc(2027, 3, 2, 11, 0), clinic="NG")  # 00:00 local
++        self.assertIn("at 12:00am", reminder_text(b))
++
++    def test_never_includes_patient_or_treatment(self):
++        a = appt("a1", utc(2027, 3, 3, 2, 30), patient="KP-000001", treatment="lower back pain")
++        text = reminder_text(a)
++        self.assertNotIn("KP-000001", text)
++        self.assertNotIn("lower back", text)
++        self.assertNotIn("assessment", text.lower())
++        self.assertNotIn("follow", text.lower())
++
++
++if __name__ == "__main__":
++    unittest.main()

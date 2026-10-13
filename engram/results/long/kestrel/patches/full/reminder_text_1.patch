@@ -1,0 +1,82 @@
+diff --git a/src/kestrel/reminders.py b/src/kestrel/reminders.py
+new file mode 100644
+index 0000000..2a264c7
+--- /dev/null
++++ b/src/kestrel/reminders.py
+@@ -0,0 +1,27 @@
++"""Text of the SMS reminder sent two days before an appointment."""
++
++from .calendar import LOCAL_TZ
++from .models import CLINICS
++
++MONTHS = ["January", "February", "March", "April", "May", "June", "July",
++          "August", "September", "October", "November", "December"]
++WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
++
++
++def reminder_text(appointment):
++    """A friendly reminder with the clinic, date and time only.
++
++    It deliberately leaves out the kind of session and the treatment, since
++    reminders must not say what an appointment is for.
++    """
++    try:
++        clinic = CLINICS[appointment.clinic].name
++    except KeyError:
++        raise ValueError(f"unknown clinic {appointment.clinic!r}") from None
++    local = appointment.start.astimezone(LOCAL_TZ)
++    date = f"{WEEKDAYS[local.weekday()]} {local.day} {MONTHS[local.month - 1]}"
++    hour = local.hour % 12 or 12
++    meridiem = "am" if local.hour < 12 else "pm"
++    time = f"{hour}:{local.minute:02d}{meridiem}"
++    return (f"Kia ora from Kestrel Physio. Reminder: you have an appointment at {clinic} "
++            f"on {date} at {time}. See you then!")
+diff --git a/tests/test_reminders.py b/tests/test_reminders.py
+new file mode 100644
+index 0000000..6c3f41a
+--- /dev/null
++++ b/tests/test_reminders.py
+@@ -0,0 +1,43 @@
++import unittest
++
++from helpers import appt, utc
++from kestrel.reminders import reminder_text
++
++
++class ReminderTextTest(unittest.TestCase):
++    def test_includes_clinic_date_and_time(self):
++        text = reminder_text(appt("a1", utc(2027, 3, 1, 22), clinic="HB"))  # 11:00 Tue 2 Mar, Auckland
++        self.assertIn("Kestrel Physio Harbour", text)
++        self.assertIn("Tuesday 2 March", text)
++        self.assertIn("11:00am", text)
++
++    def test_afternoon_time_is_pm(self):
++        text = reminder_text(appt("a1", utc(2027, 3, 2, 3, 15), clinic="NG"))  # 16:15 Tue 2 Mar
++        self.assertIn("Tuesday 2 March at 4:15pm", text)
++        self.assertIn("Kestrel Physio Northgate", text)
++
++    def test_midday_and_midnight_hours(self):
++        noon = reminder_text(appt("a1", utc(2027, 3, 2, 23, 30), clinic="WK"))  # 12:30 Wed 3 Mar, Auckland
++        self.assertIn("Wednesday 3 March at 12:30pm", noon)
++        midnight = reminder_text(appt("a2", utc(2027, 3, 1, 11), clinic="WK"))  # 00:00 Tue 2 Mar, Auckland
++        self.assertIn("Tuesday 2 March at 12:00am", midnight)
++
++    def test_no_treatment_or_session_kind(self):
++        text = reminder_text(appt("a1", utc(2027, 3, 1, 22), clinic="HB", kind="assessment",
++                                  treatment="lower back pain"))
++        self.assertNotIn("lower back pain", text)
++        self.assertNotIn("assessment", text.lower())
++        self.assertNotIn("follow", text.lower())
++        self.assertNotIn("KP-", text)
++
++    def test_fits_in_one_sms(self):
++        text = reminder_text(appt("a1", utc(2027, 3, 1, 22), clinic="HB"))
++        self.assertLessEqual(len(text), 160)
++
++    def test_rejects_unknown_clinic(self):
++        with self.assertRaises(ValueError):
++            reminder_text(appt("a1", utc(2027, 3, 1, 22), clinic="XX"))
++
++
++if __name__ == "__main__":
++    unittest.main()

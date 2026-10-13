@@ -1,0 +1,124 @@
+diff --git a/src/kestrel/pricing.py b/src/kestrel/pricing.py
+index 42ef5d5..5d124d8 100644
+--- a/src/kestrel/pricing.py
++++ b/src/kestrel/pricing.py
+@@ -1,16 +1,44 @@
+-"""Session prices, in cents (NZD)."""
++"""Session prices, in cents (NZD), and what a patient pays for an appointment."""
+ 
++import datetime
++
++from .calendar import LOCAL_TZ
+ from .models import ASSESSMENT, FOLLOWUP
+ 
+-PRICES_CENTS = {
+-    ASSESSMENT: 9500,  # $95
+-    FOLLOWUP: 7000,  # $70
+-}
++# Each entry applies from its date (local, Pacific/Auckland) until the next entry starts.
++PRICE_SCHEDULE = [
++    (datetime.date(1, 1, 1), {
++        ASSESSMENT: 9500,  # $95
++        FOLLOWUP: 7000,  # $70
++    }),
++    (datetime.date(2027, 4, 1), {
++        ASSESSMENT: 10500,  # $105
++        FOLLOWUP: 7800,  # $78
++    }),
++]
++
++CSC_FOLLOWUP_DISCOUNT_PERCENT = 20
+ 
+ 
+-def session_price(kind):
+-    """Standard price in cents for a session kind, before any discounts."""
++def session_price(kind, on_date):
++    """Standard price in cents for a session kind on a local date, before any discounts."""
++    prices = None
++    for start, table in PRICE_SCHEDULE:
++        if on_date >= start:
++            prices = table
+     try:
+-        return PRICES_CENTS[kind]
++        return prices[kind]
+     except KeyError:
+         raise ValueError(f"unknown kind {kind!r}") from None
++
++
++def appointment_price(appointment, patient):
++    """What the patient pays for this appointment, in cents.
++
++    The price is set by the appointment's local date, so bookings before 1 April 2027 keep the old prices.
++    """
++    local_date = appointment.start.astimezone(LOCAL_TZ).date()
++    price = session_price(appointment.kind, local_date)
++    if patient.csc and appointment.kind == FOLLOWUP:
++        price = price * (100 - CSC_FOLLOWUP_DISCOUNT_PERCENT) // 100
++    return price
+diff --git a/tests/test_pricing.py b/tests/test_pricing.py
+index 3eb6b3d..eb92719 100644
+--- a/tests/test_pricing.py
++++ b/tests/test_pricing.py
+@@ -1,15 +1,56 @@
++import datetime
+ import unittest
+ 
+-from kestrel.pricing import session_price
++from helpers import appt, utc
++from kestrel.models import ASSESSMENT, FOLLOWUP, Patient
++from kestrel.pricing import appointment_price, session_price
++
++TODAY = datetime.date(2026, 10, 12)
++RISE = datetime.date(2027, 4, 1)
++
++
++def patient(csc=False):
++    return Patient("KP-000001", "Ana Silva", "+64211234567", csc=csc)
+ 
+ 
+ class SessionPriceTest(unittest.TestCase):
+-    def test_initial_assessment_is_95_dollars(self):
+-        self.assertEqual(session_price("assessment"), 9500)
++    def test_initial_assessment_is_95_dollars_today(self):
++        self.assertEqual(session_price("assessment", TODAY), 9500)
+ 
+-    def test_followup_is_70_dollars(self):
+-        self.assertEqual(session_price("followup"), 7000)
++    def test_followup_is_70_dollars_today(self):
++        self.assertEqual(session_price("followup", TODAY), 7000)
++
++    def test_old_prices_before_1_april_2027(self):
++        self.assertEqual(session_price(ASSESSMENT, datetime.date(2027, 3, 31)), 9500)
++        self.assertEqual(session_price(FOLLOWUP, datetime.date(2027, 3, 31)), 7000)
++
++    def test_new_prices_from_1_april_2027(self):
++        self.assertEqual(session_price(ASSESSMENT, RISE), 10500)
++        self.assertEqual(session_price(FOLLOWUP, RISE), 7800)
+ 
+     def test_unknown_kind_raises(self):
+         with self.assertRaises(ValueError):
+-            session_price("massage")
++            session_price("massage", TODAY)
++
++
++class AppointmentPriceTest(unittest.TestCase):
++    def test_assessment_and_followup_at_standard_price(self):
++        self.assertEqual(appointment_price(appt("a1", utc(2026, 10, 12, 20), kind=ASSESSMENT), patient()), 9500)
++        self.assertEqual(appointment_price(appt("a2", utc(2026, 10, 12, 20), kind=FOLLOWUP), patient()), 7000)
++
++    def test_csc_gets_20_percent_off_followup_only(self):
++        self.assertEqual(appointment_price(appt("a1", utc(2026, 10, 12, 20), kind=FOLLOWUP), patient(csc=True)), 5600)
++        self.assertEqual(appointment_price(appt("a2", utc(2026, 10, 12, 20), kind=ASSESSMENT), patient(csc=True)), 9500)
++
++    def test_price_is_set_by_local_date_not_utc(self):
++        # 31 Mar 2027 23:30 NZDT is still 31 March locally, so the old price applies.
++        self.assertEqual(appointment_price(appt("a1", utc(2027, 3, 31, 10, 30), kind=FOLLOWUP), patient()), 7000)
++        # 1 Apr 2027 00:00 NZDT is 31 Mar 11:00 UTC: already the new price, though the UTC date is still 31 March.
++        self.assertEqual(appointment_price(appt("a2", utc(2027, 3, 31, 11, 0), kind=FOLLOWUP), patient()), 7800)
++
++    def test_csc_discount_on_new_followup_price(self):
++        self.assertEqual(appointment_price(appt("a1", utc(2027, 4, 1, 0, 0), kind=FOLLOWUP), patient(csc=True)), 6240)
++
++
++if __name__ == "__main__":
++    unittest.main()

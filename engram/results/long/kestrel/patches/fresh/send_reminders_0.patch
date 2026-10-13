@@ -1,0 +1,134 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index c8ee399..923fb8f 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -18,6 +18,7 @@
+ - `python -m kestrel day THERAPIST_ID DATE --data kestrel.json` prints a therapist's day: local time, kind and patient ID.
+ - `python -m kestrel patients --data kestrel.json` lists patient IDs and names, sorted by ID.
+ - `save` writes atomically: it writes a temporary file in the same directory and renames it over the old file, so a crash cannot leave a half-written file. Saved files are now created with owner-only permissions (`0600`).
++- `send_reminders(appointments, patients, client)` texts the patient of every booked appointment (date, time and clinic only, no name or treatment) and returns the number of messages sent. Nothing is sent if any patient is missing from `patients`.
+ 
+ ## 0.1.0
+ 
+diff --git a/src/kestrel/reminders.py b/src/kestrel/reminders.py
+new file mode 100644
+index 0000000..e346767
+--- /dev/null
++++ b/src/kestrel/reminders.py
+@@ -0,0 +1,26 @@
++"""Appointment reminders sent by SMS."""
++
++from .calendar import CLINIC_TZ
++from .models import BOOKED, CLINICS
++
++
++def reminder_text(appointment):
++    """The SMS for one appointment. Only the date, time and clinic: no name, no treatment."""
++    local = appointment.start.astimezone(CLINIC_TZ)
++    clinic = CLINICS[appointment.clinic].name
++    return f"{clinic}: reminder of your appointment on {local:%A %d %B} at {local:%H:%M}."
++
++
++def send_reminders(appointments, patients, client):
++    """Text the patient of every booked appointment. Returns the number of messages sent.
++
++    patients maps patient ID to Patient. Every message is built before anything is
++    sent, so a missing patient raises KeyError without sending any messages.
++    """
++    messages = [
++        (patients[appointment.patient_id].phone, reminder_text(appointment))
++        for appointment in appointments
++        if appointment.status == BOOKED
++    ]
++    client.send_batch(messages)
++    return len(messages)
+diff --git a/tests/test_reminders.py b/tests/test_reminders.py
+new file mode 100644
+index 0000000..2ce0580
+--- /dev/null
++++ b/tests/test_reminders.py
+@@ -0,0 +1,84 @@
++import unittest
++
++from kestrel.models import ATTENDED, CANCELLED, NO_SHOW, Patient
++from kestrel.reminders import reminder_text, send_reminders
++
++from helpers import appt, utc
++
++
++class FakeClient:
++    def __init__(self, fail=False):
++        self.batches = []
++        self.fail = fail
++
++    def send_batch(self, messages):
++        if self.fail:
++            raise RuntimeError("gateway down")
++        self.batches.append(list(messages))
++        return [{"ok": True}]
++
++
++PATIENTS = {
++    "KP-000001": Patient("KP-000001", "Aroha Test", "+6421000001", csc=False),
++    "KP-000002": Patient("KP-000002", "Hemi Test", "+6421000002", csc=True),
++}
++
++
++class SendRemindersTest(unittest.TestCase):
++    def test_sends_one_text_per_booked_appointment_and_counts_them(self):
++        client = FakeClient()
++        appointments = [
++            appt("A1", utc(2026, 10, 14, 1), patient="KP-000001"),
++            appt("A2", utc(2026, 10, 15, 1), patient="KP-000002"),
++        ]
++        self.assertEqual(send_reminders(appointments, PATIENTS, client), 2)
++        self.assertEqual(len(client.batches), 1)
++        self.assertEqual([phone for phone, _ in client.batches[0]], ["+6421000001", "+6421000002"])
++
++    def test_skips_appointments_that_are_not_booked(self):
++        client = FakeClient()
++        appointments = [
++            appt("A1", utc(2026, 10, 14, 1), patient="KP-000001"),
++            appt("A2", utc(2026, 10, 14, 2), patient="KP-000002", status=CANCELLED),
++            appt("A3", utc(2026, 10, 14, 3), patient="KP-000002", status=ATTENDED),
++            appt("A4", utc(2026, 10, 14, 4), patient="KP-000002", status=NO_SHOW),
++        ]
++        self.assertEqual(send_reminders(appointments, PATIENTS, client), 1)
++        self.assertEqual([phone for phone, _ in client.batches[0]], ["+6421000001"])
++
++    def test_no_booked_appointments_sends_nothing(self):
++        client = FakeClient()
++        self.assertEqual(send_reminders([], PATIENTS, client), 0)
++        self.assertEqual(client.batches, [[]])
++
++    def test_missing_patient_raises_before_anything_is_sent(self):
++        client = FakeClient()
++        appointments = [
++            appt("A1", utc(2026, 10, 14, 1), patient="KP-000001"),
++            appt("A2", utc(2026, 10, 14, 2), patient="KP-999999"),
++        ]
++        with self.assertRaises(KeyError):
++            send_reminders(appointments, PATIENTS, client)
++        self.assertEqual(client.batches, [])
++
++    def test_gateway_failure_propagates(self):
++        with self.assertRaises(RuntimeError):
++            send_reminders([appt("A1", utc(2026, 10, 14, 1), patient="KP-000001")], PATIENTS, FakeClient(fail=True))
++
++
++class ReminderTextTest(unittest.TestCase):
++    def test_contains_date_time_and_clinic_only(self):
++        text = reminder_text(appt("A1", utc(2026, 10, 14, 1), clinic="HB", treatment="lower back pain"))
++        self.assertIn("Kestrel Physio Harbour", text)
++        self.assertIn("14 October", text)
++        self.assertIn("14:00", text)  # 01:00 UTC is 14:00 in Auckland (NZDT, UTC+13)
++        self.assertNotIn("lower back pain", text)
++        self.assertNotIn("Aroha", text)
++
++    def test_uses_clinic_local_time(self):
++        text = reminder_text(appt("A1", utc(2026, 10, 14, 1)))
++        self.assertIn("at 14:00", text)
++
++
++if __name__ == "__main__":
++    unittest.main()

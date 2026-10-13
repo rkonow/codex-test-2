@@ -1,0 +1,76 @@
+diff --git a/src/kestrel/intervals.py b/src/kestrel/intervals.py
+new file mode 100644
+index 0000000..c1a0c10
+--- /dev/null
++++ b/src/kestrel/intervals.py
+@@ -0,0 +1,17 @@
++"""Time intervals."""
++
++
++def merge_busy(intervals):
++    """Merge (start, end) pairs given in any order into sorted, non-overlapping pairs.
++
++    Pairs that overlap or touch (one ends exactly where the next starts) are merged.
++    """
++    merged = []
++    for start, end in sorted(intervals):
++        if end < start:
++            raise ValueError(f"interval ends before it starts: {(start, end)!r}")
++        if merged and start <= merged[-1][1]:
++            merged[-1] = (merged[-1][0], max(merged[-1][1], end))
++        else:
++            merged.append((start, end))
++    return merged
+diff --git a/tests/test_intervals.py b/tests/test_intervals.py
+new file mode 100644
+index 0000000..b8a7ea3
+--- /dev/null
++++ b/tests/test_intervals.py
+@@ -0,0 +1,47 @@
++import unittest
++
++from helpers import utc
++from kestrel.intervals import merge_busy
++
++
++class MergeBusyTest(unittest.TestCase):
++    def test_empty(self):
++        self.assertEqual(merge_busy([]), [])
++
++    def test_disjoint_kept_and_sorted(self):
++        a = (utc(2027, 3, 1, 9), utc(2027, 3, 1, 10))
++        b = (utc(2027, 3, 1, 12), utc(2027, 3, 1, 13))
++        self.assertEqual(merge_busy([b, a]), [a, b])
++
++    def test_overlapping_merged(self):
++        self.assertEqual(
++            merge_busy([(utc(2027, 3, 1, 9), utc(2027, 3, 1, 10, 30)), (utc(2027, 3, 1, 10), utc(2027, 3, 1, 11))]),
++            [(utc(2027, 3, 1, 9), utc(2027, 3, 1, 11))],
++        )
++
++    def test_touching_merged(self):
++        self.assertEqual(
++            merge_busy([(utc(2027, 3, 1, 9), utc(2027, 3, 1, 10)), (utc(2027, 3, 1, 10), utc(2027, 3, 1, 11))]),
++            [(utc(2027, 3, 1, 9), utc(2027, 3, 1, 11))],
++        )
++
++    def test_nested_keeps_outer_end(self):
++        self.assertEqual(
++            merge_busy([(utc(2027, 3, 1, 9), utc(2027, 3, 1, 12)), (utc(2027, 3, 1, 10), utc(2027, 3, 1, 11))]),
++            [(utc(2027, 3, 1, 9), utc(2027, 3, 1, 12))],
++        )
++
++    def test_any_order_gives_same_result(self):
++        pairs = [(utc(2027, 3, 1, 14), utc(2027, 3, 1, 15)), (utc(2027, 3, 1, 9), utc(2027, 3, 1, 10)),
++                 (utc(2027, 3, 1, 9, 30), utc(2027, 3, 1, 11)), (utc(2027, 3, 1, 15), utc(2027, 3, 1, 16))]
++        expected = [(utc(2027, 3, 1, 9), utc(2027, 3, 1, 11)), (utc(2027, 3, 1, 14), utc(2027, 3, 1, 16))]
++        self.assertEqual(merge_busy(pairs), expected)
++        self.assertEqual(merge_busy(list(reversed(pairs))), expected)
++
++    def test_rejects_end_before_start(self):
++        with self.assertRaises(ValueError):
++            merge_busy([(utc(2027, 3, 1, 10), utc(2027, 3, 1, 9))])
++
++
++if __name__ == "__main__":
++    unittest.main()

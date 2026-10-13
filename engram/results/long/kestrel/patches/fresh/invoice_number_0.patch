@@ -1,0 +1,94 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index c8ee399..596734f 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -6,6 +6,7 @@
+ - `BulkieClient.send_batch` splits messages into calls of at most 50 (Bulkie's limit) and returns one response per call.
+ - Code runs on Python 3.9 (the reception PCs' version).
+ - `import_legacy(path)` reads the old booking system's CSV export into appointments.
++- `next_invoice_number(clinic, year, existing)` returns the next `INV-<clinic>-<year>-<sequence>` number, counting from the highest existing sequence for that clinic and year.
+ - `make_invoice(appointment, patient, number, amount_cents)` builds an `Invoice` dated the appointment's local date, with the patient name left blank.
+ - `Calendar.move(appointment_id, new_start)` reschedules a booked appointment; cancelled, attended and no-show appointments are refused.
+ - `Calendar.cancel(appointment_id, at)` cancels a booked appointment and records `cancelled_at`; `at` must be timezone-aware.
+diff --git a/src/kestrel/invoices.py b/src/kestrel/invoices.py
+index 06127c9..e031239 100644
+--- a/src/kestrel/invoices.py
++++ b/src/kestrel/invoices.py
+@@ -2,6 +2,8 @@
+ 
+ from dataclasses import dataclass
+ import datetime
++import re
++from typing import Iterable
+ 
+ from .calendar import CLINIC_TZ
+ from .models import ASSESSMENT, Appointment, Patient
+@@ -11,6 +13,8 @@ DESCRIPTIONS = {
+     "followup": "Physiotherapy follow-up",
+ }
+ 
++_SEQUENCE_RE = re.compile(r"[0-9]+")
++
+ 
+ @dataclass
+ class Invoice:
+@@ -23,6 +27,20 @@ class Invoice:
+     description: str = ""
+ 
+ 
++def next_invoice_number(clinic: str, year: int, existing: Iterable[str]) -> str:
++    """Return the next number in the INV-<clinic>-<year>-<sequence> scheme.
++
++    `existing` is every invoice number issued so far, for any clinic and year; only numbers
++    for this clinic and year count. The sequence starts at 1 and is zero-padded to five digits.
++    """
++    prefix = f"INV-{clinic}-{year}-"
++    last = 0
++    for number in existing:
++        if number.startswith(prefix) and _SEQUENCE_RE.fullmatch(number[len(prefix):]):
++            last = max(last, int(number[len(prefix):]))
++    return f"{prefix}{last + 1:05d}"
++
++
+ def make_invoice(appointment: Appointment, patient: Patient, number: str, amount_cents: int) -> Invoice:
+     """Invoice a patient for an appointment, dated the appointment's local (clinic) date.
+ 
+diff --git a/tests/test_invoices.py b/tests/test_invoices.py
+index d75d7ac..9634497 100644
+--- a/tests/test_invoices.py
++++ b/tests/test_invoices.py
+@@ -2,12 +2,33 @@ import datetime
+ import unittest
+ 
+ from helpers import appt, utc
+-from kestrel.invoices import make_invoice
++from kestrel.invoices import make_invoice, next_invoice_number
+ from kestrel.models import Patient
+ 
+ PATIENT = Patient(id="KP-000001", name="Jane Example", phone="+64211234567")
+ 
+ 
++class NextInvoiceNumberTest(unittest.TestCase):
++    def test_first_invoice_of_year_is_sequence_one(self):
++        self.assertEqual(next_invoice_number("HB", 2027, []), "INV-HB-2027-00001")
++
++    def test_follows_highest_existing_sequence(self):
++        existing = ["INV-HB-2027-00001", "INV-HB-2027-00042", "INV-HB-2027-00007"]
++        self.assertEqual(next_invoice_number("HB", 2027, existing), "INV-HB-2027-00043")
++
++    def test_ignores_other_clinics_and_years(self):
++        existing = ["INV-HB-2026-00900", "INV-KC-2027-00500", "INV-HB-2028-00100"]
++        self.assertEqual(next_invoice_number("HB", 2027, existing), "INV-HB-2027-00001")
++
++    def test_ignores_unrelated_numbers(self):
++        existing = ["N1", "INV-HB-2027-", "INV-HB-2027-abc", "INV-HB-2027-00003x", "XINV-HB-2027-00009"]
++        self.assertEqual(next_invoice_number("HB", 2027, existing), "INV-HB-2027-00001")
++
++    def test_accepts_any_iterable(self):
++        existing = (n for n in ["INV-HB-2027-00002"])
++        self.assertEqual(next_invoice_number("HB", 2027, existing), "INV-HB-2027-00003")
++
++
+ class MakeInvoiceTest(unittest.TestCase):
+     def test_copies_appointment_and_patient_details(self):
+         a = appt("a1", utc(2027, 3, 1, 20), kind="assessment", patient="KP-000001", clinic="HB")
