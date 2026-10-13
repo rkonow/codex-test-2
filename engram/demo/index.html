@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Engram Inspector</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='7' fill='%233a5ccc'/%3E%3Ccircle cx='8' cy='8' r='3' fill='white'/%3E%3C/svg%3E">
 <style>
 :root {
   --bg: #f6f6f3; --panel: #ffffff; --panel2: #f0efea; --line: #dddbd3; --text: #1f1e1b; --muted: #6d6a61; --faint: #9a968b;
@@ -405,13 +406,13 @@ async function send() {
   $("#log").appendChild(u);
   const turn = document.createElement("div");
   turn.className = "turn";
-  turn.innerHTML = `<div class="engrams"></div><div class="flow"></div><div class="stored"></div><div class="foot"></div>`;
+  turn.innerHTML = `<div class="engrams"></div><div class="flow"></div><div class="stored"></div><div class="foot tfoot"></div>`;
   $("#log").appendChild(turn);
   S.turnEl = turn;
   S.turnStartSeq = S.seq;
   S.turnKey = null;
   setBusy(true);
-  const bubbles = {}, tools = {};
+  const bubbles = {}, tools = {}, seenHooks = new Set();
   const flow = $(".flow", turn);
   const scroll = () => { const l = $("#log"); if (l.scrollHeight - l.scrollTop - l.clientHeight < 200) l.scrollTop = l.scrollHeight; };
   const bubble = mid => {
@@ -421,6 +422,9 @@ async function send() {
   const handle = ev => {
     if (ev.t === "init") { S.session = ev.session; S.turnSession = ev.session; }
     else if (ev.t === "hook") {
+      const key = ev.event + ":" + (ev.context || "");
+      if (ev.context && seenHooks.has(key)) return;
+      seenHooks.add(key);
       if (ev.context) {
         const label = ev.event === "SessionStart" ? "Engram briefing" : ev.event === "UserPromptSubmit" ? "Engram recalled" : ev.event === "PreToolUse" ? "Engram file notes" : "Engram " + ev.event;
         const d = document.createElement("details");
@@ -453,7 +457,7 @@ async function send() {
       }
     }
     else if (ev.t === "result") {
-      $(".foot", turn).textContent = `${ev.turns} steps · ${(ev.ms / 1000).toFixed(1)} s · $${(ev.cost_usd || 0).toFixed(4)} · ${ev.input_tokens.toLocaleString()} input tokens`;
+      $(".tfoot", turn).textContent = `${ev.turns} steps · ${(ev.ms / 1000).toFixed(1)} s · $${(ev.cost_usd || 0).toFixed(4)} · ${ev.input_tokens.toLocaleString()} input tokens`;
     }
     else if (ev.t === "error") flow.insertAdjacentHTML("beforeend", `<div class="err">${esc(ev.text)}</div>`);
     else if (ev.t === "done") { if (ev.session) S.session = ev.session; }
@@ -554,8 +558,19 @@ function attachToTurn(recs) {
 }
 
 function eventToTurn(e) {
-  if (!S.turnEl || e.event !== "distill" || e.session !== S.turnSession) return;
-  const f = $(".foot", S.turnEl);
+  if (!S.turnEl || e.session !== S.turnSession) return;
+  if (e.event === "recall") {
+    const d = document.createElement("div");
+    d.className = "foot";
+    const n = (e.injected || []).length;
+    d.innerHTML = `Engram recall: <b>${esc(e.decision)}</b> · gate ${(+e.gate || 0).toFixed(2)} · ${e.candidates} candidates · ${n ? `${n} record${n === 1 ? "" : "s"} injected (${e.chars} chars): ` : "nothing injected"}` +
+      (e.injected || []).map(i => `<a data-open="${esc(i)}">${esc(i)}</a>`).join(", ");
+    $(".engrams", S.turnEl).appendChild(d);
+    wireOpen(d);
+    return;
+  }
+  if (e.event !== "distill") return;
+  const f = $(".tfoot", S.turnEl);
   f.textContent += (f.textContent ? " · " : "") + (e.error ? `distill failed: ${e.error}` : `distilled ${e.kept} note${e.kept === 1 ? "" : "s"} in ${(e.ms / 1000).toFixed(1)} s ($${(e.cost_usd || 0).toFixed(4)})`) +
     (e.replaced?.length ? `, superseded ${e.replaced.length}` : "") + (e.done?.length ? `, closed ${e.done.length}` : "");
 }

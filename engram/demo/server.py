@@ -17,6 +17,7 @@ Standard library only.
 """
 
 import argparse
+import glob
 import json
 import os
 import shutil
@@ -150,19 +151,30 @@ class Demo:
 
     def chat(self, message, session, emit):
         """Runs one turn and calls `emit` with each event worth showing."""
+        # Only the demo project's settings: user-level plugins and hooks would
+        # add their own context (and failures) to every turn.
         cmd = ["claude", "-p", message, "--output-format", "stream-json", "--verbose", "--include-partial-messages",
-               "--allowedTools", TOOLS, "--disallowedTools", "WebFetch,WebSearch"]
+               "--setting-sources", "project,local", "--allowedTools", TOOLS, "--disallowedTools", "WebFetch,WebSearch"]
         if self.args.model:
             cmd += ["--model", self.args.model]
         if self.args.budget:
             cmd += ["--max-budget-usd", str(self.args.budget)]
-        if session:
-            cmd += ["--resume", session]
-        else:
-            cmd += ["--session-id", str(uuid.uuid4())]
+        sid = session or str(uuid.uuid4())
+        cmd += ["--resume", sid] if session else ["--session-id", sid]
+        lock = threading.Lock()
+
+        def send(ev):
+            with lock:
+                emit(ev)
+
+        # The stream carries SessionStart hook output but not
+        # UserPromptSubmit's; the transcript records both, so recall is read
+        # from there while the turn runs.
+        tail = TranscriptTail(sid, send)
         t0 = time.time()
+        send({"t": "init", "session": sid})
         self.proc = subprocess.Popen(cmd, cwd=self.project, env=self.env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1)
-        sid = session
+        tail.start()
         try:
             for line in self.proc.stdout:
                 try:
@@ -172,14 +184,64 @@ class Demo:
                 for out in simplify(ev):
                     if out["t"] == "init" and out.get("session"):
                         sid = out["session"]
+                        tail.session = sid
                         self.remember_session(sid, message)
-                    emit(out)
+                    send(out)
             self.proc.wait()
             if self.proc.returncode:
-                emit({"t": "error", "text": self.proc.stderr.read()[-2000:] or f"claude exited with {self.proc.returncode}"})
+                send({"t": "error", "text": self.proc.stderr.read()[-2000:] or f"claude exited with {self.proc.returncode}"})
         finally:
             self.proc = None
-        emit({"t": "done", "session": sid, "wall_s": time.time() - t0})
+            tail.stop()
+        send({"t": "done", "session": sid, "wall_s": time.time() - t0})
+
+
+class TranscriptTail(threading.Thread):
+    """Emits the context the UserPromptSubmit hook injected in this turn,
+    read from the session's transcript (from its size when the turn began)."""
+
+    def __init__(self, session, emit):
+        super().__init__(daemon=True)
+        self.session, self.emit = session, emit
+        self.done = threading.Event()
+        path = self.path()
+        self.offset = os.path.getsize(path) if path else 0
+
+    def path(self):
+        paths = glob.glob(os.path.expanduser(f"~/.claude/projects/*/{self.session}.jsonl"))
+        return paths[0] if paths else None
+
+    def run(self):
+        while True:
+            last = self.done.is_set()
+            self.scan()
+            if last:
+                return
+            self.done.wait(0.3)
+
+    def stop(self):
+        self.done.set()
+        self.join(timeout=3)
+
+    def scan(self):
+        path = self.path()
+        if not path or os.path.getsize(path) <= self.offset:
+            return
+        with open(path, "rb") as f:
+            f.seek(self.offset)
+            chunk = f.read()
+        end = chunk.rfind(b"\n") + 1
+        self.offset += end
+        for line in chunk[:end].splitlines():
+            try:
+                a = json.loads(line).get("attachment") or {}
+            except (json.JSONDecodeError, AttributeError):
+                continue
+            if a.get("type") == "hook_additional_context" and a.get("hookEvent") == "UserPromptSubmit":
+                c = a.get("content")
+                text = "\n".join(c) if isinstance(c, list) else str(c or "")
+                if text.strip():
+                    self.emit({"t": "hook", "event": a.get("hookEvent"), "name": a.get("hookName"), "context": text, "exit_code": 0, "stderr": ""})
 
 
 def simplify(ev):
