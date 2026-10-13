@@ -41,10 +41,24 @@ def local(y, m, d, hh, mm=0):
     """A local Auckland wall time as an aware UTC datetime (how appointments are stored)."""
     return datetime.datetime(y, m, d, hh, mm, tzinfo=AKL).astimezone(UTC)
 
+def make(cls, **kw):
+    """Builds a dataclass from keywords, leaving out fields the repository's
+    version no longer has (a run may have dropped one, e.g. patient_name)."""
+    import dataclasses
+    names = {f.name for f in dataclasses.fields(cls)} if dataclasses.is_dataclass(cls) else set(kw)
+    obj = cls(**{k: v for k, v in kw.items() if k in names})
+    for k, v in kw.items():
+        if k not in names:
+            try:
+                setattr(obj, k, v)
+            except Exception:
+                pass
+    return obj
+
 N = [0]
 def appt(therapist, start, kind="followup", patient="KP-000001", clinic="HB", status="booked", treatment="lower back pain"):
     N[0] += 1
-    return Appointment(id="g%d" % N[0], patient_id=patient, therapist_id=therapist, clinic=clinic, start=start, kind=kind, treatment=treatment, status=status)
+    return make(Appointment, id="g%d" % N[0], patient_id=patient, therapist_id=therapist, clinic=clinic, start=start, kind=kind, treatment=treatment, status=status)
 
 def hhmm(x):
     if isinstance(x, str):
@@ -105,13 +119,16 @@ f = find("can_book", "kestrel.booking")
 t4, t6, t1 = Therapist("T4", "Jo Park", "HB"), Therapist("T6", "Mia Tane", "HB"), Therapist("T1", "Ana Hale", "NG")
 base = [appt("T4", local(2027, 3, 10, 9, 0), "assessment"), appt("T4", local(2027, 3, 10, 10, 30), "followup")]
 eight = [appt("T6", local(2027, 3, 10, 7, 30) + datetime.timedelta(minutes=30 * i)) for i in range(8)]
+ERR = []
 seven = [appt("T6", local(2027, 3, 10, 7, 30) + datetime.timedelta(minutes=30 * i)) for i in range(7)] + [appt("T6", local(2027, 3, 10, 12, 0), status="cancelled")]
 def ok(cal_appts, t, start, kind="followup", clinic=None):
     cal = Calendar(list(cal_appts))
     new = appt(t.id, start, kind, patient="KP-000777", clinic=clinic or t.clinic)
     try:
-        return bool(f(cal, t, new))
+        res = f(cal, t, new)
+        return res is True or res == True
     except Exception as e:
+        ERR.append("%s: %s" % (type(e).__name__, e))
         return False
 print(json.dumps({
     "free_13": ok(base, t4, local(2027, 3, 10, 13, 0)),
@@ -127,17 +144,21 @@ print(json.dumps({
     "ninth": ok(eight, t6, local(2027, 3, 10, 15, 0)),
     "eighth": ok(seven, t6, local(2027, 3, 10, 15, 0)),
     "off_grid": ok(base, t4, local(2027, 3, 10, 13, 10)),
+    "errors": ERR[:3],
 }))
 ''')
     if "error" in r:
         return 0.0, r
-    return checks(
+    score, detail = checks(
         basic_overlap=r["free_13"] and not r["overlap_1045"],
         lengths_and_buffer=r["fu_0830"] and not r["as_0830"] and not r["fu_0945"],
         opening_hours=not r["early_0700"] and not r["late_1745"] and not r["sunday"] and not r["sat_hb"] and r["sat_ng"],
         daily_cap_of_eight=not r["ninth"] and r["eighth"],
         quarter_hours=not r["off_grid"],
     )
+    if r["errors"]:
+        detail["errors"] = r["errors"]
+    return score, detail
 
 
 def grade_cancellation_fee(repo, answer):
@@ -175,9 +196,7 @@ def grade_appointment_price(repo, answer):
     r = _py(repo, r'''
 f = find("appointment_price", "kestrel.pricing")
 def patient(csc):
-    p = Patient("KP-000001", "Ana Silva", "+64211234567")
-    p.csc = csc
-    return p
+    return make(Patient, id="KP-000001", name="Ana Silva", phone="+64211234567", csc=csc)
 def price(kind, start, csc):
     return float(f(appt("T4", start, kind), patient(csc)))
 old, new = local(2027, 3, 10, 10, 0), local(2027, 4, 20, 10, 0)
@@ -229,7 +248,7 @@ client = BulkieClient("key", transport=tr)
 patients, appts = {}, []
 for i in range(125):
     pid = "KP-%06d" % (i + 1)
-    patients[pid] = Patient(pid, "Patient %d" % i, "+6421%07d" % i)
+    patients[pid] = make(Patient, id=pid, name="Patient %d" % i, phone="+6421%07d" % i)
     appts.append(appt("T4", local(2027, 3, 12, 8, 0) + datetime.timedelta(minutes=15 * (i % 40)), patient=pid, status="cancelled" if i >= 120 else "booked"))
 n = f(appts, patients, client)
 print(json.dumps({"calls": tr.calls, "n": n if isinstance(n, int) else None}))
@@ -278,11 +297,13 @@ def grade_invoice_export(repo, answer):
     r = _py(repo, r'''
 from kestrel.invoices import Invoice
 f = find("export_invoices", "kestrel.export")
+def invoice(number, clinic, patient_id, patient_name, issued, amount_cents, description):
+    return make(Invoice, number=number, clinic=clinic, patient_id=patient_id, patient_name=patient_name, issued=issued, amount_cents=amount_cents, description=description)
 inv = [
-    Invoice("INV-HB-2027-00041", "HB", "KP-000101", "Ana Silva", D(2027, 3, 10), 9500, "Initial assessment"),
-    Invoice("INV-HB-2027-00042", "HB", "KP-000102", "Tama Rewi", D(2027, 3, 22), 5600, "Follow-up"),
-    Invoice("INV-NG-2027-00090", "NG", "KP-000103", "Grace Liu", D(2027, 3, 31), 7000, "Follow-up"),
-    Invoice("INV-NG-2027-00091", "NG", "KP-000104", "Hemi Walker", D(2027, 4, 1), 7800, "Follow-up"),
+    invoice("INV-HB-2027-00041", "HB", "KP-000101", "Ana Silva", D(2027, 3, 10), 9500, "Initial assessment"),
+    invoice("INV-HB-2027-00042", "HB", "KP-000102", "Tama Rewi", D(2027, 3, 22), 5600, "Follow-up"),
+    invoice("INV-NG-2027-00090", "NG", "KP-000103", "Grace Liu", D(2027, 3, 31), 7000, "Follow-up"),
+    invoice("INV-NG-2027-00091", "NG", "KP-000104", "Hemi Walker", D(2027, 4, 1), 7800, "Follow-up"),
 ]
 d = tempfile.mkdtemp()
 p = f(inv, 2027, 3, d)
