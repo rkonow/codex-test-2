@@ -1,0 +1,780 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Engram and Strata</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a single reading column of stacked "strata" bands; each band is one claim with its evidence beside or below it. */
+:root {
+  --bg: #F2F4F1; --surface: #FFFFFF; --ink: #162220; --muted: #586864; --line: #D3DAD6;
+  --accent: #0D6B64; --accent-soft: #DCEEEB; --ochre: #A86B12;
+  --s-strata: #0D6B64; --s-tantivy: #6E8199; --s-sqlite: #C2AE8F; --s-base: #A9B6B2;
+  --l1: #E3EFEC; --l2: #E9ECE3; --l3: #E4E8F0; --l4: #F3E9D9;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0E1514; --surface: #162020; --ink: #E4EBE8; --muted: #9AABA6; --line: #2B3836;
+  --accent: #4DBDB1; --accent-soft: #173431; --ochre: #E0A24A;
+  --s-strata: #4DBDB1; --s-tantivy: #8DA2BC; --s-sqlite: #A58F6C; --s-base: #4E5E5A;
+  --l1: #17302D; --l2: #232A21; --l3: #1C2433; --l4: #33291A; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0E1514; --surface: #162020; --ink: #E4EBE8; --muted: #9AABA6; --line: #2B3836;
+  --accent: #4DBDB1; --accent-soft: #173431; --ochre: #E0A24A;
+  --s-strata: #4DBDB1; --s-tantivy: #8DA2BC; --s-sqlite: #A58F6C; --s-base: #4E5E5A;
+  --l1: #17302D; --l2: #232A21; --l3: #1C2433; --l4: #33291A; color-scheme: dark }
+
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--ink); font: 400 16px/1.6 var(--body); margin: 0; }
+.wrap { max-width: 980px; margin: 0 auto; padding-inline: 20px; padding-block: 0 64px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: clamp(2.4rem, 6vw, 4.2rem); line-height: 1.02; font-weight: 700; }
+h2 { font-size: clamp(1.7rem, 3.6vw, 2.4rem); line-height: 1.1; font-weight: 700; }
+h3 { font-size: 1.2rem; line-height: 1.25; font-weight: 500; }
+p { margin: 0; max-width: 66ch; }
+.eyebrow { font: 500 0.75rem/1 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); }
+.muted { color: var(--muted); }
+code, .mono { font-family: var(--mono); font-size: 0.88em; }
+
+/* hero */
+.hero { padding-block: 64px 40px; display: grid; gap: 22px; border-bottom: 1px solid var(--line); }
+.hero .lede { font-size: 1.2rem; color: var(--muted); max-width: 60ch; }
+.strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; margin-top: 18px; border-top: 2px solid var(--ink); }
+.strip div { padding: 16px 16px 4px 0; display: grid; gap: 6px; align-content: start; }
+.strip div + div { padding-left: 16px; border-left: 1px solid var(--line); }
+.strip b { font: 700 clamp(1.6rem, 3.4vw, 2.3rem)/1 var(--display); font-variant-numeric: tabular-nums; color: var(--accent); }
+.strip span { font-size: 0.9rem; color: var(--muted); line-height: 1.4; }
+@media (max-width: 720px) { .strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } .strip div:nth-child(3) { padding-left: 0; border-left: 0; } }
+
+/* bands */
+section { padding-block: 56px 8px; display: grid; gap: 22px; }
+section + section { border-top: 1px solid var(--line); }
+.head { display: grid; gap: 12px; }
+.two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; }
+@media (max-width: 760px) { .two { grid-template-columns: minmax(0, 1fr); } }
+.fig { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 18px 18px 12px; display: grid; gap: 10px; min-width: 0; }
+.fig h3 { font-size: 1.02rem; }
+.fig .cap { font-size: 0.85rem; color: var(--muted); }
+.scroll { overflow-x: auto; }
+.scroll > svg { min-width: 560px; }
+
+/* charts and diagrams */
+svg.chart, svg.diagram { width: 100%; height: auto; display: block; }
+.grid { stroke: var(--line); stroke-width: 1; }
+.tick { font: 400 11px var(--mono); fill: var(--muted); }
+.rowlab { font: 500 13px var(--body); fill: var(--ink); }
+.rowsub { font: 400 11px var(--mono); fill: var(--muted); }
+.val { font: 400 11.5px var(--mono); fill: var(--ink); }
+.val.strong { font-weight: 500; font-size: 13px; }
+.na { font: italic 400 11.5px var(--body); fill: var(--muted); }
+.bar.s-strata { fill: var(--s-strata); } .bar.s-tantivy { fill: var(--s-tantivy); } .bar.s-sqlite { fill: var(--s-sqlite); }
+.bar.s-hi { fill: var(--accent); } .bar.s-base { fill: var(--s-base); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 0.85rem; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 7px; }
+.sw { width: 12px; height: 12px; border-radius: 2px; display: inline-block; }
+.sw.s-strata { background: var(--s-strata); } .sw.s-tantivy { background: var(--s-tantivy); } .sw.s-sqlite { background: var(--s-sqlite); }
+.box { fill: var(--surface); stroke: var(--line); stroke-width: 1.2; }
+.box.hi { stroke: var(--accent); stroke-width: 2; fill: var(--accent-soft); }
+.file { fill: none; stroke: var(--ink); stroke-width: 1.5; }
+.layer { stroke: var(--line); }
+.l1 { fill: var(--l1); } .l2 { fill: var(--l2); } .l3 { fill: var(--l3); } .l4 { fill: var(--l4); stroke: var(--ochre); stroke-width: 1.6; }
+.dh { font: 700 15px var(--display); fill: var(--ink); }
+.dt { font: 400 13px var(--body); fill: var(--ink); }
+.dm { font: 400 11.5px var(--mono); fill: var(--muted); }
+.lh { font: 600 14px var(--body); fill: var(--ink); }
+.lt { font: 400 12px var(--body); fill: var(--muted); }
+.code { font: 400 12.5px var(--mono); fill: var(--ink); }
+.code.hi { fill: var(--ochre); font-weight: 500; }
+.edge { stroke: var(--muted); stroke-width: 1.5; fill: none; }
+.edge.dashed { stroke-dasharray: 4 4; }
+.edge.cite { stroke: var(--ochre); stroke-width: 1.6; }
+.ahead { fill: var(--muted); }
+.node { fill: var(--surface); stroke: var(--ochre); stroke-width: 1.8; }
+.node.seed { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 2.2; }
+.nl { font: 500 12px var(--mono); fill: var(--ink); }
+.step { font: 500 12px var(--mono); fill: var(--accent); letter-spacing: 0.04em; }
+.big { font: 700 34px var(--display); fill: var(--accent); }
+
+/* stories, tables, code */
+.stories { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; border-top: 1px solid var(--line); }
+.stories > div { padding: 18px 18px 6px 0; display: grid; gap: 8px; align-content: start; }
+.stories > div + div { padding-left: 18px; border-left: 1px solid var(--line); }
+.stories .score { font: 500 0.95rem var(--mono); color: var(--accent); }
+@media (max-width: 760px) { .stories { grid-template-columns: minmax(0, 1fr); } .stories > div + div { padding-left: 0; border-left: 0; border-top: 1px solid var(--line); } }
+table { border-collapse: collapse; width: 100%; font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+th, td { text-align: right; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+th { font: 500 0.72rem var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+td.win { color: var(--accent); font-weight: 600; }
+pre { margin: 0; background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--ochre); border-radius: 6px; padding: 14px 16px; overflow-x: auto; font: 400 0.84rem/1.55 var(--mono); color: var(--ink); }
+pre .k { color: var(--accent); font-weight: 500; } pre .c { color: var(--muted); }
+.caps { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; }
+.caps div { border-top: 2px solid var(--ochre); padding-top: 10px; display: grid; gap: 4px; }
+.caps b { font: 500 0.92rem var(--mono); }
+.caps span { font-size: 0.9rem; color: var(--muted); }
+.graphband { background: linear-gradient(var(--l4), var(--l4)) top / 100% 4px no-repeat; }
+.fits { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; }
+@media (max-width: 760px) { .fits { grid-template-columns: minmax(0, 1fr); } }
+.fits ul { margin: 0; padding-left: 1.1em; display: grid; gap: 8px; }
+.idx { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
+@media (max-width: 820px) { .idx { grid-template-columns: minmax(0, 1fr); } }
+.idx .fig { align-content: start; }
+.idxhead { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.chip { font: 500 0.72rem/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; padding: 6px 9px; border-radius: 4px; color: var(--ink); }
+.chip.c1 { background: var(--l1); } .chip.c2 { background: var(--l2); } .chip.c3 { background: var(--l3); } .chip.c4 { background: var(--l4); box-shadow: inset 0 0 0 1px var(--ochre); }
+pre .s { color: var(--ochre); }
+.ms { font: 500 12px var(--mono); fill: var(--accent); }
+.notes { font-size: 0.85rem; color: var(--muted); display: grid; gap: 8px; }
+a { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+<header class="hero">
+  <div class="eyebrow">Engram · Strata</div>
+  <h1>Context that compounds.</h1>
+  <p class="lede">Engram gives an AI coding agent a memory that lasts across sessions. Strata is the single-file search database underneath it: full text, filters, vectors and a graph, answered by one SQL statement. Together they let an agent remember what you told it last week, quickly and cheaply.</p>
+  <div class="strip">
+    <div><b>71 → 86%</b><span>tasks solved by a fresh session once Engram is on, at the same $0.008 per task</span></div>
+    <div><b>57%</b><span>lower cost per task than keeping the whole history in context, at the same 93% solve rate</span></div>
+    <div><b>9.5×</b><span>faster than SQLite at the p95 of two-hop graph traversals over 1.15M citations</span></div>
+    <div><b>2×</b><span>more of a paper's references found by following citations from a vector search</span></div>
+  </div>
+</header>
+
+<section>
+  <div class="head">
+    <div class="eyebrow">How it fits together</div>
+    <h2>One memory, one file, one query language</h2>
+    <p class="muted">Engram listens to a Claude Code session through hooks, distils what matters into notes, and recalls the right ones before each prompt. Everything lives in a Strata file, where every row is indexed four ways at once and a cost-based planner decides how to combine them.</p>
+  </div>
+  <div class="fig scroll">
+<svg viewBox="0 0 760 430" class="diagram" role="img" aria-label="How Engram and Strata fit together">
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ahead"/></marker>
+  </defs>
+  <!-- agent -->
+  <rect x="20" y="30" width="200" height="130" rx="6" class="box"/>
+  <text x="120" y="58" class="dh" text-anchor="middle">Claude Code session</text>
+  <text x="120" y="84" class="dt" text-anchor="middle">prompts, tool calls,</text>
+  <text x="120" y="102" class="dt" text-anchor="middle">decisions, fixes</text>
+  <text x="120" y="134" class="dm" text-anchor="middle">hooks · MCP tools</text>
+  <!-- engram -->
+  <rect x="280" y="30" width="200" height="130" rx="6" class="box hi"/>
+  <text x="380" y="58" class="dh" text-anchor="middle">Engram</text>
+  <text x="380" y="84" class="dt" text-anchor="middle">distils turns into notes</text>
+  <text x="380" y="102" class="dt" text-anchor="middle">recalls what fits the prompt</text>
+  <text x="380" y="134" class="dm" text-anchor="middle">median recall 1.7 ms</text>
+  <!-- arrows agent <-> engram -->
+  <line x1="222" y1="78" x2="276" y2="78" class="edge" marker-end="url(#ah)"/>
+  <line x1="278" y1="114" x2="224" y2="114" class="edge" marker-end="url(#ah)"/>
+  <text x="249" y="70" class="dm" text-anchor="middle">record</text>
+  <text x="249" y="132" class="dm" text-anchor="middle">inject</text>
+  <!-- query -->
+  <rect x="540" y="30" width="200" height="130" rx="6" class="box"/>
+  <text x="640" y="58" class="dh" text-anchor="middle">One SQL statement</text>
+  <text x="640" y="84" class="dt" text-anchor="middle">MATCH, filters, similarity,</text>
+  <text x="640" y="102" class="dt" text-anchor="middle">rrf, REACHABLE, ppr</text>
+  <text x="640" y="134" class="dm" text-anchor="middle">cost-based planner</text>
+  <line x1="482" y1="95" x2="536" y2="95" class="edge" marker-end="url(#ah)"/>
+  <!-- strata file -->
+  <rect x="20" y="210" width="720" height="200" rx="8" class="file"/>
+  <text x="40" y="238" class="dh">Strata · one file, ACID commits</text>
+  <text x="720" y="238" class="dm" text-anchor="end">durable commit 0.27 ms · snapshot 0.1–0.2 µs</text>
+  <line x1="640" y1="162" x2="640" y2="206" class="edge" marker-end="url(#ah)"/>
+  <line x1="380" y1="162" x2="380" y2="206" class="edge" marker-end="url(#ah)"/>
+  <!-- strata layers -->
+  <rect x="40" y="258" width="160" height="132" rx="5" class="layer l1"/>
+  <text x="120" y="284" class="lh" text-anchor="middle">Full text</text>
+  <text x="120" y="306" class="lt" text-anchor="middle">posting lists</text>
+  <text x="120" y="324" class="lt" text-anchor="middle">BM25, Block-Max</text>
+  <text x="120" y="342" class="lt" text-anchor="middle">WAND, phrases</text>
+  <rect x="215" y="258" width="160" height="132" rx="5" class="layer l2"/>
+  <text x="295" y="284" class="lh" text-anchor="middle">Columns</text>
+  <text x="295" y="306" class="lt" text-anchor="middle">packed fields,</text>
+  <text x="295" y="324" class="lt" text-anchor="middle">zone maps, facets,</text>
+  <text x="295" y="342" class="lt" text-anchor="middle">range histograms</text>
+  <rect x="390" y="258" width="160" height="132" rx="5" class="layer l3"/>
+  <text x="470" y="284" class="lh" text-anchor="middle">Vectors</text>
+  <text x="470" y="306" class="lt" text-anchor="middle">HNSW and IVF,</text>
+  <text x="470" y="324" class="lt" text-anchor="middle">float32 or SQ8,</text>
+  <text x="470" y="342" class="lt" text-anchor="middle">filtered search</text>
+  <rect x="565" y="258" width="160" height="132" rx="5" class="layer l4"/>
+  <text x="645" y="284" class="lh" text-anchor="middle">Graph edges</text>
+  <text x="645" y="306" class="lt" text-anchor="middle">out-edge CSR,</text>
+  <text x="645" y="324" class="lt" text-anchor="middle">reverse index,</text>
+  <text x="645" y="342" class="lt" text-anchor="middle">27 bytes per edge</text>
+  <text x="380" y="380" class="dm" text-anchor="middle">every row is indexed all four ways at once</text>
+</svg>
+</div>
+</section>
+
+<section id="how">
+  <div class="head">
+    <div class="eyebrow">How the agent uses it</div>
+    <h2>Four milliseconds between your prompt and the right memory</h2>
+    <p class="muted">The agent never has to remember to look things up. Claude Code calls Engram's hooks at fixed moments, and each hook is a handful of Strata queries against one table, <code>memory</code>, where every prompt, answer, tool call, error and distilled note is a row. Each row is indexed four ways at once, so one statement can mix them.</p>
+  </div>
+  <div class="fig scroll"><svg viewBox="0 0 760 330" class="diagram" role="img" aria-label="What happens between a prompt and the model">
+  <defs>
+    <marker id="ah3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="ahead"/></marker>
+  </defs>
+  <text x="20" y="22" class="step">EVERY PROMPT · 100,000 RECORDS IN MEMORY · MEDIANS</text>
+  <!-- 1 prompt -->
+  <rect x="20" y="100" width="120" height="80" rx="6" class="box"/>
+  <text x="80" y="128" class="lh" text-anchor="middle">Prompt</text>
+  <text x="80" y="148" class="lt" text-anchor="middle">hook fires,</text>
+  <text x="80" y="164" class="lt" text-anchor="middle">prompt stored</text>
+  <!-- 2 embed -->
+  <rect x="168" y="100" width="120" height="80" rx="6" class="box"/>
+  <text x="228" y="128" class="lh" text-anchor="middle">Embed</text>
+  <text x="228" y="148" class="lt" text-anchor="middle">512 dimensions</text>
+  <text x="228" y="168" class="ms" text-anchor="middle">0.09 ms</text>
+  <line x1="142" y1="140" x2="164" y2="140" class="edge" marker-end="url(#ah3)"/>
+  <!-- 3a bm25 -->
+  <rect x="318" y="44" width="150" height="82" rx="6" class="layer l1"/>
+  <text x="393" y="70" class="lh" text-anchor="middle">BM25 top 50</text>
+  <text x="393" y="90" class="lt" text-anchor="middle">full text</text>
+  <text x="393" y="112" class="ms" text-anchor="middle">1.0 ms</text>
+  <!-- 3b vector -->
+  <rect x="318" y="154" width="150" height="82" rx="6" class="layer l3"/>
+  <text x="393" y="180" class="lh" text-anchor="middle">Vector top 50</text>
+  <text x="393" y="200" class="lt" text-anchor="middle">similarity</text>
+  <text x="393" y="222" class="ms" text-anchor="middle">1.0 ms</text>
+  <line x1="290" y1="132" x2="314" y2="94" class="edge" marker-end="url(#ah3)"/>
+  <line x1="290" y1="148" x2="314" y2="186" class="edge" marker-end="url(#ah3)"/>
+  <!-- 4 fuse -->
+  <rect x="498" y="100" width="120" height="80" rx="6" class="box"/>
+  <text x="558" y="124" class="lh" text-anchor="middle">Fuse + gate</text>
+  <text x="558" y="144" class="lt" text-anchor="middle">skip, brief</text>
+  <text x="558" y="160" class="lt" text-anchor="middle">or inject</text>
+  <text x="558" y="176" class="ms" text-anchor="middle">0.3 ms</text>
+  <line x1="470" y1="92" x2="494" y2="128" class="edge" marker-end="url(#ah3)"/>
+  <line x1="470" y1="188" x2="494" y2="152" class="edge" marker-end="url(#ah3)"/>
+  <!-- 5 pack -->
+  <rect x="640" y="100" width="100" height="80" rx="6" class="box hi"/>
+  <text x="690" y="124" class="lh" text-anchor="middle">To model</text>
+  <text x="690" y="144" class="lt" text-anchor="middle">≤ 4,000</text>
+  <text x="690" y="160" class="lt" text-anchor="middle">characters</text>
+  <text x="690" y="176" class="ms" text-anchor="middle">0.25 ms</text>
+  <line x1="620" y1="140" x2="636" y2="140" class="edge" marker-end="url(#ah3)"/>
+  <!-- columns band -->
+  <rect x="318" y="252" width="300" height="30" rx="5" class="layer l2"/>
+  <text x="468" y="272" class="lt" text-anchor="middle">columns: skip what is still in context</text>
+  <!-- total -->
+  <line x1="20" y1="304" x2="740" y2="304" class="grid"/>
+  <text x="20" y="322" class="dm">whole hook: 4.7 ms median, 8.8 ms p99</text>
+  <text x="740" y="322" class="dm" text-anchor="end">off the prompt's path: capture tool calls, distil notes</text>
+</svg>
+</div>
+  <div class="two">
+    <div class="fig" style="align-content:start">
+      <h3>Prompt hook latency as the memory grows</h3>
+      <div class="scroll"><table>
+        <thead><tr><th>Records in memory</th><th>Search, median</th><th>Whole hook, median</th><th>Whole hook, p99</th></tr></thead>
+        <tbody>
+          <tr><td>10,000</td><td>1.8 ms</td><td>4.2 ms</td><td>8.3 ms</td></tr>
+          <tr><td>100,000</td><td>3.0 ms</td><td>4.7 ms</td><td>8.8 ms</td></tr>
+          <tr><td>1,000,000</td><td>8.8 ms</td><td>11.2 ms</td><td>28.3 ms</td></tr>
+        </tbody>
+      </table></div>
+      <p class="cap">LongMemEval sessions loaded at each size, static embedder, one daemon per project. A model's first token takes hundreds of milliseconds, so recall never shows.</p>
+    </div>
+    <div class="fig" style="align-content:start">
+      <h3>Less rereading, fewer tokens</h3>
+      <div class="scroll"><table>
+        <thead><tr><th>Per task, kestrel</th><th>Steps</th><th>Input tokens</th><th>Wall time</th></tr></thead>
+        <tbody>
+          <tr><td>Fresh session</td><td>8.8</td><td>288k</td><td>26 s</td></tr>
+          <tr><td>Fresh + Engram</td><td class="win">6.3</td><td class="win">221k</td><td class="win">24 s</td></tr>
+          <tr><td>Whole history</td><td>3.5</td><td>517k</td><td>24 s</td></tr>
+          <tr><td>Compacted + Engram</td><td>6.2</td><td class="win">278k</td><td>27 s</td></tr>
+        </tbody>
+      </table></div>
+      <p class="cap">With the right notes injected up front, a fresh agent takes 28% fewer steps and reads 23% fewer tokens than one that has to dig through the code. Against keeping the whole history in context, Engram reads 46% fewer tokens for the same solve rate.</p>
+    </div>
+  </div>
+
+  <div class="head" style="margin-top:8px">
+    <h3 style="font-size:1.35rem">One table, four indexes, one query each</h3>
+    <p class="muted">These are the shapes of the queries Engram runs, filled in with examples from the clinic project. The <code>memory</code> table's fields are <code>id, session, kind, tag, turn, seq, ts, importance</code> (columns), <code>body, files</code> (full text), <code>emb</code> (a 512-dimension vector) and <code>links</code> (graph edges).</p>
+  </div>
+  <div class="idx">
+    <div class="fig">
+      <div class="idxhead"><span class="chip c1">Full text</span><span class="cap">posting lists, BM25, Block-Max WAND</span></div>
+      <h3>"What went wrong last time someone touched pricing?"</h3>
+      <p class="muted">Before the agent edits a file, Engram finds earlier errors and decisions that mention it and injects the newest two.</p>
+<pre><span class="k">SELECT</span> ts, kind, text <span class="k">FROM</span> memory
+<span class="k">WHERE</span> MATCH(files, <span class="s">'pricing AND py'</span>)
+  <span class="k">AND</span> kind <span class="k">IN</span> (<span class="s">'error'</span>, <span class="s">'decision'</span>, <span class="s">'fact'</span>)
+<span class="k">ORDER BY</span> seq <span class="k">DESC LIMIT</span> 3;</pre>
+      <p class="cap">Keyword recall uses <code>ORDER BY bm25(body, :prompt)</code>. Strata's BM25 is 1.8–4.6× faster than Tantivy's.</p>
+    </div>
+    <div class="fig">
+      <div class="idxhead"><span class="chip c2">Columns</span><span class="cap">packed fields, zone maps, facets</span></div>
+      <h3>"Show me what happened around that error."</h3>
+      <p class="muted">The <code>memory_timeline</code> tool reads a slice of one session in order. Every recall also uses columns to skip what is still in the context window.</p>
+<pre><span class="k">SELECT</span> seq, kind, tag, text <span class="k">FROM</span> memory
+<span class="k">WHERE</span> session = <span class="s">'s-0412'</span>
+  <span class="k">AND</span> seq <span class="k">BETWEEN</span> 118 <span class="k">AND</span> 132
+<span class="k">ORDER BY</span> seq;
+
+<span class="c">-- what kinds of memory exist, at a glance</span>
+<span class="k">SELECT</span> kind, COUNT(*) <span class="k">FROM</span> memory <span class="k">GROUP BY</span> kind <span class="k">ORDER BY</span> 2 <span class="k">DESC</span>;</pre>
+      <p class="cap">Ranges, IN-lists and facet counts never touch the text or the vectors.</p>
+    </div>
+    <div class="fig">
+      <div class="idxhead"><span class="chip c3">Vectors</span><span class="cap">HNSW or flat, filtered search</span></div>
+      <h3>"What do follow-ups cost now?"</h3>
+      <p class="muted">The words don't match the note "Board: from 1 April a follow-up is $78", but the meaning does. Every prompt is embedded in 0.09 ms and searched by similarity, filtered to notes.</p>
+<pre><span class="k">SELECT</span> id, text, score() <span class="k">FROM</span> memory
+<span class="k">WHERE</span> kind <span class="k">IN</span> (<span class="s">'decision'</span>, <span class="s">'fact'</span>, <span class="s">'preference'</span>)
+<span class="k">ORDER BY</span> similarity(emb, :prompt) <span class="k">DESC LIMIT</span> 50;</pre>
+      <p class="cap">Strata answers vector top-10 in 0.09–0.20 ms; the planner picks pre- or post-filtering per query.</p>
+    </div>
+    <div class="fig">
+      <div class="idxhead"><span class="chip c4">Graph</span><span class="cap">EDGES field, REACHABLE, PATH, ppr</span></div>
+      <h3>"Everything we decided about the invoice export."</h3>
+      <p class="muted">Distilled notes link to the things they are about (<code>e:invoice export</code>, <code>f:src/kestrel/export.py</code>), to the turn they came from, and to the older note they supersede. One hop inward from an entity collects them all.</p>
+<pre><span class="k">SELECT</span> ts, kind, text <span class="k">FROM</span> memory
+<span class="k">WHERE</span> REACHABLE(links, <span class="s">'e:invoice export'</span>, hops => 1, dir => <span class="s">'in'</span>)
+<span class="k">ORDER BY</span> ts <span class="k">DESC</span>;
+
+<span class="c">-- graph recall: the neighbours of the best hits, ranked by meaning</span>
+<span class="k">SELECT</span> id, text <span class="k">FROM</span> memory
+<span class="k">WHERE</span> REACHABLE(links, (<span class="k">SELECT</span> id <span class="k">FROM</span> memory
+        <span class="k">ORDER BY</span> similarity(emb, :prompt) <span class="k">DESC LIMIT</span> 5),
+      hops => 2, dir => <span class="s">'both'</span>)
+<span class="k">ORDER BY</span> similarity(emb, :prompt) <span class="k">DESC LIMIT</span> 20;</pre>
+      <p class="cap">Two-hop traversals run at a 2.6 ms p95 over a million edges. Graph recall is opt-in today (<code>ENGRAM_GRAPH=1</code>) while it is measured on agent tasks.</p>
+    </div>
+  </div>
+  <div class="fig">
+    <h3>All four in one statement</h3>
+    <p class="muted">Strata's SQL lets a single statement filter by columns, require words, rank by meaning and walk the graph. The cost-based planner decides which index goes first.</p>
+<pre><span class="k">SELECT</span> ts, text <span class="k">FROM</span> memory
+<span class="k">WHERE</span> kind = <span class="s">'decision'</span>                                  <span class="c">-- columns</span>
+  <span class="k">AND</span> ts >= 1791000000                                   <span class="c">-- columns: a time range</span>
+  <span class="k">AND</span> MATCH(body, <span class="s">'privacy OR names'</span>)                    <span class="c">-- full text</span>
+  <span class="k">AND</span> REACHABLE(links, <span class="s">'e:invoice export'</span>, dir => <span class="s">'in'</span>)   <span class="c">-- graph</span>
+<span class="k">ORDER BY</span> rrf(bm25(body, :q), similarity(emb, :q)) <span class="k">DESC</span>     <span class="c">-- text + vectors</span>
+<span class="k">LIMIT</span> 5;</pre>
+    <p class="cap">The model also gets five memory tools: <code>memory_search</code> (hybrid search), <code>memory_timeline</code>, <code>memory_sql</code> (read-only SQL over the table), <code>memory_remember</code> and <code>memory_forget</code>.</p>
+  </div>
+</section>
+
+<section>
+  <div class="head">
+    <div class="eyebrow">Engram · the kestrel benchmark</div>
+    <h2>The agent remembers what the clinic owner said</h2>
+    <p class="muted">We built a physiotherapy clinic's booking system over seven working sessions with an AI coding agent. Along the way the owner mentioned what real owners mention: new prices from April, a 48-hour cancellation rule, a privacy officer's ban on patient names in exports, and that reception still runs Python 3.9. None of it was written into the code. Then we asked for 14 new features, three times each, and graded all 210 answers automatically.</p>
+  </div>
+  <div class="two">
+    <div class="fig">
+      <h3>Tasks solved, 42 graded runs per setup</h3>
+      <svg viewBox="0 0 720 204" role="img" aria-label="Tasks solved" class="chart">
+<line x1="280.0" y1="20" x2="280.0" y2="198" class="grid"/>
+<text x="280.0" y="14" class="tick" text-anchor="middle">0%</text>
+<line x1="372.5" y1="20" x2="372.5" y2="198" class="grid"/>
+<text x="372.5" y="14" class="tick" text-anchor="middle">25%</text>
+<line x1="465.0" y1="20" x2="465.0" y2="198" class="grid"/>
+<text x="465.0" y="14" class="tick" text-anchor="middle">50%</text>
+<line x1="557.5" y1="20" x2="557.5" y2="198" class="grid"/>
+<text x="557.5" y="14" class="tick" text-anchor="middle">75%</text>
+<line x1="650.0" y1="20" x2="650.0" y2="198" class="grid"/>
+<text x="650.0" y="14" class="tick" text-anchor="middle">100%</text>
+<text x="268" y="36.0" class="rowlab" text-anchor="end">Fresh session</text>
+<text x="268" y="49.0" class="rowsub" text-anchor="end">$0.008 per task</text>
+<rect x="280" y="26" width="264.2" height="22" rx="2" class="bar s-base"/>
+<text x="550.2" y="41.0" class="val strong">71%</text>
+<text x="268" y="70.0" class="rowlab" text-anchor="end">Fresh + Engram</text>
+<text x="268" y="83.0" class="rowsub" text-anchor="end">$0.008 per task</text>
+<rect x="280" y="60" width="317.1" height="22" rx="2" class="bar s-hi"/>
+<text x="603.1" y="75.0" class="val strong">86%</text>
+<text x="268" y="104.0" class="rowlab" text-anchor="end">Compacted session</text>
+<text x="268" y="117.0" class="rowsub" text-anchor="end">$0.18 per task</text>
+<rect x="280" y="94" width="299.7" height="22" rx="2" class="bar s-base"/>
+<text x="585.7" y="109.0" class="val strong">81%</text>
+<text x="268" y="138.0" class="rowlab" text-anchor="end">Compacted + Engram</text>
+<text x="268" y="151.0" class="rowsub" text-anchor="end">$0.21 per task</text>
+<rect x="280" y="128" width="343.7" height="22" rx="2" class="bar s-hi"/>
+<text x="629.7" y="143.0" class="val strong">93%</text>
+<text x="268" y="172.0" class="rowlab" text-anchor="end">Whole history in context</text>
+<text x="268" y="185.0" class="rowsub" text-anchor="end">$0.49 per task</text>
+<rect x="280" y="162" width="343.7" height="22" rx="2" class="bar s-base"/>
+<text x="629.7" y="177.0" class="val strong">93%</text>
+</svg>
+      <div class="cap">Engram setups in teal. The same small model ran every setup.</div>
+    </div>
+    <div class="fig" style="align-content:start">
+      <h3>What each setup costs</h3>
+      <div class="scroll"><table>
+        <thead><tr><th>Setup</th><th>Solved</th><th>Score</th><th>$ / task</th><th>$ / solved</th></tr></thead>
+        <tbody>
+          <tr><td>Fresh session</td><td>71%</td><td>0.85</td><td>0.008</td><td>0.012</td></tr>
+          <tr><td>Fresh + Engram</td><td class="win">86%</td><td class="win">0.92</td><td class="win">0.008</td><td class="win">0.009</td></tr>
+          <tr><td>Compacted session</td><td>81%</td><td>0.93</td><td>0.176</td><td>0.217</td></tr>
+          <tr><td>Compacted + Engram</td><td class="win">93%</td><td class="win">0.99</td><td>0.212</td><td>0.228</td></tr>
+          <tr><td>Whole history</td><td>93%</td><td>0.97</td><td>0.492</td><td>0.530</td></tr>
+        </tbody>
+      </table></div>
+      <p class="cap">Building Engram's memory from the week of conversation cost about $0.09, once. Fresh + Engram is the cheapest way to a correct answer in the whole test.</p>
+    </div>
+  </div>
+  <div class="stories">
+    <div><span class="score">0/6 → 6/6</span><h3>"Should we move to a newer Python?"</h3><p class="muted">Every setup advised caution. Only with Engram did the agent know the reason it was told a week earlier: the reception PCs still run Python 3.9.</p></div>
+    <div><span class="score">0/3 → 3/3</span><h3>The April price rise</h3><p class="muted">A fresh agent couldn't find the board's new prices: twice it declined to write the function, once it shipped the old ones. With Engram it applied the new prices and the card-holder discount.</p></div>
+    <div><span class="score">1/3 → 3/3</span><h3>"Can we double-book 07:30?"</h3><p class="muted">After compaction, the agent usually forgot why the clinic never overbooks. With Engram it recalled the patient complaint to the physiotherapy board every time.</p></div>
+  </div>
+</section>
+
+<section>
+  <div class="head">
+    <div class="eyebrow">Strata · search and vectors</div>
+    <h2>Faster than the specialists, in one embedded file</h2>
+    <p class="muted">Strata ran the same query workload as SQLite with FTS5 and as Tantivy, the Rust search library behind Quickwit, on four BEIR collections from 5,183 to 522,931 documents. Answers were checked against each other, and ranking quality matched: BM25 nDCG@10 within 0.02 of both baselines on every collection.</p>
+  </div>
+  <div class="fig">
+    <h3>Warm median latency, TREC-COVID (171,332 documents), log scale</h3>
+    <div class="legend"><span><i class="sw s-strata"></i>Strata</span><span><i class="sw s-tantivy"></i>Tantivy 0.26</span><span><i class="sw s-sqlite"></i>SQLite 3.53 + FTS5</span></div>
+    <div class="scroll"><svg viewBox="0 0 720 471" role="img" aria-label="Warm median latency on TREC-COVID" class="chart">
+<line x1="150.0" y1="22" x2="150.0" y2="461" class="grid"/>
+<text x="150.0" y="16" class="tick" text-anchor="middle">0.01 ms</text>
+<line x1="250.0" y1="22" x2="250.0" y2="461" class="grid"/>
+<text x="250.0" y="16" class="tick" text-anchor="middle">0.1 ms</text>
+<line x1="350.0" y1="22" x2="350.0" y2="461" class="grid"/>
+<text x="350.0" y="16" class="tick" text-anchor="middle">1 ms</text>
+<line x1="450.0" y1="22" x2="450.0" y2="461" class="grid"/>
+<text x="450.0" y="16" class="tick" text-anchor="middle">10 ms</text>
+<line x1="550.0" y1="22" x2="550.0" y2="461" class="grid"/>
+<text x="550.0" y="16" class="tick" text-anchor="middle">100 ms</text>
+<line x1="650.0" y1="22" x2="650.0" y2="461" class="grid"/>
+<text x="650.0" y="16" class="tick" text-anchor="middle">1 s</text>
+<text x="138" y="56.5" class="rowlab" text-anchor="end">BM25 top-10</text>
+<rect x="150" y="30" width="178.7" height="13" rx="2" class="bar s-strata"/>
+<text x="334.7" y="40" class="val">0.613 ms</text>
+<rect x="150" y="46" width="205.3" height="13" rx="2" class="bar s-tantivy"/>
+<text x="361.3" y="56" class="val">1.13 ms</text>
+<rect x="150" y="62" width="411.5" height="13" rx="2" class="bar s-sqlite"/>
+<text x="567.5" y="72" class="val">130 ms</text>
+<text x="138" y="117.5" class="rowlab" text-anchor="end">Two-word AND</text>
+<rect x="150" y="91" width="96.8" height="13" rx="2" class="bar s-strata"/>
+<text x="252.8" y="101" class="val">0.093 ms</text>
+<rect x="150" y="107" width="152.0" height="13" rx="2" class="bar s-tantivy"/>
+<text x="308.0" y="117" class="val">0.331 ms</text>
+<rect x="150" y="123" width="181.6" height="13" rx="2" class="bar s-sqlite"/>
+<text x="337.6" y="133" class="val">0.654 ms</text>
+<text x="138" y="178.5" class="rowlab" text-anchor="end">Structured filter</text>
+<rect x="150" y="152" width="177.2" height="13" rx="2" class="bar s-strata"/>
+<text x="333.2" y="162" class="val">0.592 ms</text>
+<rect x="150" y="168" width="203.2" height="13" rx="2" class="bar s-tantivy"/>
+<text x="359.2" y="178" class="val">1.08 ms</text>
+<rect x="150" y="184" width="357.9" height="13" rx="2" class="bar s-sqlite"/>
+<text x="513.9" y="194" class="val">37.9 ms</text>
+<text x="138" y="239.5" class="rowlab" text-anchor="end">Filter + BM25</text>
+<rect x="150" y="213" width="155.6" height="13" rx="2" class="bar s-strata"/>
+<text x="311.6" y="223" class="val">0.360 ms</text>
+<rect x="150" y="229" width="222.2" height="13" rx="2" class="bar s-tantivy"/>
+<text x="378.2" y="239" class="val">1.67 ms</text>
+<rect x="150" y="245" width="411.5" height="13" rx="2" class="bar s-sqlite"/>
+<text x="567.5" y="255" class="val">130 ms</text>
+<text x="138" y="300.5" class="rowlab" text-anchor="end">Vector top-10</text>
+<rect x="150" y="274" width="121.7" height="13" rx="2" class="bar s-strata"/>
+<text x="277.7" y="284" class="val">0.165 ms</text>
+<text x="156" y="300" class="na">Tantivy: not supported</text>
+<rect x="150" y="306" width="462.8" height="13" rx="2" class="bar s-sqlite"/>
+<text x="618.8" y="316" class="val">425 ms</text>
+<text x="138" y="361.5" class="rowlab" text-anchor="end">Filter + vector</text>
+<rect x="150" y="335" width="144.1" height="13" rx="2" class="bar s-strata"/>
+<text x="300.1" y="345" class="val">0.276 ms</text>
+<text x="156" y="361" class="na">Tantivy: not supported</text>
+<rect x="150" y="367" width="369.5" height="13" rx="2" class="bar s-sqlite"/>
+<text x="525.5" y="377" class="val">49.5 ms</text>
+<text x="138" y="422.5" class="rowlab" text-anchor="end">Hybrid (BM25 + vector)</text>
+<rect x="150" y="396" width="212.4" height="13" rx="2" class="bar s-strata"/>
+<text x="368.4" y="406" class="val">1.33 ms</text>
+<text x="156" y="422" class="na">Tantivy: not supported</text>
+<rect x="150" y="428" width="474.5" height="13" rx="2" class="bar s-sqlite"/>
+<text x="630.5" y="438" class="val">556 ms</text>
+</svg></div>
+    <div class="cap">Tantivy has no vector search. SQLite has no vector index here, so its vector numbers are a full scan.</div>
+  </div>
+  <div class="two">
+    <div class="fig" style="align-content:start">
+      <h3>Across all four collections</h3>
+      <div class="scroll"><table>
+        <thead><tr><th>Query</th><th>vs Tantivy</th><th>vs SQLite</th></tr></thead>
+        <tbody>
+          <tr><td>BM25 top-10, warm</td><td class="win">1.8–4.6× faster</td><td class="win">45–213× faster</td></tr>
+          <tr><td>Two-word AND, warm</td><td class="win">3.6–6.7× faster</td><td class="win">2.4–7× faster</td></tr>
+          <tr><td>Vector top-10</td><td>no vectors</td><td class="win">0.09–0.20 ms vs 12 ms–1 s</td></tr>
+          <tr><td>Vector top-10, cold</td><td>no vectors</td><td class="win">50–63× faster</td></tr>
+          <tr><td>Text and filter, warm</td><td class="win">wins 23 of 28</td><td class="win">wins all</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+    <div class="fig" style="align-content:start">
+      <h3>Built like a database</h3>
+      <div class="scroll"><table>
+        <tbody>
+          <tr><td>Durable commit</td><td>0.27 ms</td></tr>
+          <tr><td>Snapshot</td><td>0.1–0.2 µs</td></tr>
+          <tr><td>Crash tests</td><td>every one recovered a committed prefix</td></tr>
+          <tr><td>File size</td><td>close to SQLite's</td></tr>
+          <tr><td>Hybrid ranking</td><td>+0.02–0.03 nDCG over vectors, 0.4–1.5 ms</td></tr>
+          <tr><td>Filtered vector planner</td><td>1.5–5.3× faster than any fixed strategy</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </div>
+</section>
+
+<section class="graphband">
+  <div class="head">
+    <div class="eyebrow" style="color:var(--ochre)">Strata · graphs</div>
+    <h2>Every row is a node. Every query can walk the graph.</h2>
+    <p class="muted">Graph databases keep nodes and edges in stores of their own. Strata keeps one table: an <code>EDGES</code> field holds a row's outgoing links, each pointing at another row's key, optionally with a label and a weight. The same row still has its text, its fields and its embedding, so a traversal can start from a keyword search, a filter or a vector search, all in the same statement.</p>
+  </div>
+  <div class="fig scroll">
+<svg viewBox="0 0 760 210" class="diagram" role="img" aria-label="A row is a node">
+  <rect x="20" y="20" width="430" height="170" rx="6" class="box"/>
+  <text x="40" y="48" class="dh">row  p1  (a node)</text>
+  <text x="40" y="78" class="code">id      'p1'</text>
+  <text x="40" y="100" class="code">title   'Attention is all you need'</text>
+  <text x="40" y="122" class="code">year    2017</text>
+  <text x="40" y="144" class="code">emb     [0.12, -0.04, … 512 dims]</text>
+  <text x="40" y="166" class="code hi">cites   ["p7", ["extends","p9"], ["refutes","p11",0.5]]</text>
+  <circle cx="560" cy="60" r="20" class="node"/><text x="560" y="65" class="nl" text-anchor="middle">p7</text>
+  <circle cx="660" cy="105" r="20" class="node"/><text x="660" y="110" class="nl" text-anchor="middle">p9</text>
+  <circle cx="560" cy="160" r="20" class="node"/><text x="560" y="165" class="nl" text-anchor="middle">p11</text>
+  <line x1="452" y1="160" x2="536" y2="68" class="edge cite"/>
+  <line x1="452" y1="164" x2="636" y2="108" class="edge cite"/>
+  <line x1="452" y1="168" x2="536" y2="160" class="edge cite"/>
+  <text x="625" y="80" class="dm">extends</text>
+  <text x="600" y="186" class="dm">refutes · w 0.5</text>
+</svg>
+</div>
+
+  <div class="caps">
+    <div><b>REACHABLE(f, seeds, hops)</b><span>rows within n hops, out, in or both ways, filtered by label or by a predicate on every step</span></div>
+    <div><b>PATH(f, from, to)</b><span>one shortest path, optionally only through rows that match a condition</span></div>
+    <div><b>hops()</b><span>a row's distance from the seeds, usable in ORDER BY and SELECT</span></div>
+    <div><b>ppr(f, seeds)</b><span>personalized PageRank as a score, fusable with BM25 and similarity through rrf()</span></div>
+  </div>
+
+<pre><span class="c">-- the way in is a vector search: what its two best hits cite, ranked by similarity</span>
+<span class="k">SELECT</span> id <span class="k">FROM</span> papers
+<span class="k">WHERE</span> REACHABLE(cites, (<span class="k">SELECT</span> id <span class="k">FROM</span> papers <span class="k">ORDER BY</span> similarity(emb, :q) <span class="k">DESC LIMIT</span> 2))
+  <span class="k">AND</span> year &gt;= 2018
+<span class="k">ORDER BY</span> similarity(emb, :q) <span class="k">DESC LIMIT</span> 20;
+
+<span class="c">-- PageRank from hybrid hits, fused with both rankings</span>
+<span class="k">SELECT</span> id <span class="k">FROM</span> papers <span class="k">ORDER BY</span> rrf(bm25(body, :t), similarity(emb, :q),
+  ppr(cites, (<span class="k">SELECT</span> id <span class="k">FROM</span> papers <span class="k">ORDER BY</span> rrf(bm25(body, :t), similarity(emb, :q)) <span class="k">DESC LIMIT</span> 2))) <span class="k">DESC LIMIT</span> 20;</pre>
+
+  <div class="two">
+    <div class="fig">
+      <h3>arXiv: 168,343 papers, 1,148,979 citations · p95</h3>
+      <div class="legend"><span><i class="sw s-strata"></i>Strata</span><span><i class="sw s-sqlite"></i>SQLite 3.53, recursive CTE</span></div>
+      <div class="scroll"><svg viewBox="0 0 720 224" role="img" aria-label="Graph traversal p95 on arXiv" class="chart">
+<line x1="150.0" y1="22" x2="150.0" y2="214" class="grid"/>
+<text x="150.0" y="16" class="tick" text-anchor="middle">0.01 ms</text>
+<line x1="275.0" y1="22" x2="275.0" y2="214" class="grid"/>
+<text x="275.0" y="16" class="tick" text-anchor="middle">0.1 ms</text>
+<line x1="400.0" y1="22" x2="400.0" y2="214" class="grid"/>
+<text x="400.0" y="16" class="tick" text-anchor="middle">1 ms</text>
+<line x1="525.0" y1="22" x2="525.0" y2="214" class="grid"/>
+<text x="525.0" y="16" class="tick" text-anchor="middle">10 ms</text>
+<line x1="650.0" y1="22" x2="650.0" y2="214" class="grid"/>
+<text x="650.0" y="16" class="tick" text-anchor="middle">100 ms</text>
+<text x="138" y="48.5" class="rowlab" text-anchor="end">1 hop out · 7 rows</text>
+<rect x="150" y="30" width="57.8" height="13" rx="2" class="bar s-strata"/>
+<text x="213.8" y="40" class="val">0.029 ms</text>
+<rect x="150" y="46" width="59.6" height="13" rx="2" class="bar s-sqlite"/>
+<text x="215.6" y="56" class="val">0.030 ms</text>
+<text x="138" y="93.5" class="rowlab" text-anchor="end">2 hops out · 56 rows</text>
+<rect x="150" y="75" width="118.1" height="13" rx="2" class="bar s-strata"/>
+<text x="274.1" y="85" class="val">0.088 ms</text>
+<rect x="150" y="91" width="177.3" height="13" rx="2" class="bar s-sqlite"/>
+<text x="333.3" y="101" class="val">0.262 ms</text>
+<text x="138" y="138.5" class="rowlab" text-anchor="end">3 hops out · 219 rows</text>
+<rect x="150" y="120" width="181.7" height="13" rx="2" class="bar s-strata"/>
+<text x="337.7" y="130" class="val">0.284 ms</text>
+<rect x="150" y="136" width="291.2" height="13" rx="2" class="bar s-sqlite"/>
+<text x="447.2" y="146" class="val">2.14 ms</text>
+<text x="138" y="183.5" class="rowlab" text-anchor="end">2 hops both ways · 3,790 rows</text>
+<rect x="150" y="165" width="301.6" height="13" rx="2" class="bar s-strata"/>
+<text x="457.6" y="175" class="val">2.59 ms</text>
+<rect x="150" y="181" width="423.7" height="13" rx="2" class="bar s-sqlite"/>
+<text x="579.7" y="191" class="val">24.5 ms</text>
+</svg></div>
+      <div class="cap">200 random seeds, warm, one thread, through SQL. Every count was checked against SQLite.</div>
+    </div>
+    <div class="fig">
+      <h3>Synthetic power-law graph: 1M rows, 10M edges · p95</h3>
+      <div class="legend"><span><i class="sw s-strata"></i>Strata</span><span><i class="sw s-sqlite"></i>SQLite 3.53, recursive CTE</span></div>
+      <div class="scroll"><svg viewBox="0 0 720 179" role="img" aria-label="Graph traversal p95 on a 1M-row graph" class="chart">
+<line x1="150.0" y1="22" x2="150.0" y2="169" class="grid"/>
+<text x="150.0" y="16" class="tick" text-anchor="middle">0.01 ms</text>
+<line x1="275.0" y1="22" x2="275.0" y2="169" class="grid"/>
+<text x="275.0" y="16" class="tick" text-anchor="middle">0.1 ms</text>
+<line x1="400.0" y1="22" x2="400.0" y2="169" class="grid"/>
+<text x="400.0" y="16" class="tick" text-anchor="middle">1 ms</text>
+<line x1="525.0" y1="22" x2="525.0" y2="169" class="grid"/>
+<text x="525.0" y="16" class="tick" text-anchor="middle">10 ms</text>
+<line x1="650.0" y1="22" x2="650.0" y2="169" class="grid"/>
+<text x="650.0" y="16" class="tick" text-anchor="middle">100 ms</text>
+<text x="138" y="48.5" class="rowlab" text-anchor="end">2 hops out · 108 rows</text>
+<rect x="150" y="30" width="117.4" height="13" rx="2" class="bar s-strata"/>
+<text x="273.4" y="40" class="val">0.087 ms</text>
+<rect x="150" y="46" width="145.9" height="13" rx="2" class="bar s-sqlite"/>
+<text x="301.9" y="56" class="val">0.147 ms</text>
+<text x="138" y="93.5" class="rowlab" text-anchor="end">3 hops out · 890 rows</text>
+<rect x="150" y="75" width="182.6" height="13" rx="2" class="bar s-strata"/>
+<text x="338.6" y="85" class="val">0.289 ms</text>
+<rect x="150" y="91" width="261.7" height="13" rx="2" class="bar s-sqlite"/>
+<text x="417.7" y="101" class="val">1.24 ms</text>
+<text x="138" y="138.5" class="rowlab" text-anchor="end">2 hops both ways · 1,586 rows</text>
+<rect x="150" y="120" width="230.9" height="13" rx="2" class="bar s-strata"/>
+<text x="386.9" y="130" class="val">0.704 ms</text>
+<rect x="150" y="136" width="341.9" height="13" rx="2" class="bar s-sqlite"/>
+<text x="497.9" y="146" class="val">5.43 ms</text>
+</svg></div>
+      <div class="cap">One hop costs the same in both, about 20 µs, mostly parsing and planning. From two hops on, Strata reads a compact edge slice where SQLite joins through a B-tree per row.</div>
+    </div>
+  </div>
+
+  <div class="scroll"><table>
+    <thead><tr><th>Graph query, median</th><th>arXiv</th><th>1M rows</th><th>SQLite</th></tr></thead>
+    <tbody>
+      <tr><td>Shortest path, either direction</td><td class="win">0.19 ms</td><td class="win">0.13 ms</td><td>no practical CTE form</td></tr>
+      <tr><td>Personalized PageRank, ε = 10⁻⁴</td><td class="win">1.36 ms</td><td class="win">5.8 ms</td><td>no practical CTE form</td></tr>
+      <tr><td>Vector search, then expand along citations</td><td class="win">0.32 ms</td><td></td><td></td></tr>
+      <tr><td>RRF of vector search and PageRank</td><td class="win">2.3 ms</td><td></td><td></td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="head" style="margin-top:12px">
+    <h2>The graph finds what search alone misses</h2>
+    <p class="muted">The test: given a new arXiv paper's title and abstract, find the papers it cites. 1,000 recent papers were held out of the table; half chose the one parameter, the other half are reported. The simplest graph plan wins: take the two papers nearest the query, follow their citations, rank what they cite by similarity. Papers on the same topic cite the same work, so their reference lists are better candidates than the papers themselves.</p>
+  </div>
+  <div class="fig scroll">
+<svg viewBox="0 0 760 300" class="diagram" role="img" aria-label="Vector search as the way into the citation graph">
+  <defs>
+    <marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="ahead"/></marker>
+  </defs>
+  <!-- step labels -->
+  <text x="90" y="26" class="step" text-anchor="middle">1 · Ask</text>
+  <text x="290" y="26" class="step" text-anchor="middle">2 · Nearest 2 papers</text>
+  <text x="500" y="26" class="step" text-anchor="middle">3 · Follow their citations</text>
+  <text x="680" y="26" class="step" text-anchor="middle">4 · Rank by similarity</text>
+  <!-- query -->
+  <rect x="20" y="110" width="140" height="70" rx="6" class="box"/>
+  <text x="90" y="140" class="dt" text-anchor="middle">new paper's</text>
+  <text x="90" y="160" class="dt" text-anchor="middle">title + abstract</text>
+  <!-- seeds -->
+  <circle cx="290" cy="105" r="22" class="node seed"/><text x="290" y="110" class="nl" text-anchor="middle">A</text>
+  <circle cx="290" cy="195" r="22" class="node seed"/><text x="290" y="200" class="nl" text-anchor="middle">B</text>
+  <line x1="162" y1="135" x2="264" y2="110" class="edge dashed" marker-end="url(#ah2)"/>
+  <line x1="162" y1="155" x2="264" y2="190" class="edge dashed" marker-end="url(#ah2)"/>
+  <text x="212" y="98" class="dm" text-anchor="middle">similarity</text>
+  <!-- cited -->
+  <circle cx="470" cy="62" r="15" class="node"/>
+  <circle cx="520" cy="110" r="15" class="node"/>
+  <circle cx="470" cy="150" r="15" class="node"/>
+  <circle cx="520" cy="196" r="15" class="node"/>
+  <circle cx="470" cy="240" r="15" class="node"/>
+  <line x1="311" y1="98" x2="453" y2="66" class="edge cite" marker-end="url(#ah2)"/>
+  <line x1="312" y1="105" x2="503" y2="110" class="edge cite" marker-end="url(#ah2)"/>
+  <line x1="310" y1="114" x2="454" y2="145" class="edge cite" marker-end="url(#ah2)"/>
+  <line x1="311" y1="188" x2="454" y2="155" class="edge cite" marker-end="url(#ah2)"/>
+  <line x1="312" y1="195" x2="503" y2="196" class="edge cite" marker-end="url(#ah2)"/>
+  <line x1="310" y1="204" x2="454" y2="236" class="edge cite" marker-end="url(#ah2)"/>
+  <text x="385" y="280" class="dm" text-anchor="middle">cites (EDGES field, resolved by key)</text>
+  <!-- ranked -->
+  <rect x="610" y="60" width="140" height="190" rx="6" class="box hi"/>
+  <text x="680" y="92" class="dt" text-anchor="middle">20 candidates,</text>
+  <text x="680" y="112" class="dt" text-anchor="middle">seeds removed</text>
+  <text x="680" y="152" class="big" text-anchor="middle">2×</text>
+  <text x="680" y="178" class="dm" text-anchor="middle">references found</text>
+  <text x="680" y="196" class="dm" text-anchor="middle">vs vector search</text>
+  <text x="680" y="228" class="dm" text-anchor="middle">0.43 ms</text>
+  <line x1="538" y1="150" x2="606" y2="150" class="edge" marker-end="url(#ah2)"/>
+</svg>
+</div>
+  <div class="fig">
+    <h3>nDCG@20 for finding a paper's references, 484 held-out papers</h3>
+    <svg viewBox="0 0 720 204" role="img" aria-label="nDCG@20 for finding a paper&#x27;s references" class="chart">
+<line x1="280.0" y1="20" x2="280.0" y2="198" class="grid"/>
+<text x="280.0" y="14" class="tick" text-anchor="middle">0</text>
+<line x1="403.3" y1="20" x2="403.3" y2="198" class="grid"/>
+<text x="403.3" y="14" class="tick" text-anchor="middle">0.1</text>
+<line x1="526.7" y1="20" x2="526.7" y2="198" class="grid"/>
+<text x="526.7" y="14" class="tick" text-anchor="middle">0.2</text>
+<line x1="650.0" y1="20" x2="650.0" y2="198" class="grid"/>
+<text x="650.0" y="14" class="tick" text-anchor="middle">0.3</text>
+<text x="268" y="36.0" class="rowlab" text-anchor="end">Vector search</text>
+<text x="268" y="49.0" class="rowsub" text-anchor="end">0.22 ms</text>
+<rect x="280" y="26" width="151.7" height="22" rx="2" class="bar s-base"/>
+<text x="437.7" y="41.0" class="val strong">0.123</text>
+<text x="268" y="70.0" class="rowlab" text-anchor="end">Hybrid BM25 + vector</text>
+<text x="268" y="83.0" class="rowsub" text-anchor="end">34 ms</text>
+<rect x="280" y="60" width="197.3" height="22" rx="2" class="bar s-base"/>
+<text x="483.3" y="75.0" class="val strong">0.160</text>
+<text x="268" y="104.0" class="rowlab" text-anchor="end">BM25</text>
+<text x="268" y="117.0" class="rowsub" text-anchor="end">30 ms</text>
+<rect x="280" y="94" width="198.6" height="22" rx="2" class="bar s-base"/>
+<text x="484.6" y="109.0" class="val strong">0.161</text>
+<text x="268" y="138.0" class="rowlab" text-anchor="end">PageRank from 1 vector hit</text>
+<text x="268" y="151.0" class="rowsub" text-anchor="end">6.7 ms</text>
+<rect x="280" y="128" width="260.2" height="22" rx="2" class="bar s-base"/>
+<text x="546.2" y="143.0" class="val strong">0.211</text>
+<text x="268" y="172.0" class="rowlab" text-anchor="end">Citations of the 2 nearest papers</text>
+<text x="268" y="185.0" class="rowsub" text-anchor="end">0.43 ms</text>
+<rect x="280" y="162" width="312.0" height="22" rx="2" class="bar s-hi"/>
+<text x="598.0" y="177.0" class="val strong">0.253</text>
+</svg>
+    <div class="cap">Time per query under each method. Against BM25 and hybrid search the gain is +57% and +58%; p &lt; 0.0001 against vector search. Edges built from vector similarity alone add nothing (0.079): the value comes from real relations the text does not carry.</div>
+  </div>
+</section>
+
+<section>
+  <div class="head">
+    <div class="eyebrow">Where it fits</div>
+    <h2>Built for local, read-mostly retrieval</h2>
+  </div>
+  <div class="fits">
+    <div class="fig" style="align-content:start">
+      <h3>Good fit</h3>
+      <ul>
+        <li>Long-term memory for coding agents and assistants, on the developer's own machine.</li>
+        <li>Search over documents that carry metadata, embeddings and links: a desktop app's search box, an edge device, retrieval for a model on a laptop.</li>
+        <li>Anything that wants SQL and one file to copy, back up or ship.</li>
+      </ul>
+    </div>
+    <div class="fig" style="align-content:start">
+      <h3>Where others still lead</h3>
+      <ul>
+        <li>Tantivy counts facets 1.1–2.7× faster and is 1.8–2.9× faster on cold structured filters.</li>
+        <li>Loads that build the HNSW graph are 1.5–9× slower than SQLite's (0.9–1.5× without it).</li>
+        <li>SQL covers single-table SELECT; writes go through the Rust API. No joins, no clustering.</li>
+        <li>Graph hops across segments cost 2–5× an in-memory CSR array.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="notes">
+    <p><b>How these numbers were measured.</b> Engram: 5 setups × 14 tasks × 3 repeats on the kestrel scenario, with Claude Code's own memory and the repository reset before every run, no user plugins loaded, and every answer graded by code. Every setup kept Claude Code's built-in memory notes. One task, can_book, defeated every setup. Seven runs first crashed the grader; after rebuilding each from its saved patch and regrading, three compacted-session invoice exports passed and four stayed at zero: two fresh runs declined to write the price function without the new prices, one raised an error for card holders, and one reminder run returned a result the grader could not read.</p>
+    <p>Strata: SQLite 3.53.2 with FTS5 and Tantivy 0.26.2 on SciFact, FiQA, TREC-COVID and Quora, one 4-core cloud VM, single-threaded queries, all systems fully merged. SQLite had no vector index, so its vector numbers measure a scan; a fuller comparison would add sqlite-vec and a dedicated vector store. Graph quality uses one task and one static embedder; a stronger embedder would raise the vector baseline.</p>
+  </div>
+</section>
+
+</div>
+</body>
+</html>

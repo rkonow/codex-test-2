@@ -52,16 +52,16 @@
   },
   "compact": {
    "runs": 42,
-   "solved": 31,
-   "solved_rate": 0.7380952380952381,
+   "solved": 34,
+   "solved_rate": 0.8095238095238095,
    "solved_ci95": [
-    0.5893098001502445,
-    0.8469751462739642
+    0.6669893264500356,
+    0.9001811039014357
    ],
-   "conversation_solved_rate": 0.6666666666666666,
-   "mean_score": 0.8547619047619047,
+   "conversation_solved_rate": 0.7575757575757576,
+   "mean_score": 0.9261904761904762,
    "cost_per_task_usd": 0.175634865952381,
-   "cost_per_solved_task_usd": 0.2379569151612904,
+   "cost_per_solved_task_usd": 0.21696071676470594,
    "wall_s_mean": 42.44582381134941,
    "wall_s_median": 21.973798513412476,
    "steps_mean": 6.380952380952381,
@@ -526,9 +526,9 @@
      "score": 1.0
     },
     "compact": {
-     "solved": 0,
+     "solved": 3,
      "runs": 3,
-     "score": 0.0
+     "score": 1.0
     },
     "fresh+engram": {
      "solved": 3,

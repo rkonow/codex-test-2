@@ -129,3 +129,5 @@ python3 scripts/ab_stats.py stockroom=results/ab/stockroom/runs.jsonl slotwise=r
 Results are in `results/`. `report/engram.html` covers the system and
 `report/structure.html` the record structure (`scripts/build_report.py`,
 `scripts/build_structure_report.py`).
+`report/showcase.html` sums up what Engram and Strata deliver together: the
+kestrel benchmark, Strata against SQLite and Tantivy, and Strata's graph queries.
