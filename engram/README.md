@@ -75,6 +75,23 @@ turn with one). Choose it with `ENGRAM_DISTILL_MODEL` or `"distill":
 default model is used. `ENGRAM_DISTILL=0` or `"distill": {"enabled":
 false}` turns it off.
 
+## Live inspector
+
+```sh
+demo/run.sh --model <model> --distill-model <small model>   # opens http://127.0.0.1:8765
+```
+
+A local web app for watching Engram work: chat with Claude Code in a scratch
+project (`~/engram-demo/project`, with its own store; `--data` moves it) and
+see, as each turn runs, what the hooks store, what the distiller writes down
+and what recall injects. The inspector reads the Strata file through the
+project's daemon: every record and its links, the knowledge notes, the graph
+(with `REACHABLE` traversals), the vectors (projected on their first two
+principal components, with nearest neighbours), the table's schema and
+segments, and an SQL console with text-embedded vector parameters.
+Nothing is simulated: chat turns are `claude -p` runs and every view is a query
+against the store. `--embedder hash:256` runs without the embedding model.
+
 ## Evaluation
 
 ```sh
