@@ -5,23 +5,28 @@ The A/B test in ab_eval.py starts every task in a new session. This one keeps
 the whole history in a single session, as a long working day does, and
 compacts it after each block of work, as Claude Code does when the context
 fills up. Each follow-up task then forks that session (`--resume ID
---fork-session`), so every run starts from the same state. Four lanes per
-scenario, each with its own history:
+--fork-session`), so every run starts from the same state. The lanes, each
+with its own history:
 
   compact         the history compacts after each block; no Engram
   compact+engram  the same, with Engram recording and recalling throughout
   compact+engram+graph  the same, with graph recall on (ENGRAM_GRAPH=1)
   full            the history never compacts (the whole session stays in
                   context); no Engram
+  fresh           each block is its own session, and each task starts a new
+                  one, as when work resumes the next day; no Engram
+  fresh+engram    the same, with Engram
 
 Runs inside a lane are sequential: a resumed session refers to the files
 by path, so the repository is restored to the same directory before each
 run. Lanes run in parallel.
 
   python3 scripts/long_session_ab.py --model <model> --scenarios stockroom slotwise --repeats 3
+  python3 scripts/long_session_ab.py --model <model> --scenarios kestrel --lanes fresh fresh+engram compact compact+engram full
 
 Results go to results/long/<scenario>/runs.jsonl (one row per run) and
-history_<lane>.json (the history's turns, costs and compaction summaries).
+history_<lane>.json (the history's turns, costs, compaction summaries and,
+with Engram, what its distillation cost).
 """
 
 import argparse
@@ -42,6 +47,9 @@ import ab_eval as ab  # noqa: E402
 
 RESULTS = os.path.join(ab.ROOT, "results", "long")
 LANES = ["compact", "compact+engram", "compact+engram+graph", "full"]
+ALL_LANES = LANES + ["fresh", "fresh+engram"]
+# Settings of an enclosing session that would change how the runs compact.
+SCRUB = ("CLAUDE_CODE_AUTO_COMPACT_WINDOW", "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE", "CLAUDECODE")
 
 
 def claude(prompt, cwd, env, model, session=None, resume=None, fork=False, timeout=1200):
@@ -98,6 +106,24 @@ def context_tokens(session):
     return last
 
 
+def distill_cost(home):
+    """What Engram's distillation (a separate model call after each turn) cost during the history."""
+    out = {"turns": 0, "errors": 0, "cost_usd": 0.0, "ms": []}
+    for path in glob.glob(os.path.join(home, "projects", "*", "events.log")):
+        for line in open(path, encoding="utf-8"):
+            try:
+                ev = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if ev.get("event") == "distill":
+                out["turns"] += 1
+                out["errors"] += "error" in ev
+                out["cost_usd"] += ev.get("cost_usd") or 0
+                if ev.get("ms") is not None:
+                    out["ms"].append(ev["ms"])
+    return out
+
+
 class Lane:
     def __init__(self, args, sc, name):
         self.args, self.sc, self.name = args, sc, name
@@ -106,10 +132,13 @@ class Lane:
         self.home = os.path.join(self.dir, "engram")
         self.engram = "engram" in name
         self.compact = name.startswith("compact")
+        self.fresh = name.startswith("fresh")
         self.hist_path = os.path.join(sc["results"], f"history_{name.replace('+', '_')}.json")
 
     def env(self, distill):
         env = ab.base_env(self.home, self.engram, distill=distill)
+        for k in SCRUB:
+            env.pop(k, None)
         env["ENGRAM_DISTILL_MODEL"] = self.args.distill_model or self.args.model
         if "graph" in self.name:
             env["ENGRAM_GRAPH"] = "1"
@@ -127,9 +156,14 @@ class Lane:
             ab.install(self.repo, self.home)
         env = self.env(distill=True)
         session = str(uuid.uuid4())
+        sessions = [session]
         turns = []
         first = True
         for k, prompts in enumerate(self.sc["history"]):
+            if self.fresh and k:
+                session = str(uuid.uuid4())
+                sessions.append(session)
+                first = True
             for prompt in prompts:
                 out = claude(prompt, self.repo, env, self.args.model, session=session if first else None, resume=None if first else session)
                 first = False
@@ -146,9 +180,11 @@ class Lane:
             if os.path.exists(src):
                 shutil.copytree(src, src + ".snap", symlinks=True)
         h = {
-            "lane": self.name, "session": session, "turns": turns, "summaries": summaries(session), "context_tokens": context_tokens(session),
+            "lane": self.name, "session": session, "sessions": sessions, "turns": turns, "summaries": summaries(session), "context_tokens": context_tokens(session),
             "cost_usd": sum(t["cost"] or 0 for t in turns), "git_log": subprocess.run(["git", "log", "--oneline"], cwd=self.repo, capture_output=True, text=True).stdout,
         }
+        if self.engram:
+            h["distill"] = distill_cost(self.home)
         os.makedirs(self.sc["results"], exist_ok=True)
         json.dump(h, open(self.hist_path, "w"), indent=1)
         return h
@@ -162,7 +198,10 @@ class Lane:
     def run(self, task, rep, hist, lock):
         self.restore()
         env = self.env(distill=False)
-        out = claude(task["prompt"], self.repo, env, self.args.model, resume=hist["session"], fork=True)
+        if self.fresh:
+            out = claude(task["prompt"], self.repo, env, self.args.model)
+        else:
+            out = claude(task["prompt"], self.repo, env, self.args.model, resume=hist["session"], fork=True)
         if self.engram:
             ab.stop_daemon(self.repo, self.home)
         score, detail = task["grade"](self.repo, out.get("result") or "")
@@ -212,7 +251,7 @@ def main():
     ap.add_argument("--model", required=True)
     ap.add_argument("--distill-model", default=None)
     ap.add_argument("--scenarios", nargs="+", default=["stockroom", "slotwise"])
-    ap.add_argument("--lanes", nargs="+", default=LANES)
+    ap.add_argument("--lanes", nargs="+", default=LANES, choices=ALL_LANES)
     ap.add_argument("--tasks", nargs="*")
     ap.add_argument("--repeats", type=int, default=3)
     ap.add_argument("--work", default="/home/user/long")
