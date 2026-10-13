@@ -346,7 +346,7 @@ def transcript_tools(session):
 
 
 def engram_events(home):
-    out = {"injected_chars": 0, "recalls": 0, "decisions": [], "briefing_chars": 0}
+    out = {"injected_chars": 0, "recalls": 0, "decisions": [], "briefing_chars": 0, "recall_ms": []}
     for path in glob.glob(os.path.join(home, "projects", "*", "events.log")):
         for line in open(path, encoding="utf-8"):
             try:
@@ -357,6 +357,8 @@ def engram_events(home):
                 out["recalls"] += 1
                 out["decisions"].append(ev.get("decision"))
                 out["injected_chars"] += ev.get("chars", 0)
+                if ev.get("ms") is not None:
+                    out["recall_ms"].append(round(ev["ms"], 2))
             elif ev.get("event") == "SessionStart":
                 out["briefing_chars"] += ev.get("chars", 0)
     return out
