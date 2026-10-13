@@ -181,6 +181,9 @@ pub struct PkIndex {
     bytes: Slice<u8>,
     ints: Slice<i64>,
     hash: HashFn,
+    /// `hash` is [`key_hash`], whose integer hash is a bijection, so an
+    /// integer key with an equal hash needs no comparison.
+    bijective_ints: bool,
 }
 
 impl PkIndex {
@@ -190,7 +193,9 @@ impl PkIndex {
     }
 
     pub fn from_section(bytes: OwnedBytes) -> Result<PkIndex> {
-        PkIndex::from_section_with(bytes, key_hash)
+        let mut idx = PkIndex::from_section_with(bytes, key_hash)?;
+        idx.bijective_ints = true;
+        Ok(idx)
     }
 
     pub(crate) fn from_section_with(bytes: OwnedBytes, hash: HashFn) -> Result<PkIndex> {
@@ -219,7 +224,7 @@ impl PkIndex {
                 return Err(corrupt("pk key array size"));
             }
         }
-        Ok(PkIndex { str_keys: kind == KIND_STR, n, bits, dir, entries, offsets, bytes, ints, hash })
+        Ok(PkIndex { str_keys: kind == KIND_STR, n, bits, dir, entries, offsets, bytes, ints, hash, bijective_ints: false })
     }
 
     /// Number of documents (keys) in the segment.
@@ -240,20 +245,34 @@ impl PkIndex {
 
     /// Every document holding `key`, in increasing docID order.
     pub fn lookup_all<'a>(&'a self, key: &'a Value) -> impl Iterator<Item = DocId> + 'a {
-        let k = KeyRef::of(key).filter(|k| matches!(k, KeyRef::Str(_)) == self.str_keys);
-        let (h, range) = match k {
-            Some(k) => {
-                let h = (self.hash)(k);
+        self.lookup_key(KeyRef::of(key))
+    }
+
+    /// Every document holding the borrowed key `k`, in increasing docID order.
+    pub fn lookup_key<'a>(&'a self, k: Option<KeyRef<'a>>) -> impl Iterator<Item = DocId> + 'a {
+        let h = k.map_or(0, |k| (self.hash)(k));
+        self.lookup_hashed(k, h)
+    }
+
+    /// Like [`lookup_key`](Self::lookup_key) with the key's hash already
+    /// computed (`h` must be this index's hash of `k`), so that a lookup over
+    /// many segments hashes once.
+    pub fn lookup_hashed<'a>(&'a self, k: Option<KeyRef<'a>>, h: u64) -> impl Iterator<Item = DocId> + 'a {
+        let k = k.filter(|k| matches!(k, KeyRef::Str(_)) == self.str_keys);
+        let range = match k {
+            Some(_) => {
                 let b = bucket(h, self.bits);
-                (h, self.dir[b] as usize..self.dir[b + 1] as usize)
+                self.dir[b] as usize..self.dir[b + 1] as usize
             }
-            None => (0, 0..0),
+            None => 0..0,
         };
+        // The integer hash is a bijection: an equal hash is an equal key.
+        let verify = self.str_keys || !self.bijective_ints;
         range
             .map(move |i| (self.entries[2 * i], self.entries[2 * i + 1] as DocId))
             .skip_while(move |&(eh, _)| eh < h)
             .take_while(move |&(eh, _)| eh == h)
-            .filter(move |&(_, d)| Some(self.key_ref(d)) == k)
+            .filter(move |&(_, d)| !verify || Some(self.key_ref(d)) == k)
             .map(|(_, d)| d)
     }
 

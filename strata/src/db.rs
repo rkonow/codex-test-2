@@ -124,8 +124,14 @@ impl DocumentSource for StoredSource {
         let mut vectors = Vec::new();
         let mut numeric = Vec::new();
         let mut keyword = Vec::new();
+        let mut edges = Vec::new();
         for (i, f) in schema.fields.iter().enumerate() {
             match f.ty {
+                FieldType::Edges if !f.stored && f.indexed => {
+                    if let Some(g) = crate::graph::GraphReader::open(seg, &f.name)? {
+                        edges.push((i, g));
+                    }
+                }
                 FieldType::Vector { .. } => vectors.push((i, VectorReader::open(seg, &f.name)?)),
                 FieldType::Int | FieldType::Float if !f.stored && f.indexed => numeric.push((i, NumericColumn::open(seg, &f.name)?)),
                 FieldType::Keyword if !f.stored && f.indexed => keyword.push((i, KeywordColumn::open(seg, &f.name)?)),
@@ -148,6 +154,9 @@ impl DocumentSource for StoredSource {
             }
             for (i, k) in &keyword {
                 doc[*i] = k.value_of_doc(d).map_or(Value::Null, |v| Value::Str(v.to_string()));
+            }
+            for (i, g) in &edges {
+                doc[*i] = g.edges_value(d);
             }
             schema.fill_generated(&mut doc);
             out.push(doc);

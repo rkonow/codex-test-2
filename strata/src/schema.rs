@@ -26,6 +26,9 @@ pub enum FieldType {
     Float,
     /// A fixed-dimension float vector; similarity is the dot product.
     Vector { dim: usize, index: VectorIndexKind },
+    /// Outgoing edges to other rows of the table, by primary key: a JSON
+    /// array (see [`crate::graph`]). Indexed: out-edges and a reverse index.
+    Edges,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -88,6 +91,11 @@ impl Schema {
                 if !ok || !matches!(f.ty, FieldType::Text { .. }) {
                     return Err(Error::Schema(format!("{} must be TEXT generated from stored text fields", f.name)));
                 }
+            }
+        }
+        if s.primary_key.is_none() {
+            if let Some(f) = s.fields.iter().find(|f| f.ty == FieldType::Edges) {
+                return Err(Error::Schema(format!("EDGES field {} needs a primary key", f.name)));
             }
         }
         let mut names: Vec<&str> = s.fields.iter().map(|f| f.name.as_str()).collect();

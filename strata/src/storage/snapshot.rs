@@ -92,6 +92,18 @@ impl Snapshot {
         })
     }
 
+    /// Like [`lookup`](Self::lookup), for a borrowed key (graph traversals
+    /// resolve edge targets stored as keys).
+    pub fn lookup_key(&self, key: crate::storage::KeyRef) -> Option<(usize, DocId)> {
+        let segs = &self.inner.segments;
+        let h = crate::storage::key_hash(key);
+        (0..segs.len()).rev().find_map(|i| {
+            let pk = self.inner.pks[i].as_ref()?;
+            let mut docs = pk.lookup_hashed(Some(key), h);
+            docs.find(|&d| segs[i].live.as_ref().is_none_or(|l| l.contains(d))).map(|d| (i, d))
+        })
+    }
+
     /// The primary key of document `doc` of segment `seg`.
     pub fn key(&self, seg: usize, doc: DocId) -> Option<Value> {
         Some(self.pk(seg)?.key(doc))

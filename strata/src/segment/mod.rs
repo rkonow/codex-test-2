@@ -14,7 +14,8 @@
 //! viewed in place as `&[u64]` (see [`posting_bench::bytes`]).
 //!
 //! Section names are `component.field.part`, e.g. `text.body.dict`,
-//! `col.year`, `kw.category.post`, `vec.emb.ivf`, `store.data`, `pk`.
+//! `col.year`, `kw.category.post`, `vec.emb.ivf`, `graph.links`,
+//! `store.data`, `pk`.
 
 pub mod build;
 pub mod filter;
@@ -151,6 +152,7 @@ pub fn random_access(name: &str) -> bool {
         || name.ends_with(".dict")
         || name.ends_with(".f32")
         || name.contains(".hnsw")
+        || name.starts_with("graph.")
 }
 
 /// A read-only segment: zero-copy views of its sections.

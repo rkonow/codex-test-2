@@ -52,6 +52,11 @@ pub trait DocumentSource: Send + Sync {
 pub struct DbOptions {
     /// Options of every segment build (memtable, flush, bulk load, merge).
     pub build: BuildOptions,
+    /// Options of memtable segment builds instead of `build`. A memtable
+    /// chunk is rebuilt by the first snapshot after each write, so an index
+    /// that is slow to build but fast to search (HNSW) costs more there
+    /// than a scan of a few hundred vectors (`vector.index = flat`).
+    pub mem_build: Option<BuildOptions>,
     /// Flush when the memtable's documents plus pending deletes exceed this.
     pub memtable_max_docs: usize,
     /// Documents per memtable chunk (rounded up to a multiple of 64). Each
@@ -80,6 +85,7 @@ impl Default for DbOptions {
     fn default() -> Self {
         DbOptions {
             build: BuildOptions::default(),
+            mem_build: None,
             memtable_max_docs: 10_000,
             memtable_chunk_docs: 1024,
             segment_max_docs: 100_000,
@@ -286,7 +292,7 @@ impl Database {
                 let built = lock(&self.state).memseg(part.gen, part.chunk, part.len);
                 part.seg = Some(built.unwrap_or_else(|| {
                     let id = MEM_ID | self.mem_ids.fetch_add(1, Ordering::Relaxed);
-                    let seg = build_memseg(&self.schema, &self.opts.build, part, id);
+                    let seg = build_memseg(&self.schema, self.opts.mem_build.as_ref().unwrap_or(&self.opts.build), part, id);
                     lock(&self.state).keep_memseg(&seg);
                     seg
                 }));
