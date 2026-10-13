@@ -13,7 +13,12 @@ def run_py(repo, code, pythonpath="src", timeout=60):
     env = dict(os.environ, PYTHONPATH=os.path.join(repo, pythonpath), PYTHONDONTWRITEBYTECODE="1")
     try:
         p = subprocess.run([sys.executable, "-c", code], cwd=repo, env=env, capture_output=True, text=True, timeout=timeout)
-        return json.loads(p.stdout.strip().splitlines()[-1])
+        out = p.stdout.strip().splitlines()
+        if not out:
+            # The snippet raised: report its own error, not an empty-output IndexError.
+            err = p.stderr.strip().splitlines()
+            return {"error": (err[-1] if err else f"no output, exit {p.returncode}")[:300]}
+        return json.loads(out[-1])
     except Exception as e:  # noqa: BLE001 - a broken implementation scores 0
         return {"error": f"{type(e).__name__}: {e}"[:300]}
 
