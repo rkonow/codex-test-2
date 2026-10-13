@@ -13,6 +13,7 @@ pub mod daemon;
 pub mod distill;
 pub mod embed;
 pub mod hook;
+pub mod inspect;
 pub mod install;
 pub mod mcp;
 pub mod paths;
