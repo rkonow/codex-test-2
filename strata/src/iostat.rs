@@ -17,6 +17,9 @@ use std::path::Path;
 pub const PAGE: usize = 4096;
 
 /// Drops the file's clean pages from the page cache.
+/// Only Linux has `posix_fadvise`; elsewhere this is a no-op and pages stay
+/// resident.
+#[cfg(target_os = "linux")]
 pub fn evict(path: &Path) -> io::Result<()> {
     let f = File::open(path)?;
     let r = unsafe { libc::posix_fadvise(f.as_raw_fd(), 0, 0, libc::POSIX_FADV_DONTNEED) };
@@ -24,6 +27,11 @@ pub fn evict(path: &Path) -> io::Result<()> {
         return Err(io::Error::from_raw_os_error(r));
     }
     Ok(())
+}
+
+#[cfg(not(target_os = "linux"))]
+pub fn evict(path: &Path) -> io::Result<()> {
+    File::open(path).map(|_| ())
 }
 
 /// Evicts every regular file under `dir` (for multi-file engines).
@@ -53,7 +61,7 @@ pub fn resident_pages(path: &Path) -> io::Result<usize> {
         }
         let pages = len.div_ceil(PAGE);
         let mut v = vec![0u8; pages];
-        let r = libc::mincore(p, len, v.as_mut_ptr());
+        let r = libc::mincore(p, len, v.as_mut_ptr() as *mut _);
         libc::munmap(p, len);
         if r != 0 {
             return Err(io::Error::last_os_error());
