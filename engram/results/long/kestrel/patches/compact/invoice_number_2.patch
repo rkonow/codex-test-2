@@ -1,0 +1,106 @@
+diff --git a/src/kestrel/invoices.py b/src/kestrel/invoices.py
+index 092b7e4..0366767 100644
+--- a/src/kestrel/invoices.py
++++ b/src/kestrel/invoices.py
+@@ -2,6 +2,7 @@
+ 
+ from dataclasses import dataclass
+ import datetime
++import re
+ 
+ from .calendar import LOCAL_TZ
+ from .ids import normalize_patient_id
+@@ -40,3 +41,25 @@ def make_invoice(appointment, patient, number, amount_cents):
+         amount_cents=amount_cents,
+         appointment_id=appointment.id,
+     )
++
++
++INVOICE_NUMBER_RE = re.compile(r"^INV-([A-Z]+)-(\d{4})-(\d{5})$")
++
++
++def next_invoice_number(clinic, year, existing):
++    """Next invoice number for a clinic in a year, given every number issued so far.
++
++    Numbers are INV-<clinic>-<year>-<five-digit sequence>, counted per clinic and
++    restarting each year. Numbers for other clinics or years are ignored.
++    """
++    if not re.fullmatch(r"[A-Z]+", clinic):
++        raise ValueError(f"clinic code must be upper-case letters: {clinic!r}")
++    prefix = f"INV-{clinic}-{year:04d}-"
++    highest = 0
++    for number in existing:
++        match = INVOICE_NUMBER_RE.match(number)
++        if match and number.startswith(prefix):
++            highest = max(highest, int(match.group(3)))
++    if highest + 1 > 99999:
++        raise ValueError(f"no invoice numbers left for {clinic} in {year}")
++    return f"{prefix}{highest + 1:05d}"
+diff --git a/tests/test_invoices.py b/tests/test_invoices.py
+index 2e8268b..5fcca57 100644
+--- a/tests/test_invoices.py
++++ b/tests/test_invoices.py
+@@ -1,7 +1,7 @@
+ import datetime
+ import unittest
+ 
+-from kestrel.invoices import make_invoice
++from kestrel.invoices import make_invoice, next_invoice_number
+ from kestrel.models import ASSESSMENT, FOLLOWUP, Appointment, Patient
+ 
+ 
+@@ -69,3 +69,54 @@ class MakeInvoiceTest(unittest.TestCase):
+     def test_zero_amount_is_allowed(self):
+         invoice = make_invoice(appointment(utc(2026, 10, 12, 9, 0)), PATIENT, "N", 0)
+         self.assertEqual(invoice.amount_cents, 0)
++
++
++class NextInvoiceNumberTest(unittest.TestCase):
++    def test_first_invoice_of_the_year_is_sequence_one(self):
++        self.assertEqual(next_invoice_number("HB", 2026, []), "INV-HB-2026-00001")
++
++    def test_follows_the_highest_existing_number(self):
++        existing = ["INV-HB-2026-00001", "INV-HB-2026-00002"]
++        self.assertEqual(next_invoice_number("HB", 2026, existing), "INV-HB-2026-00003")
++
++    def test_uses_highest_not_last_listed(self):
++        existing = ["INV-HB-2026-00007", "INV-HB-2026-00002"]
++        self.assertEqual(next_invoice_number("HB", 2026, existing), "INV-HB-2026-00008")
++
++    def test_other_clinics_do_not_count(self):
++        existing = ["INV-NG-2026-00009", "INV-WK-2026-00004"]
++        self.assertEqual(next_invoice_number("HB", 2026, existing), "INV-HB-2026-00001")
++
++    def test_other_years_do_not_count(self):
++        existing = ["INV-HB-2025-00040"]
++        self.assertEqual(next_invoice_number("HB", 2026, existing), "INV-HB-2026-00001")
++
++    def test_sequence_restarts_each_year(self):
++        existing = ["INV-HB-2025-00040", "INV-HB-2026-00002"]
++        self.assertEqual(next_invoice_number("HB", 2026, existing), "INV-HB-2026-00003")
++        self.assertEqual(next_invoice_number("HB", 2027, existing), "INV-HB-2027-00001")
++
++    def test_malformed_numbers_are_ignored(self):
++        existing = ["INV-HB-2026-7", "INV-HB-2026-00005-x", "HB-2026-00009", "inv-hb-2026-00009"]
++        self.assertEqual(next_invoice_number("HB", 2026, existing), "INV-HB-2026-00001")
++
++    def test_accepts_any_iterable(self):
++        existing = (n for n in ["INV-HB-2026-00003"])
++        self.assertEqual(next_invoice_number("HB", 2026, existing), "INV-HB-2026-00004")
++
++    def test_lower_case_clinic_is_rejected(self):
++        with self.assertRaises(ValueError):
++            next_invoice_number("hb", 2026, [])
++
++    def test_empty_clinic_is_rejected(self):
++        with self.assertRaises(ValueError):
++            next_invoice_number("", 2026, [])
++
++    def test_last_sequence_number_is_allowed(self):
++        existing = ["INV-HB-2026-99998"]
++        self.assertEqual(next_invoice_number("HB", 2026, existing), "INV-HB-2026-99999")
++
++    def test_running_out_of_numbers_raises(self):
++        existing = ["INV-HB-2026-99999"]
++        with self.assertRaises(ValueError):
++            next_invoice_number("HB", 2026, existing)

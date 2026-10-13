@@ -1,0 +1,89 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index c8ee399..cacf5f0 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -7,6 +7,7 @@
+ - Code runs on Python 3.9 (the reception PCs' version).
+ - `import_legacy(path)` reads the old booking system's CSV export into appointments.
+ - `make_invoice(appointment, patient, number, amount_cents)` builds an `Invoice` dated the appointment's local date, with the patient name left blank.
++- `next_invoice_number(clinic, year, existing)` returns the next `INV-<clinic>-<year>-<sequence>` number, one more than the highest issued for that clinic and year.
+ - `Calendar.move(appointment_id, new_start)` reschedules a booked appointment; cancelled, attended and no-show appointments are refused.
+ - `Calendar.cancel(appointment_id, at)` cancels a booked appointment and records `cancelled_at`; `at` must be timezone-aware.
+ - Patients have a `csc` flag, stored in the JSON file (defaults to off for existing records).
+diff --git a/src/kestrel/invoices.py b/src/kestrel/invoices.py
+index 06127c9..ce6b624 100644
+--- a/src/kestrel/invoices.py
++++ b/src/kestrel/invoices.py
+@@ -2,6 +2,8 @@
+ 
+ from dataclasses import dataclass
+ import datetime
++import re
++from typing import Iterable
+ 
+ from .calendar import CLINIC_TZ
+ from .models import ASSESSMENT, Appointment, Patient
+@@ -23,6 +25,22 @@ class Invoice:
+     description: str = ""
+ 
+ 
++def next_invoice_number(clinic: str, year: int, existing: Iterable[str]) -> str:
++    """Return the next number in the INV-<clinic>-<year>-<sequence> scheme.
++
++    The sequence is one more than the highest already issued for this clinic and year, so
++    numbers issued for other clinics or years are ignored, and gaps are never reused.
++    Strings that do not follow the scheme are ignored too.
++    """
++    pattern = re.compile(rf"INV-{re.escape(clinic)}-{year}-([0-9]+)")
++    highest = 0
++    for number in existing:
++        match = pattern.fullmatch(number)
++        if match is not None:
++            highest = max(highest, int(match.group(1)))
++    return f"INV-{clinic}-{year}-{highest + 1:05d}"
++
++
+ def make_invoice(appointment: Appointment, patient: Patient, number: str, amount_cents: int) -> Invoice:
+     """Invoice a patient for an appointment, dated the appointment's local (clinic) date.
+ 
+diff --git a/tests/test_invoices.py b/tests/test_invoices.py
+index d75d7ac..64302cc 100644
+--- a/tests/test_invoices.py
++++ b/tests/test_invoices.py
+@@ -2,12 +2,35 @@ import datetime
+ import unittest
+ 
+ from helpers import appt, utc
+-from kestrel.invoices import make_invoice
++from kestrel.invoices import make_invoice, next_invoice_number
+ from kestrel.models import Patient
+ 
+ PATIENT = Patient(id="KP-000001", name="Jane Example", phone="+64211234567")
+ 
+ 
++class NextInvoiceNumberTest(unittest.TestCase):
++    def test_first_invoice_of_the_year_is_one(self):
++        self.assertEqual(next_invoice_number("HB", 2027, []), "INV-HB-2027-00001")
++
++    def test_one_more_than_highest_for_clinic_and_year(self):
++        existing = ["INV-HB-2027-00001", "INV-HB-2027-00042", "INV-HB-2027-00007"]
++        self.assertEqual(next_invoice_number("HB", 2027, existing), "INV-HB-2027-00043")
++
++    def test_ignores_other_clinics_and_years(self):
++        existing = ["INV-HB-2026-00900", "INV-WG-2027-00500", "INV-HB-2027-00003"]
++        self.assertEqual(next_invoice_number("HB", 2027, existing), "INV-HB-2027-00004")
++
++    def test_ignores_strings_that_do_not_follow_the_scheme(self):
++        existing = ["N1", "INV-HB-2027-", "INV-HB-2027-00002x", "XINV-HB-2027-00009", "INV-HBX-2027-00008"]
++        self.assertEqual(next_invoice_number("HB", 2027, existing), "INV-HB-2027-00001")
++
++    def test_does_not_reuse_gaps(self):
++        self.assertEqual(next_invoice_number("HB", 2027, ["INV-HB-2027-00005"]), "INV-HB-2027-00006")
++
++    def test_accepts_any_iterable(self):
++        self.assertEqual(next_invoice_number("HB", 2027, (n for n in ["INV-HB-2027-00002"])), "INV-HB-2027-00003")
++
++
+ class MakeInvoiceTest(unittest.TestCase):
+     def test_copies_appointment_and_patient_details(self):
+         a = appt("a1", utc(2027, 3, 1, 20), kind="assessment", patient="KP-000001", clinic="HB")

@@ -1,0 +1,66 @@
+diff --git a/src/kestrel/intervals.py b/src/kestrel/intervals.py
+new file mode 100644
+index 0000000..825154f
+--- /dev/null
++++ b/src/kestrel/intervals.py
+@@ -0,0 +1,19 @@
++"""Time intervals."""
++
++
++def merge_busy(intervals):
++    """Merge (start, end) pairs into sorted, non-overlapping pairs.
++
++    Input can be in any order. Pairs that overlap or touch (one ends where the
++    next starts) become one pair. Raises ValueError if any end is before its start.
++    """
++    pairs = sorted(intervals)
++    merged = []
++    for start, end in pairs:
++        if end < start:
++            raise ValueError(f"interval ends before it starts: {(start, end)!r}")
++        if merged and start <= merged[-1][1]:
++            merged[-1] = (merged[-1][0], max(merged[-1][1], end))
++        else:
++            merged.append((start, end))
++    return merged
+diff --git a/tests/test_intervals.py b/tests/test_intervals.py
+new file mode 100644
+index 0000000..7d8972d
+--- /dev/null
++++ b/tests/test_intervals.py
+@@ -0,0 +1,35 @@
++import unittest
++
++from kestrel.intervals import merge_busy
++
++
++class MergeBusyTest(unittest.TestCase):
++    def test_empty(self):
++        self.assertEqual(merge_busy([]), [])
++
++    def test_disjoint_kept_and_sorted(self):
++        self.assertEqual(merge_busy([(5, 6), (1, 2)]), [(1, 2), (5, 6)])
++
++    def test_overlapping_merge(self):
++        self.assertEqual(merge_busy([(1, 4), (3, 6)]), [(1, 6)])
++
++    def test_touching_merge(self):
++        self.assertEqual(merge_busy([(1, 3), (3, 5)]), [(1, 5)])
++
++    def test_contained_keeps_outer_end(self):
++        self.assertEqual(merge_busy([(1, 10), (3, 4)]), [(1, 10)])
++
++    def test_any_order(self):
++        self.assertEqual(merge_busy([(7, 8), (3, 4), (1, 2), (2, 3), (6, 9)]),
++                         [(1, 4), (6, 9)])
++
++    def test_chain_merges_into_one(self):
++        self.assertEqual(merge_busy([(4, 5), (1, 2), (2, 4)]), [(1, 5)])
++
++    def test_rejects_end_before_start(self):
++        with self.assertRaises(ValueError):
++            merge_busy([(5, 1)])
++
++
++if __name__ == "__main__":
++    unittest.main()

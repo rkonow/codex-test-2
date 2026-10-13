@@ -1,0 +1,72 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index c8ee399..3e37d91 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -15,6 +15,7 @@
+ - Calendar sort order fixed.
+ - `therapist_load(calendar, week_start)` report of appointments per therapist for a week.
+ - `Waitlist` of patients waiting for a slot to free up, by appointment kind.
++- `Waitlist.next_for(kind)` returns the entry to offer a freed slot of that kind to (urgent first, then request order), or `None` if nobody is waiting for that kind.
+ - `python -m kestrel day THERAPIST_ID DATE --data kestrel.json` prints a therapist's day: local time, kind and patient ID.
+ - `python -m kestrel patients --data kestrel.json` lists patient IDs and names, sorted by ID.
+ - `save` writes atomically: it writes a temporary file in the same directory and renames it over the old file, so a crash cannot leave a half-written file. Saved files are now created with owner-only permissions (`0600`).
+diff --git a/src/kestrel/waitlist.py b/src/kestrel/waitlist.py
+index ba8c156..6b7a5e3 100644
+--- a/src/kestrel/waitlist.py
++++ b/src/kestrel/waitlist.py
+@@ -38,3 +38,12 @@ class Waitlist:
+     def entries(self):
+         """Urgent entries first, then everyone else, each in the order they asked."""
+         return sorted(self._entries.values(), key=lambda e: (not e.urgent, e.requested_at))
++
++    def next_for(self, kind):
++        """The entry to offer a freed slot of this kind to, or None if nobody is waiting for it."""
++        if kind not in KINDS:
++            raise ValueError(f"unknown kind {kind!r}")
++        for entry in self.entries():
++            if entry.kind == kind:
++                return entry
++        return None
+diff --git a/tests/test_waitlist.py b/tests/test_waitlist.py
+index 6caf1e2..89c780d 100644
+--- a/tests/test_waitlist.py
++++ b/tests/test_waitlist.py
+@@ -75,6 +75,38 @@ class WaitlistTest(unittest.TestCase):
+         wl.add(entry("KP-000001", day=5))
+         self.assertEqual([e.requested_at.day for e in wl.entries()], [5])
+ 
++    def test_next_for_empty(self):
++        self.assertIsNone(Waitlist().next_for("followup"))
++
++    def test_next_for_is_first_of_that_kind_in_queue_order(self):
++        wl = Waitlist()
++        wl.add(entry("KP-000001", day=1, kind="assessment"))
++        wl.add(entry("KP-000002", day=2, kind="followup"))
++        wl.add(entry("KP-000003", day=3, kind="followup"))
++        self.assertEqual(wl.next_for("followup").patient_id, "KP-000002")
++        self.assertEqual(wl.next_for("assessment").patient_id, "KP-000001")
++
++    def test_next_for_prefers_urgent_of_that_kind(self):
++        wl = Waitlist()
++        wl.add(entry("KP-000001", day=1))
++        wl.add(entry("KP-000002", day=2, urgent=True))
++        self.assertEqual(wl.next_for("followup").patient_id, "KP-000002")
++
++    def test_next_for_none_when_nobody_waits_for_that_kind(self):
++        wl = Waitlist()
++        wl.add(entry("KP-000001", day=1, kind="followup"))
++        self.assertIsNone(wl.next_for("assessment"))
++
++    def test_next_for_rejects_unknown_kind(self):
++        with self.assertRaises(ValueError):
++            Waitlist().next_for("massage")
++
++    def test_next_for_does_not_remove_entry(self):
++        wl = Waitlist()
++        wl.add(entry("KP-000001", day=1))
++        wl.next_for("followup")
++        self.assertEqual(len(wl.entries()), 1)
++
+ 
+ if __name__ == "__main__":
+     unittest.main()

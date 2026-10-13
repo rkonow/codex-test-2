@@ -1,0 +1,129 @@
+diff --git a/src/kestrel/booking.py b/src/kestrel/booking.py
+new file mode 100644
+index 0000000..a0f252c
+--- /dev/null
++++ b/src/kestrel/booking.py
+@@ -0,0 +1,41 @@
++"""Booking rules: can a new appointment go into a therapist's calendar?"""
++
++import datetime
++
++from .calendar import CLINIC_TZ
++from .models import ASSESSMENT, CANCELLED, FOLLOWUP
++
++DURATION = {ASSESSMENT: datetime.timedelta(minutes=45), FOLLOWUP: datetime.timedelta(minutes=30)}
++# Gap the therapist keeps free after an appointment of each kind, for writing notes.
++GAP_AFTER = {ASSESSMENT: datetime.timedelta(minutes=15), FOLLOWUP: datetime.timedelta(0)}
++MAX_PER_DAY = 8
++
++
++def can_book(calendar, therapist, appointment):
++    """True if `appointment` can be added to the calendar for `therapist`, else False.
++
++    Kestrel never overbooks, so nothing may overlap an existing booking, not even to cover no-shows.
++    Cancelled appointments do not count against the calendar.
++    """
++    if appointment.therapist_id != therapist.id:
++        return False
++    local_start = appointment.start.astimezone(CLINIC_TZ)
++    if local_start.minute % 15 or local_start.second or local_start.microsecond:
++        return False
++
++    others = [a for a in calendar.for_therapist(therapist.id) if a.status != CANCELLED and a.id != appointment.id]
++    for other in others:
++        if appointment.start <= other.start:
++            if not _has_room_between(appointment, other):
++                return False
++        elif not _has_room_between(other, appointment):
++            return False
++
++    same_day = [a for a in others if a.start.astimezone(CLINIC_TZ).date() == local_start.date()]
++    return len(same_day) < MAX_PER_DAY
++
++
++def _has_room_between(earlier, later):
++    """The later appointment starts after the earlier one ends and its gap has passed."""
++    free_from = earlier.start + DURATION[earlier.kind] + GAP_AFTER[earlier.kind]
++    return later.start >= free_from
+diff --git a/tests/test_booking.py b/tests/test_booking.py
+new file mode 100644
+index 0000000..6df37b9
+--- /dev/null
++++ b/tests/test_booking.py
+@@ -0,0 +1,76 @@
++import datetime
++import unittest
++
++from helpers import appt
++from kestrel.booking import can_book
++from kestrel.calendar import CLINIC_TZ, Calendar
++from kestrel.models import ASSESSMENT, FOLLOWUP, Therapist
++
++JO = Therapist("T1", "Jo Park", "HB")
++
++
++def local(hh, mm, day=12):
++    """A time on 2026-10-<day> in Auckland."""
++    return datetime.datetime(2026, 10, day, hh, mm, tzinfo=CLINIC_TZ)
++
++
++class CanBookTest(unittest.TestCase):
++    def test_free_slot_is_bookable(self):
++        self.assertTrue(can_book(Calendar(), JO, appt("new", local(9, 0), kind=FOLLOWUP)))
++
++    def test_other_therapists_bookings_do_not_block(self):
++        cal = Calendar([appt("a1", local(9, 0), kind=FOLLOWUP, therapist="T2")])
++        self.assertTrue(can_book(cal, JO, appt("new", local(9, 0), kind=FOLLOWUP)))
++
++    def test_appointment_for_another_therapist_is_refused(self):
++        self.assertFalse(can_book(Calendar(), JO, appt("new", local(9, 0), kind=FOLLOWUP, therapist="T2")))
++
++    def test_start_must_be_a_quarter_hour(self):
++        self.assertFalse(can_book(Calendar(), JO, appt("new", local(9, 10), kind=FOLLOWUP)))
++        self.assertTrue(can_book(Calendar(), JO, appt("new", local(9, 15), kind=FOLLOWUP)))
++
++    def test_overlapping_booking_is_refused(self):
++        cal = Calendar([appt("a1", local(9, 0), kind=FOLLOWUP)])
++        self.assertFalse(can_book(cal, JO, appt("new", local(9, 15), kind=FOLLOWUP)))
++        self.assertFalse(can_book(cal, JO, appt("new", local(8, 45), kind=ASSESSMENT)))
++
++    def test_same_start_is_refused(self):
++        cal = Calendar([appt("a1", local(9, 0), kind=FOLLOWUP)])
++        self.assertFalse(can_book(cal, JO, appt("new", local(9, 0), kind=FOLLOWUP)))
++
++    def test_back_to_back_followups_are_allowed(self):
++        cal = Calendar([appt("a1", local(9, 0), kind=FOLLOWUP)])
++        self.assertTrue(can_book(cal, JO, appt("new", local(9, 30), kind=FOLLOWUP)))
++        self.assertTrue(can_book(Calendar([appt("a1", local(9, 30), kind=FOLLOWUP)]), JO,
++                                 appt("new", local(9, 0), kind=FOLLOWUP)))
++
++    def test_assessment_needs_fifteen_minutes_gap_after_it(self):
++        cal = Calendar([appt("a1", local(9, 0), kind=ASSESSMENT)])  # 09:00-09:45
++        self.assertFalse(can_book(cal, JO, appt("new", local(9, 45), kind=FOLLOWUP)))
++        self.assertTrue(can_book(cal, JO, appt("new", local(10, 0), kind=FOLLOWUP)))
++
++    def test_assessment_needs_fifteen_minutes_gap_before_the_next_booking(self):
++        cal = Calendar([appt("a1", local(8, 45), kind=FOLLOWUP)])  # new assessment 08:00-08:45 leaves no gap
++        self.assertFalse(can_book(cal, JO, appt("new", local(8, 0), kind=ASSESSMENT)))
++        cal = Calendar([appt("a1", local(9, 0), kind=FOLLOWUP)])  # exactly 15 minutes after 08:45
++        self.assertTrue(can_book(cal, JO, appt("new", local(8, 0), kind=ASSESSMENT)))
++
++    def test_cancelled_bookings_do_not_block(self):
++        cal = Calendar([appt("a1", local(9, 0), kind=FOLLOWUP, status="cancelled")])
++        self.assertTrue(can_book(cal, JO, appt("new", local(9, 0), kind=FOLLOWUP)))
++
++    def test_eighth_patient_of_the_day_is_allowed_ninth_is_not(self):
++        starts = [local(8, 0) + datetime.timedelta(minutes=30 * i) for i in range(8)]
++        cal = Calendar([appt(f"a{i}", s, kind=FOLLOWUP) for i, s in enumerate(starts[:7])])
++        self.assertTrue(can_book(cal, JO, appt("new", starts[7], kind=FOLLOWUP)))
++        cal.add(appt("a7", starts[7], kind=FOLLOWUP))
++        self.assertFalse(can_book(cal, JO, appt("new", local(12, 0), kind=FOLLOWUP)))
++
++    def test_daily_limit_is_per_auckland_date(self):
++        starts = [local(8, 0) + datetime.timedelta(minutes=30 * i) for i in range(8)]
++        cal = Calendar([appt(f"a{i}", s, kind=FOLLOWUP) for i, s in enumerate(starts)])
++        self.assertTrue(can_book(cal, JO, appt("new", local(9, 0, day=13), kind=FOLLOWUP)))
++
++
++if __name__ == "__main__":
++    unittest.main()

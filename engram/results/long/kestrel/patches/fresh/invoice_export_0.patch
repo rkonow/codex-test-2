@@ -1,0 +1,154 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index c8ee399..07b3a91 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -2,6 +2,7 @@
+ 
+ ## Unreleased
+ 
++- `export_invoices(invoices, year, month, out_dir)` writes that month's invoices to `kestrel-invoices-YYYY-MM.csv` for Xero (DD/MM/YYYY dates, two-decimal amounts, patient IDs only) and returns the path.
+ - `session_price(kind)`: assessment $95, follow-up $70, in cents.
+ - `BulkieClient.send_batch` splits messages into calls of at most 50 (Bulkie's limit) and returns one response per call.
+ - Code runs on Python 3.9 (the reception PCs' version).
+diff --git a/src/kestrel/export.py b/src/kestrel/export.py
+new file mode 100644
+index 0000000..033aa5b
+--- /dev/null
++++ b/src/kestrel/export.py
+@@ -0,0 +1,43 @@
++"""Exports for the accountants."""
++
++import csv
++import io
++import os
++
++from .storage import _write_atomic
++
++HEADER = ["Invoice Number", "Date", "Patient ID", "Clinic", "Description", "Amount"]
++
++
++def _dollars(cents):
++    """Format cents as dollars with two decimals, e.g. 9500 -> "95.00", -250 -> "-2.50"."""
++    sign = "-" if cents < 0 else ""
++    cents = abs(cents)
++    return f"{sign}{cents // 100}.{cents % 100:02d}"
++
++
++def export_invoices(invoices, year, month, out_dir):
++    """Write the invoices issued in year-month to out_dir as CSV, and return the file's path.
++
++    Patient names are never written, only patient IDs, as the privacy rules require.
++    The file is written even when no invoices fall in the month (it then has just the header).
++    """
++    rows = sorted(
++        (i for i in invoices if i.issued.year == year and i.issued.month == month),
++        key=lambda i: (i.issued, i.number),
++    )
++    buffer = io.StringIO()
++    writer = csv.writer(buffer, lineterminator="\n")
++    writer.writerow(HEADER)
++    for invoice in rows:
++        writer.writerow([
++            invoice.number,
++            invoice.issued.strftime("%d/%m/%Y"),
++            invoice.patient_id,
++            invoice.clinic,
++            invoice.description,
++            _dollars(invoice.amount_cents),
++        ])
++    path = os.path.join(out_dir, f"kestrel-invoices-{year:04d}-{month:02d}.csv")
++    _write_atomic(path, buffer.getvalue())
++    return path
+diff --git a/tests/test_export.py b/tests/test_export.py
+new file mode 100644
+index 0000000..54857b6
+--- /dev/null
++++ b/tests/test_export.py
+@@ -0,0 +1,87 @@
++import datetime
++import os
++import tempfile
++import unittest
++
++from kestrel.export import export_invoices
++from kestrel.invoices import Invoice
++
++
++def invoice(number, issued, amount_cents=9500, patient_id="KP-000001", patient_name="", clinic="HB", description="Physiotherapy assessment"):
++    return Invoice(number=number, clinic=clinic, patient_id=patient_id, patient_name=patient_name,
++                   issued=issued, amount_cents=amount_cents, description=description)
++
++
++class ExportInvoicesTest(unittest.TestCase):
++    def setUp(self):
++        self._tmp = tempfile.TemporaryDirectory()
++        self.out_dir = self._tmp.name
++
++    def tearDown(self):
++        self._tmp.cleanup()
++
++    def read(self, path):
++        with open(path, encoding="utf-8", newline="") as f:
++            return f.read()
++
++    def test_writes_named_file_and_returns_its_path(self):
++        path = export_invoices([invoice("INV-HB-2027-00001", datetime.date(2027, 3, 2))], 2027, 3, self.out_dir)
++        self.assertEqual(path, os.path.join(self.out_dir, "kestrel-invoices-2027-03.csv"))
++        self.assertTrue(os.path.isfile(path))
++
++    def test_csv_layout(self):
++        path = export_invoices([invoice("INV-HB-2027-00001", datetime.date(2027, 3, 2), 9500)], 2027, 3, self.out_dir)
++        self.assertEqual(self.read(path).splitlines(), [
++            "Invoice Number,Date,Patient ID,Clinic,Description,Amount",
++            "INV-HB-2027-00001,02/03/2027,KP-000001,HB,Physiotherapy assessment,95.00",
++        ])
++
++    def test_only_invoices_from_the_given_month(self):
++        invoices = [
++            invoice("N-feb", datetime.date(2027, 2, 28)),
++            invoice("N-mar", datetime.date(2027, 3, 1)),
++            invoice("N-apr", datetime.date(2027, 4, 1)),
++            invoice("N-mar-2026", datetime.date(2026, 3, 15)),
++        ]
++        path = export_invoices(invoices, 2027, 3, self.out_dir)
++        lines = self.read(path).splitlines()
++        self.assertEqual(len(lines), 2)
++        self.assertTrue(lines[1].startswith("N-mar,"))
++
++    def test_sorted_by_date_then_number(self):
++        invoices = [
++            invoice("N-2", datetime.date(2027, 3, 9)),
++            invoice("N-3", datetime.date(2027, 3, 2)),
++            invoice("N-1", datetime.date(2027, 3, 2)),
++        ]
++        lines = self.read(export_invoices(invoices, 2027, 3, self.out_dir)).splitlines()
++        self.assertEqual([line.split(",")[0] for line in lines[1:]], ["N-1", "N-3", "N-2"])
++
++    def test_amounts_have_two_decimals_and_no_symbol(self):
++        invoices = [
++            invoice("N-1", datetime.date(2027, 3, 1), 7000),
++            invoice("N-2", datetime.date(2027, 3, 1), 12345),
++            invoice("N-3", datetime.date(2027, 3, 1), -250),
++        ]
++        lines = self.read(export_invoices(invoices, 2027, 3, self.out_dir)).splitlines()
++        self.assertEqual([line.split(",")[-1] for line in lines[1:]], ["70.00", "123.45", "-2.50"])
++
++    def test_patient_names_are_never_written(self):
++        invoices = [invoice("N-1", datetime.date(2027, 3, 1), patient_name="Jane Example")]
++        text = self.read(export_invoices(invoices, 2027, 3, self.out_dir))
++        self.assertNotIn("Jane Example", text)
++        self.assertIn("KP-000001", text)
++
++    def test_month_with_no_invoices_gives_header_only(self):
++        path = export_invoices([invoice("N-1", datetime.date(2027, 4, 1))], 2027, 3, self.out_dir)
++        self.assertEqual(self.read(path).splitlines(), ["Invoice Number,Date,Patient ID,Clinic,Description,Amount"])
++
++    def test_overwrites_existing_export(self):
++        export_invoices([invoice("N-old", datetime.date(2027, 3, 1))], 2027, 3, self.out_dir)
++        path = export_invoices([invoice("N-new", datetime.date(2027, 3, 1))], 2027, 3, self.out_dir)
++        self.assertIn("N-new", self.read(path))
++        self.assertNotIn("N-old", self.read(path))
++
++
++if __name__ == "__main__":
++    unittest.main()

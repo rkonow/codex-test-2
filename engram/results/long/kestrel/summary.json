@@ -1,0 +1,551 @@
+{
+ "lanes": {
+  "fresh": {
+   "runs": 42,
+   "solved": 30,
+   "solved_rate": 0.7142857142857143,
+   "solved_ci95": [
+    0.5643250392275445,
+    0.8283314125542434
+   ],
+   "conversation_solved_rate": 0.6363636363636364,
+   "mean_score": 0.8547619047619047,
+   "cost_per_task_usd": 0.008263575714285714,
+   "cost_per_solved_task_usd": 0.011569006,
+   "wall_s_mean": 25.59288421698979,
+   "wall_s_median": 23.099669098854065,
+   "steps_mean": 8.833333333333334,
+   "input_tokens_mean": 288378.5238095238,
+   "errors": 0,
+   "memory_tool_calls_mean": 0,
+   "history_cost_usd": 0.4193022,
+   "history_distill_cost_usd": null,
+   "history_wall_s": 545.2310512065887,
+   "history_context_tokens": 53782,
+   "recall_ms_median": null,
+   "recall_ms_p95": null
+  },
+  "fresh+engram": {
+   "runs": 42,
+   "solved": 36,
+   "solved_rate": 0.8571428571428571,
+   "solved_ci95": [
+    0.7215861764782122,
+    0.9328412431581007
+   ],
+   "conversation_solved_rate": 0.8181818181818182,
+   "mean_score": 0.9222222222222223,
+   "cost_per_task_usd": 0.007770678333333334,
+   "cost_per_solved_task_usd": 0.00906579138888889,
+   "wall_s_mean": 24.399413154238747,
+   "wall_s_median": 20.650858998298645,
+   "steps_mean": 6.309523809523809,
+   "input_tokens_mean": 221221.2380952381,
+   "errors": 0,
+   "memory_tool_calls_mean": 0.09523809523809523,
+   "history_cost_usd": 0.46505793,
+   "history_distill_cost_usd": 0.09180204,
+   "history_wall_s": 561.541276216507,
+   "history_context_tokens": 64835,
+   "recall_ms_median": 1.56,
+   "recall_ms_p95": 2.71
+  },
+  "compact": {
+   "runs": 42,
+   "solved": 34,
+   "solved_rate": 0.8095238095238095,
+   "solved_ci95": [
+    0.6669893264500356,
+    0.9001811039014357
+   ],
+   "conversation_solved_rate": 0.7575757575757576,
+   "mean_score": 0.9261904761904762,
+   "cost_per_task_usd": 0.175634865952381,
+   "cost_per_solved_task_usd": 0.21696071676470594,
+   "wall_s_mean": 42.44582381134941,
+   "wall_s_median": 21.973798513412476,
+   "steps_mean": 6.380952380952381,
+   "input_tokens_mean": 247592.02380952382,
+   "errors": 0,
+   "memory_tool_calls_mean": 0,
+   "history_cost_usd": 3.054672015,
+   "history_distill_cost_usd": null,
+   "history_wall_s": 624.3460900783539,
+   "history_context_tokens": 62802,
+   "recall_ms_median": null,
+   "recall_ms_p95": null
+  },
+  "compact+engram": {
+   "runs": 42,
+   "solved": 39,
+   "solved_rate": 0.9285714285714286,
+   "solved_ci95": [
+    0.8099028671147483,
+    0.9754100364488272
+   ],
+   "conversation_solved_rate": 0.9090909090909091,
+   "mean_score": 0.9857142857142858,
+   "cost_per_task_usd": 0.21194682523809522,
+   "cost_per_solved_task_usd": 0.22825042717948713,
+   "wall_s_mean": 26.513593770208814,
+   "wall_s_median": 21.69011151790619,
+   "steps_mean": 6.214285714285714,
+   "input_tokens_mean": 278270,
+   "errors": 0,
+   "memory_tool_calls_mean": 0.023809523809523808,
+   "history_cost_usd": 3.6626348749999997,
+   "history_distill_cost_usd": 0.09357678000000001,
+   "history_wall_s": 639.511470079422,
+   "history_context_tokens": 73597,
+   "recall_ms_median": 1.7,
+   "recall_ms_p95": 2.75
+  },
+  "full": {
+   "runs": 42,
+   "solved": 39,
+   "solved_rate": 0.9285714285714286,
+   "solved_ci95": [
+    0.8099028671147483,
+    0.9754100364488272
+   ],
+   "conversation_solved_rate": 0.9090909090909091,
+   "mean_score": 0.9714285714285714,
+   "cost_per_task_usd": 0.4920082616666666,
+   "cost_per_solved_task_usd": 0.529855051025641,
+   "wall_s_mean": 24.47241774059477,
+   "wall_s_median": 21.920552015304565,
+   "steps_mean": 3.4761904761904763,
+   "input_tokens_mean": 517191.8095238095,
+   "errors": 0,
+   "memory_tool_calls_mean": 0,
+   "history_cost_usd": 4.44894475,
+   "history_distill_cost_usd": null,
+   "history_wall_s": 450.204021692276,
+   "history_context_tokens": 144350,
+   "recall_ms_median": null,
+   "recall_ms_p95": null
+  }
+ },
+ "tasks": {
+  "overbooking_advice": {
+   "kind": "conversation",
+   "lanes": {
+    "full": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "fresh": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "compact": {
+     "solved": 1,
+     "runs": 3,
+     "score": 0.6666666666666666
+    },
+    "fresh+engram": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "compact+engram": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    }
+   }
+  },
+  "upcoming": {
+   "kind": "repo",
+   "lanes": {
+    "fresh": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "compact": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "full": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "compact+engram": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "fresh+engram": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    }
+   }
+  },
+  "send_reminders": {
+   "kind": "conversation",
+   "lanes": {
+    "fresh": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "compact": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "fresh+engram": {
+     "solved": 2,
+     "runs": 3,
+     "score": 0.6666666666666666
+    },
+    "compact+engram": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "full": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    }
+   }
+  },
+  "can_book": {
+   "kind": "conversation",
+   "lanes": {
+    "fresh+engram": {
+     "solved": 0,
+     "runs": 3,
+     "score": 0.4666666666666666
+    },
+    "compact+engram": {
+     "solved": 0,
+     "runs": 3,
+     "score": 0.8000000000000002
+    },
+    "compact": {
+     "solved": 0,
+     "runs": 3,
+     "score": 0.8000000000000002
+    },
+    "full": {
+     "solved": 0,
+     "runs": 3,
+     "score": 0.6000000000000001
+    },
+    "fresh": {
+     "solved": 0,
+     "runs": 3,
+     "score": 0.8000000000000002
+    }
+   }
+  },
+  "cancellation_fee": {
+   "kind": "conversation",
+   "lanes": {
+    "fresh+engram": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "compact": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "fresh": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "full": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "compact+engram": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    }
+   }
+  },
+  "merge_busy": {
+   "kind": "control",
+   "lanes": {
+    "full": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "fresh+engram": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "fresh": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "compact": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "compact+engram": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    }
+   }
+  },
+  "free_slots": {
+   "kind": "conversation",
+   "lanes": {
+    "fresh": {
+     "solved": 0,
+     "runs": 3,
+     "score": 0.6666666666666666
+    },
+    "full": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "fresh+engram": {
+     "solved": 1,
+     "runs": 3,
+     "score": 0.7777777777777778
+    },
+    "compact": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "compact+engram": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    }
+   }
+  },
+  "waitlist_offer": {
+   "kind": "conversation",
+   "lanes": {
+    "fresh+engram": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "compact+engram": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "compact": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "fresh": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "full": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    }
+   }
+  },
+  "reminder_text": {
+   "kind": "conversation",
+   "lanes": {
+    "compact+engram": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "compact": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "full": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "fresh+engram": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "fresh": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    }
+   }
+  },
+  "python_advice": {
+   "kind": "conversation",
+   "lanes": {
+    "full": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "compact+engram": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "fresh": {
+     "solved": 0,
+     "runs": 3,
+     "score": 0.5
+    },
+    "fresh+engram": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "compact": {
+     "solved": 0,
+     "runs": 3,
+     "score": 0.5
+    }
+   }
+  },
+  "invoice_number": {
+   "kind": "conversation",
+   "lanes": {
+    "compact+engram": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "fresh": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "fresh+engram": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "compact": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "full": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    }
+   }
+  },
+  "appointment_price": {
+   "kind": "conversation",
+   "lanes": {
+    "compact": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "compact+engram": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "fresh": {
+     "solved": 0,
+     "runs": 3,
+     "score": 0.0
+    },
+    "fresh+engram": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "full": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    }
+   }
+  },
+  "parse_duration": {
+   "kind": "control",
+   "lanes": {
+    "fresh": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "compact+engram": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "fresh+engram": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "compact": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "full": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    }
+   }
+  },
+  "invoice_export": {
+   "kind": "conversation",
+   "lanes": {
+    "full": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "compact": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "fresh+engram": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "fresh": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    },
+    "compact+engram": {
+     "solved": 3,
+     "runs": 3,
+     "score": 1.0
+    }
+   }
+  }
+ }
+}

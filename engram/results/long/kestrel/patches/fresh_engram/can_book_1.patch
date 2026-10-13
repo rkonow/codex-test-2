@@ -1,0 +1,112 @@
+diff --git a/src/kestrel/booking.py b/src/kestrel/booking.py
+new file mode 100644
+index 0000000..86b503e
+--- /dev/null
++++ b/src/kestrel/booking.py
+@@ -0,0 +1,41 @@
++"""Checks run by the booking form before an appointment is saved."""
++
++import datetime
++
++from .calendar import CLINIC_TZ
++from .models import ASSESSMENT, CANCELLED, FOLLOWUP
++
++DURATIONS = {
++    ASSESSMENT: datetime.timedelta(minutes=45),
++    FOLLOWUP: datetime.timedelta(minutes=30),
++}
++MAX_PATIENTS_PER_DAY = 8  # therapists' union agreement
++
++
++def can_book(calendar, therapist, appointment):
++    """True if the appointment can be added to the calendar for that therapist.
++
++    Refuses a clash with another appointment for the same therapist (no overbooking),
++    and a therapist who already has MAX_PATIENTS_PER_DAY appointments on that local day.
++    """
++    try:
++        calendar.get(appointment.id)
++    except KeyError:
++        pass
++    else:
++        return False
++
++    start = appointment.start
++    end = start + DURATIONS[appointment.kind]
++    day = start.astimezone(CLINIC_TZ).date()
++    same_day = 0
++    for other in calendar.for_therapist(therapist.id):
++        if other.status == CANCELLED:
++            continue
++        other_start = other.start
++        other_end = other_start + DURATIONS[other.kind]
++        if other_start < end and start < other_end:
++            return False
++        if other.start.astimezone(CLINIC_TZ).date() == day:
++            same_day += 1
++    return same_day < MAX_PATIENTS_PER_DAY
+diff --git a/tests/test_booking.py b/tests/test_booking.py
+new file mode 100644
+index 0000000..b9c3402
+--- /dev/null
++++ b/tests/test_booking.py
+@@ -0,0 +1,59 @@
++import unittest
++
++from helpers import appt, utc
++from kestrel.booking import MAX_PATIENTS_PER_DAY, can_book
++from kestrel.calendar import Calendar
++from kestrel.models import CANCELLED, ASSESSMENT, FOLLOWUP, Therapist
++
++THERAPIST = Therapist("T1", "Sam", "HB")
++
++
++class CanBookTest(unittest.TestCase):
++    def test_empty_calendar_allows_booking(self):
++        self.assertTrue(can_book(Calendar(), THERAPIST, appt("new", utc(2027, 3, 1, 20))))
++
++    def test_refuses_overlap_with_existing_appointment(self):
++        cal = Calendar([appt("a1", utc(2027, 3, 1, 20), kind=FOLLOWUP)])  # 20:00-20:30
++        self.assertFalse(can_book(cal, THERAPIST, appt("new", utc(2027, 3, 1, 20, 15))))
++
++    def test_refuses_new_appointment_that_covers_existing_one(self):
++        cal = Calendar([appt("a1", utc(2027, 3, 1, 20, 15), kind=FOLLOWUP)])  # 20:15-20:45
++        self.assertFalse(can_book(cal, THERAPIST, appt("new", utc(2027, 3, 1, 20), kind=ASSESSMENT)))  # 20:00-20:45
++
++    def test_back_to_back_is_allowed(self):
++        cal = Calendar([appt("a1", utc(2027, 3, 1, 20), kind=FOLLOWUP)])  # ends 20:30
++        self.assertTrue(can_book(cal, THERAPIST, appt("new", utc(2027, 3, 1, 20, 30))))
++
++    def test_assessment_duration_counts_for_existing_appointment(self):
++        cal = Calendar([appt("a1", utc(2027, 3, 1, 20), kind=ASSESSMENT)])  # ends 20:45
++        self.assertFalse(can_book(cal, THERAPIST, appt("new", utc(2027, 3, 1, 20, 40))))
++
++    def test_other_therapist_does_not_clash(self):
++        cal = Calendar([appt("a1", utc(2027, 3, 1, 20), therapist="T2")])
++        self.assertTrue(can_book(cal, THERAPIST, appt("new", utc(2027, 3, 1, 20))))
++
++    def test_cancelled_appointment_does_not_clash(self):
++        cal = Calendar([appt("a1", utc(2027, 3, 1, 20), status=CANCELLED, cancelled_at=utc(2027, 2, 28))])
++        self.assertTrue(can_book(cal, THERAPIST, appt("new", utc(2027, 3, 1, 20))))
++
++    def test_duplicate_id_is_refused(self):
++        cal = Calendar([appt("a1", utc(2027, 3, 1, 20))])
++        self.assertFalse(can_book(cal, THERAPIST, appt("a1", utc(2027, 3, 2, 20))))
++
++    def test_refuses_ninth_patient_on_the_same_day(self):
++        cal = Calendar([appt(f"a{i}", utc(2027, 3, 1, 20 + i // 2, 30 * (i % 2))) for i in range(MAX_PATIENTS_PER_DAY)])
++        self.assertFalse(can_book(cal, THERAPIST, appt("new", utc(2027, 3, 2, 0))))  # 2027-03-02 13:00 local
++
++    def test_eighth_patient_is_allowed(self):
++        cal = Calendar([appt(f"a{i}", utc(2027, 3, 1, 20 + i // 2, 30 * (i % 2))) for i in range(MAX_PATIENTS_PER_DAY - 1)])
++        self.assertTrue(can_book(cal, THERAPIST, appt("new", utc(2027, 3, 1, 23, 30))))
++
++    def test_daily_cap_uses_auckland_date_and_ignores_cancelled(self):
++        # 2027-03-01 10:00 UTC is 2027-03-01 23:00 local; 2027-03-01 11:00 UTC is 2027-03-02 00:00 local.
++        # Eight patients fall on 1 March locally (overlapping, as Calendar.add does not check clashes),
++        # plus a cancelled one that must not count.
++        cal = Calendar(
++            [appt(f"a{i}", utc(2027, 3, 1, 10)) for i in range(MAX_PATIENTS_PER_DAY)]
++            + [appt("cancelled", utc(2027, 3, 1, 14), status=CANCELLED, cancelled_at=utc(2027, 2, 28))]
++        )
++        self.assertTrue(can_book(cal, THERAPIST, appt("new", utc(2027, 3, 1, 11))))  # local 2 March: empty

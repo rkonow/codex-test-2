@@ -1,0 +1,88 @@
+diff --git a/src/kestrel/reminders.py b/src/kestrel/reminders.py
+new file mode 100644
+index 0000000..77414f9
+--- /dev/null
++++ b/src/kestrel/reminders.py
+@@ -0,0 +1,22 @@
++"""Text of the SMS reminder sent two days before an appointment."""
++
++from .calendar import LOCAL_TZ
++from .models import CLINICS
++
++
++def reminder_text(appointment):
++    """The reminder for `appointment`: practice name, date and time only.
++
++    Deliberately says nothing about the treatment or the kind of session.
++    """
++    if appointment.clinic not in CLINICS:
++        raise ValueError(f"unknown clinic {appointment.clinic!r}")
++    local = appointment.start.astimezone(LOCAL_TZ)
++    hour = local.hour % 12 or 12
++    ampm = "am" if local.hour < 12 else "pm"
++    minutes = f":{local.minute:02d}" if local.minute else ""
++    when = f"{local.strftime('%A')} {local.day} {local.strftime('%B')} at {hour}{minutes}{ampm}"
++    return (
++        f"Hi from {CLINICS[appointment.clinic].name}! Reminder of your appointment on {when}. "
++        f"See you then. To change it, please call the clinic."
++    )
+diff --git a/tests/test_reminders.py b/tests/test_reminders.py
+new file mode 100644
+index 0000000..8a606e8
+--- /dev/null
++++ b/tests/test_reminders.py
+@@ -0,0 +1,54 @@
++import unittest
++
++from helpers import appt, utc
++from kestrel.models import CLINICS
++from kestrel.reminders import reminder_text
++
++
++class ReminderTextTest(unittest.TestCase):
++    def test_gives_clinic_date_and_time(self):
++        # 2027-03-02 01:30 UTC is 14:30 on Tuesday 2 March in Auckland (NZDT, +13).
++        text = reminder_text(appt("a1", utc(2027, 3, 2, 1, 30), clinic="NG"))
++        self.assertIn("Kestrel Physio Northgate", text)
++        self.assertIn("Tuesday 2 March at 2:30pm", text)
++
++    def test_whole_hour_has_no_minutes(self):
++        text = reminder_text(appt("a1", utc(2027, 3, 2, 22), clinic="HB"))  # 11:00am Tuesday 2 March
++        self.assertIn("at 11am", text)
++
++    def test_morning_and_midday(self):
++        self.assertIn("at 12:15pm", reminder_text(appt("a1", utc(2027, 3, 1, 23, 15))))
++        self.assertIn("at 7:30am", reminder_text(appt("a2", utc(2027, 3, 1, 18, 30))))
++
++    def test_uses_local_date_not_utc(self):
++        # 22:00 UTC on Monday 1 March is 11:00 on Tuesday 2 March in Auckland.
++        text = reminder_text(appt("a1", utc(2027, 3, 1, 22)))
++        self.assertIn("Tuesday 2 March", text)
++
++    def test_says_nothing_about_treatment_or_kind(self):
++        text = reminder_text(appt("a1", utc(2027, 3, 1, 22), kind="assessment",
++                                  treatment="lower back pain", clinic="WK"))
++        self.assertNotIn("lower back pain", text)
++        self.assertNotIn("assessment", text.lower())
++        self.assertNotIn("follow", text.lower())
++
++    def test_clinic_names(self):
++        for code, name in [("NG", "Kestrel Physio Northgate"), ("HB", "Kestrel Physio Harbour"),
++                           ("WK", "Kestrel Physio Westwick")]:
++            with self.subTest(code=code):
++                self.assertIn(name, reminder_text(appt("a1", utc(2027, 3, 1, 22), clinic=code)))
++
++    def test_rejects_unknown_clinic(self):
++        with self.assertRaises(ValueError):
++            reminder_text(appt("a1", utc(2027, 3, 1, 22), clinic="XX"))
++
++    def test_fits_one_sms_segment_for_longest_case(self):
++        # Longest day name, a two-digit day, the longest month and a time with minutes.
++        start = utc(2027, 9, 28, 22, 45)  # 11:45am Wednesday 29 September 2027, Auckland (NZDT, +13)
++        for clinic in CLINICS:
++            with self.subTest(clinic=clinic):
++                self.assertLessEqual(len(reminder_text(appt("a1", start, clinic=clinic))), 160)
++
++
++if __name__ == "__main__":
++    unittest.main()

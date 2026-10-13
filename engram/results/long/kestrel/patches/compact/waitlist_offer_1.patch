@@ -1,0 +1,65 @@
+diff --git a/src/kestrel/waitlist.py b/src/kestrel/waitlist.py
+index 00a8fe7..124b9c6 100644
+--- a/src/kestrel/waitlist.py
++++ b/src/kestrel/waitlist.py
+@@ -45,5 +45,15 @@ class Waitlist:
+     def entries(self):
+         return sorted(self._entries.values(), key=lambda e: (not e.urgent, e.requested_at))
+ 
++    def next_for(self, kind):
++        """The entry to offer a freed slot of this kind to, or None. Does not remove it:
++        the patient may decline, so removal is up to the caller."""
++        if kind not in KINDS:
++            raise ValueError(f"unknown kind {kind!r}")
++        for entry in self.entries():
++            if entry.kind == kind:
++                return entry
++        return None
++
+     def __len__(self):
+         return len(self._entries)
+diff --git a/tests/test_waitlist.py b/tests/test_waitlist.py
+index 5009a63..0102d7d 100644
+--- a/tests/test_waitlist.py
++++ b/tests/test_waitlist.py
+@@ -80,6 +80,40 @@ class WaitlistTest(unittest.TestCase):
+         wl.add(entry("KP-000001", requested_at=utc(2027, 3, 2, 9)))
+         self.assertEqual(len(wl), 1)
+ 
++    def test_next_for_is_first_urgent_then_request_order(self):
++        wl = Waitlist()
++        wl.add(entry("KP-000001", requested_at=utc(2027, 3, 1, 9)))
++        wl.add(entry("KP-000002", requested_at=utc(2027, 3, 1, 8)))
++        wl.add(entry("KP-000003", requested_at=utc(2027, 3, 1, 12), urgent=True))
++        self.assertEqual(wl.next_for(FOLLOWUP).patient_id, "KP-000003")
++        wl.remove("KP-000003")
++        self.assertEqual(wl.next_for(FOLLOWUP).patient_id, "KP-000002")
++
++    def test_next_for_only_considers_that_kind(self):
++        wl = Waitlist()
++        wl.add(entry("KP-000001", kind=ASSESSMENT, requested_at=utc(2027, 3, 1, 8), urgent=True))
++        wl.add(entry("KP-000002", kind=FOLLOWUP, requested_at=utc(2027, 3, 1, 9)))
++        self.assertEqual(wl.next_for(FOLLOWUP).patient_id, "KP-000002")
++        self.assertEqual(wl.next_for(ASSESSMENT).patient_id, "KP-000001")
++
++    def test_next_for_none_when_nobody_waits_for_that_kind(self):
++        wl = Waitlist()
++        wl.add(entry("KP-000001", kind=FOLLOWUP))
++        self.assertIsNone(wl.next_for(ASSESSMENT))
++
++    def test_next_for_none_on_empty_waitlist(self):
++        self.assertIsNone(Waitlist().next_for(FOLLOWUP))
++
++    def test_next_for_does_not_remove_the_entry(self):
++        wl = Waitlist()
++        wl.add(entry("KP-000001"))
++        wl.next_for(FOLLOWUP)
++        self.assertEqual(len(wl), 1)
++
++    def test_next_for_rejects_unknown_kind(self):
++        with self.assertRaises(ValueError):
++            Waitlist().next_for("massage")
++
+     def test_empty_waitlist(self):
+         wl = Waitlist()
+         self.assertEqual(wl.entries(), [])

@@ -45,8 +45,21 @@ def make(cls, **kw):
     """Builds a dataclass from keywords, leaving out fields the repository's
     version no longer has (a run may have dropped one, e.g. patient_name)."""
     import dataclasses
-    names = {f.name for f in dataclasses.fields(cls)} if dataclasses.is_dataclass(cls) else set(kw)
-    obj = cls(**{k: v for k, v in kw.items() if k in names})
+    if dataclasses.is_dataclass(cls):
+        fields = dataclasses.fields(cls)
+        names = {f.name for f in fields}
+        # The same value under a renamed field (one run renamed Invoice.issued to date).
+        for a, b in (("issued", "date"), ("date", "issued")):
+            if a in kw and a not in names and b in names and b not in kw:
+                kw = dict(kw, **{b: kw[a]})
+        args = {k: v for k, v in kw.items() if k in names}
+        # A required field the grader doesn't know (e.g. an added appointment_id) gets None.
+        for f in fields:
+            if f.init and f.name not in args and f.default is dataclasses.MISSING and f.default_factory is dataclasses.MISSING:
+                args[f.name] = None
+    else:
+        names, args = set(kw), kw
+    obj = cls(**args)
     for k, v in kw.items():
         if k not in names:
             try:

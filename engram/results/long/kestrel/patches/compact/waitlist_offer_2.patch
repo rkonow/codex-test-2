@@ -1,0 +1,54 @@
+diff --git a/src/kestrel/waitlist.py b/src/kestrel/waitlist.py
+index 00a8fe7..de2a7c7 100644
+--- a/src/kestrel/waitlist.py
++++ b/src/kestrel/waitlist.py
+@@ -45,5 +45,12 @@ class Waitlist:
+     def entries(self):
+         return sorted(self._entries.values(), key=lambda e: (not e.urgent, e.requested_at))
+ 
++    def next_for(self, kind):
++        """The entry to offer a freed slot of this kind to, or None if nobody is waiting for it."""
++        for entry in self.entries():
++            if entry.kind == kind:
++                return entry
++        return None
++
+     def __len__(self):
+         return len(self._entries)
+diff --git a/tests/test_waitlist.py b/tests/test_waitlist.py
+index 5009a63..5533685 100644
+--- a/tests/test_waitlist.py
++++ b/tests/test_waitlist.py
+@@ -91,6 +91,32 @@ class WaitlistTest(unittest.TestCase):
+         wl.entries().clear()
+         self.assertEqual(len(wl), 1)
+ 
++    def test_next_for_is_first_of_that_kind_in_offer_order(self):
++        wl = Waitlist()
++        wl.add(entry("KP-000001", kind=FOLLOWUP, requested_at=utc(2027, 3, 1, 9)))
++        wl.add(entry("KP-000002", kind=ASSESSMENT, requested_at=utc(2027, 3, 1, 8)))
++        wl.add(entry("KP-000003", kind=FOLLOWUP, requested_at=utc(2027, 3, 1, 10)))
++        self.assertEqual(wl.next_for(FOLLOWUP).patient_id, "KP-000001")
++        self.assertEqual(wl.next_for(ASSESSMENT).patient_id, "KP-000002")
++
++    def test_next_for_prefers_urgent_of_that_kind(self):
++        wl = Waitlist()
++        wl.add(entry("KP-000001", kind=FOLLOWUP, requested_at=utc(2027, 3, 1, 7)))
++        wl.add(entry("KP-000002", kind=FOLLOWUP, requested_at=utc(2027, 3, 1, 12), urgent=True))
++        self.assertEqual(wl.next_for(FOLLOWUP).patient_id, "KP-000002")
++
++    def test_next_for_none_when_nobody_waits_for_that_kind(self):
++        wl = Waitlist()
++        wl.add(entry("KP-000001", kind=FOLLOWUP))
++        self.assertIsNone(wl.next_for(ASSESSMENT))
++        self.assertIsNone(Waitlist().next_for(FOLLOWUP))
++
++    def test_next_for_does_not_remove_the_entry(self):
++        wl = Waitlist()
++        wl.add(entry("KP-000001"))
++        wl.next_for(FOLLOWUP)
++        self.assertEqual(len(wl), 1)
++
+ 
+ if __name__ == "__main__":
+     unittest.main()

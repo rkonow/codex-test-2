@@ -1,0 +1,115 @@
+diff --git a/src/kestrel/reminders.py b/src/kestrel/reminders.py
+new file mode 100644
+index 0000000..01b3655
+--- /dev/null
++++ b/src/kestrel/reminders.py
+@@ -0,0 +1,26 @@
++"""Appointment reminder texts."""
++
++from .calendar import CLINIC_TZ
++from .models import BOOKED, CLINICS
++
++
++def reminder_text(appointment):
++    """The SMS body. Only the date, time and clinic: never the patient's name or treatment."""
++    local = appointment.start.astimezone(CLINIC_TZ)
++    clinic = CLINICS[appointment.clinic].name
++    return f"{clinic}: reminder of your appointment on {local:%A %d %B} at {local:%H:%M}."
++
++
++def send_reminders(appointments, patients, client):
++    """Text each patient with a booked appointment. Returns the number of messages sent.
++
++    Every message is built before anything is sent, so a missing patient or
++    clinic stops the run without a partial send.
++    """
++    messages = [
++        (patients[a.patient_id].phone, reminder_text(a))
++        for a in appointments
++        if a.status == BOOKED
++    ]
++    client.send_batch(messages)
++    return len(messages)
+diff --git a/tests/test_reminders.py b/tests/test_reminders.py
+new file mode 100644
+index 0000000..fd95b4a
+--- /dev/null
++++ b/tests/test_reminders.py
+@@ -0,0 +1,77 @@
++import unittest
++
++from kestrel.models import ATTENDED, CANCELLED, NO_SHOW, Patient
++from kestrel.reminders import reminder_text, send_reminders
++
++from helpers import appt, utc
++
++
++class FakeClient:
++    def __init__(self):
++        self.batches = []
++
++    def send_batch(self, messages):
++        self.batches.append(list(messages))
++        return [{"ok": True}]
++
++
++PATIENTS = {
++    "KP-000001": Patient("KP-000001", "Ana Lee", "+64211111111"),
++    "KP-000002": Patient("KP-000002", "Ben Ortiz", "+64222222222"),
++}
++
++
++class SendRemindersTest(unittest.TestCase):
++    def test_sends_one_text_per_booked_appointment_and_returns_count(self):
++        appointments = [
++            appt("A1", utc(2026, 10, 13, 20, 30), patient="KP-000001"),
++            appt("A2", utc(2026, 10, 14, 1, 0), patient="KP-000002"),
++        ]
++        client = FakeClient()
++        self.assertEqual(send_reminders(appointments, PATIENTS, client), 2)
++        self.assertEqual(len(client.batches), 1)
++        phones = [phone for phone, _ in client.batches[0]]
++        self.assertEqual(phones, ["+64211111111", "+64222222222"])
++
++    def test_skips_appointments_that_are_not_booked(self):
++        appointments = [
++            appt("A1", utc(2026, 10, 13, 20, 30), patient="KP-000001"),
++            appt("A2", utc(2026, 10, 13, 21, 0), patient="KP-000002", status=CANCELLED),
++            appt("A3", utc(2026, 10, 13, 22, 0), patient="KP-000002", status=ATTENDED),
++            appt("A4", utc(2026, 10, 13, 23, 0), patient="KP-000002", status=NO_SHOW),
++        ]
++        client = FakeClient()
++        self.assertEqual(send_reminders(appointments, PATIENTS, client), 1)
++        self.assertEqual([p for p, _ in client.batches[0]], ["+64211111111"])
++
++    def test_nothing_sent_when_no_booked_appointments(self):
++        client = FakeClient()
++        self.assertEqual(send_reminders([], PATIENTS, client), 0)
++        self.assertEqual(client.batches, [[]])
++
++    def test_missing_patient_sends_nothing(self):
++        appointments = [
++            appt("A1", utc(2026, 10, 13, 20, 30), patient="KP-000001"),
++            appt("A2", utc(2026, 10, 13, 21, 0), patient="KP-999999"),
++        ]
++        client = FakeClient()
++        with self.assertRaises(KeyError):
++            send_reminders(appointments, PATIENTS, client)
++        self.assertEqual(client.batches, [])
++
++
++class ReminderTextTest(unittest.TestCase):
++    def test_contains_date_time_and_clinic_only(self):
++        # 2026-10-13 20:30 UTC is 09:30 on 14 October in Auckland (NZDT, UTC+13).
++        a = appt("A1", utc(2026, 10, 13, 20, 30), patient="KP-000001", clinic="HB", treatment="lower back pain")
++        text = reminder_text(a)
++        self.assertIn("Kestrel Physio Harbour", text)
++        self.assertIn("Wednesday 14 October", text)
++        self.assertIn("09:30", text)
++        self.assertNotIn("lower back pain", text)
++        self.assertNotIn("Ana", text)
++        self.assertNotIn("KP-000001", text)
++
++
++if __name__ == "__main__":
++    unittest.main()

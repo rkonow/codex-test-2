@@ -1,0 +1,59 @@
+diff --git a/src/kestrel/waitlist.py b/src/kestrel/waitlist.py
+index ba8c156..7d82601 100644
+--- a/src/kestrel/waitlist.py
++++ b/src/kestrel/waitlist.py
+@@ -38,3 +38,10 @@ class Waitlist:
+     def entries(self):
+         """Urgent entries first, then everyone else, each in the order they asked."""
+         return sorted(self._entries.values(), key=lambda e: (not e.urgent, e.requested_at))
++
++    def next_for(self, kind):
++        """The entry to offer a freed slot of this kind to, or None if nobody is waiting for it."""
++        for entry in self.entries():
++            if entry.kind == kind:
++                return entry
++        return None
+diff --git a/tests/test_waitlist.py b/tests/test_waitlist.py
+index 6caf1e2..68ce52f 100644
+--- a/tests/test_waitlist.py
++++ b/tests/test_waitlist.py
+@@ -2,6 +2,7 @@ import datetime
+ import unittest
+ 
+ from helpers import utc
++from kestrel.models import ASSESSMENT, FOLLOWUP
+ from kestrel.waitlist import Waitlist, WaitlistEntry
+ 
+ 
+@@ -68,6 +69,31 @@ class WaitlistTest(unittest.TestCase):
+         with self.assertRaises(KeyError):
+             Waitlist().remove("KP-000001")
+ 
++    def test_next_for_empty(self):
++        self.assertIsNone(Waitlist().next_for(ASSESSMENT))
++
++    def test_next_for_only_considers_that_kind(self):
++        wl = Waitlist()
++        wl.add(entry("KP-000001", day=1, kind="followup"))
++        wl.add(entry("KP-000002", day=2, kind="assessment"))
++        self.assertEqual(wl.next_for(ASSESSMENT).patient_id, "KP-000002")
++        self.assertEqual(wl.next_for(FOLLOWUP).patient_id, "KP-000001")
++
++    def test_next_for_none_waiting_for_kind(self):
++        wl = Waitlist()
++        wl.add(entry("KP-000001", day=1, kind="followup"))
++        self.assertIsNone(wl.next_for(ASSESSMENT))
++
++    def test_next_for_prefers_urgent_then_request_order(self):
++        wl = Waitlist()
++        wl.add(entry("KP-000001", day=1, kind="followup"))
++        wl.add(entry("KP-000002", day=2, kind="followup", urgent=True))
++        wl.add(entry("KP-000003", day=3, kind="followup", urgent=True))
++        self.assertEqual(wl.next_for(FOLLOWUP).patient_id, "KP-000002")
++        wl.remove("KP-000002")
++        wl.remove("KP-000003")
++        self.assertEqual(wl.next_for(FOLLOWUP).patient_id, "KP-000001")
++
+     def test_patient_can_rejoin_after_removal(self):
+         wl = Waitlist()
+         wl.add(entry("KP-000001", day=1))

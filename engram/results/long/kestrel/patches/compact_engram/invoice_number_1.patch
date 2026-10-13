@@ -1,0 +1,95 @@
+diff --git a/src/kestrel/invoices.py b/src/kestrel/invoices.py
+index ee8310b..44d1311 100644
+--- a/src/kestrel/invoices.py
++++ b/src/kestrel/invoices.py
+@@ -2,17 +2,19 @@
+ 
+ from dataclasses import dataclass
+ import datetime
++import re
+ 
+ from .calendar import CLINIC_TZ
+ from .models import ASSESSMENT, FOLLOWUP
+ 
+ # Invoices go to the accountants, so they carry the patient ID only, never the name.
+-# Planned number format, for when we generate numbers ourselves (Tui Accounting):
+-# INV-<clinic code>-<year>-<sequence>, sequence five digits, restarting at 00001 each year
+-# per clinic, e.g. INV-HB-2027-00042.
++# Number format for Tui Accounting: INV-<clinic code>-<year>-<sequence>, sequence five digits,
++# restarting at 00001 each year per clinic, e.g. INV-HB-2027-00042.
+ 
+ DESCRIPTIONS = {ASSESSMENT: "Initial assessment", FOLLOWUP: "Follow-up session"}
+ 
++NUMBER_PATTERN = re.compile(r"INV-([A-Z]+)-(\d{4})-(\d{5})")
++
+ 
+ @dataclass
+ class Invoice:
+@@ -34,3 +36,18 @@ def make_invoice(appointment, patient, number, amount_cents):
+         amount_cents=amount_cents,
+         description=DESCRIPTIONS[appointment.kind],
+     )
++
++
++def next_invoice_number(clinic, year, existing):
++    """Return the next invoice number for a clinic in a year, given every number issued so far.
++
++    Numbers for other clinics or years, and anything not in the INV-<clinic>-<year>-<sequence> form, are ignored.
++    """
++    highest = 0
++    for number in existing:
++        match = NUMBER_PATTERN.fullmatch(number)
++        if match and match.group(1) == clinic and int(match.group(2)) == year:
++            highest = max(highest, int(match.group(3)))
++    if highest >= 99999:
++        raise ValueError(f"no invoice numbers left for {clinic} {year}")
++    return f"INV-{clinic}-{year:04d}-{highest + 1:05d}"
+diff --git a/tests/test_invoices.py b/tests/test_invoices.py
+index 73e002f..9a7db18 100644
+--- a/tests/test_invoices.py
++++ b/tests/test_invoices.py
+@@ -3,7 +3,7 @@ import datetime
+ import unittest
+ 
+ from helpers import appt, utc
+-from kestrel.invoices import Invoice, make_invoice
++from kestrel.invoices import Invoice, make_invoice, next_invoice_number
+ from kestrel.models import ASSESSMENT, FOLLOWUP, Patient
+ 
+ 
+@@ -47,5 +47,35 @@ class MakeInvoiceTest(unittest.TestCase):
+         self.assertIsInstance(invoice, Invoice)
+ 
+ 
++class NextInvoiceNumberTest(unittest.TestCase):
++    def test_first_invoice_of_the_year_is_00001(self):
++        self.assertEqual(next_invoice_number("HB", 2027, []), "INV-HB-2027-00001")
++
++    def test_follows_the_highest_sequence_for_that_clinic_and_year(self):
++        existing = ["INV-HB-2027-00001", "INV-HB-2027-00042", "INV-HB-2027-00007"]
++        self.assertEqual(next_invoice_number("HB", 2027, existing), "INV-HB-2027-00043")
++
++    def test_counts_each_clinic_separately(self):
++        existing = ["INV-NG-2027-00009", "INV-HB-2027-00002"]
++        self.assertEqual(next_invoice_number("HB", 2027, existing), "INV-HB-2027-00003")
++        self.assertEqual(next_invoice_number("WK", 2027, existing), "INV-WK-2027-00001")
++
++    def test_restarts_at_00001_in_a_new_year(self):
++        existing = ["INV-HB-2026-00150"]
++        self.assertEqual(next_invoice_number("HB", 2027, existing), "INV-HB-2027-00001")
++
++    def test_ignores_malformed_numbers(self):
++        existing = ["INV-HB-2027-42", "HB-2027-00099", "INV-HB-2027-00003 ", "x"]
++        self.assertEqual(next_invoice_number("HB", 2027, existing), "INV-HB-2027-00001")
++
++    def test_accepts_a_generator_of_numbers(self):
++        numbers = (n for n in ["INV-NG-2027-00004"])
++        self.assertEqual(next_invoice_number("NG", 2027, numbers), "INV-NG-2027-00005")
++
++    def test_refuses_to_overflow_the_five_digit_sequence(self):
++        with self.assertRaises(ValueError):
++            next_invoice_number("HB", 2027, ["INV-HB-2027-99999"])
++
++
+ if __name__ == "__main__":
+     unittest.main()

@@ -1,0 +1,60 @@
+diff --git a/src/kestrel/reminders.py b/src/kestrel/reminders.py
+new file mode 100644
+index 0000000..20ae554
+--- /dev/null
++++ b/src/kestrel/reminders.py
+@@ -0,0 +1,14 @@
++"""Text of the SMS reminder sent two days before an appointment."""
++
++from .calendar import CLINIC_TZ
++from .models import CLINICS
++
++
++def reminder_text(appointment):
++    """Friendly reminder with the date, time and clinic name. Never the treatment or the patient's name."""
++    local = appointment.start.astimezone(CLINIC_TZ)
++    clinic = CLINICS[appointment.clinic].name
++    return (
++        f"Kia ora! Reminder: physio at {clinic} on {local:%A} {local.day} {local:%B} at {local:%H:%M}. "
++        "Need to change it? Please call the clinic. See you then!"
++    )
+diff --git a/tests/test_reminders.py b/tests/test_reminders.py
+new file mode 100644
+index 0000000..f0265bf
+--- /dev/null
++++ b/tests/test_reminders.py
+@@ -0,0 +1,34 @@
++import unittest
++
++from helpers import appt, utc
++from kestrel.models import ASSESSMENT
++from kestrel.reminders import reminder_text
++
++
++class ReminderTextTest(unittest.TestCase):
++    def test_gives_date_time_and_clinic_name(self):
++        # 12 Oct 2026 03:00 UTC is 12 Oct 2026 16:00 in Auckland (NZDT, UTC+13).
++        text = reminder_text(appt("a1", utc(2026, 10, 12, 3), clinic="HB"))
++        self.assertIn("Monday 12 October at 16:00", text)
++        self.assertIn("Kestrel Physio Harbour", text)
++
++    def test_uses_auckland_date_across_midnight_utc(self):
++        # 13 Oct 2026 20:00 UTC is 14 Oct 2026 09:00 in Auckland.
++        text = reminder_text(appt("a1", utc(2026, 10, 13, 20), clinic="NG"))
++        self.assertIn("Wednesday 14 October at 09:00", text)
++        self.assertIn("Kestrel Physio Northgate", text)
++
++    def test_never_mentions_treatment_or_patient_name(self):
++        text = reminder_text(appt("a1", utc(2026, 10, 12, 3), kind=ASSESSMENT, treatment="ankle sprain",
++                                  patient="KP-000001"))
++        self.assertNotIn("ankle sprain", text)
++        self.assertNotIn("KP-000001", text)
++
++    def test_is_one_friendly_message(self):
++        text = reminder_text(appt("a1", utc(2026, 10, 12, 3), clinic="WK"))
++        self.assertTrue(text.startswith("Kia ora"))
++        self.assertIn("Kestrel Physio Westwick", text)
++
++
++if __name__ == "__main__":
++    unittest.main()

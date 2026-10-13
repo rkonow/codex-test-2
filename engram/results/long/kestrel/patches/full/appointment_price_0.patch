@@ -1,0 +1,135 @@
+diff --git a/src/kestrel/pricing.py b/src/kestrel/pricing.py
+index 7f0b788..0b1f06d 100644
+--- a/src/kestrel/pricing.py
++++ b/src/kestrel/pricing.py
+@@ -1,16 +1,47 @@
+ """Session prices, in cents (NZD)."""
+ 
+-from .models import ASSESSMENT, FOLLOWUP
++import datetime
+ 
+-PRICES_CENTS = {
++from .calendar import LOCAL_TZ
++from .models import ASSESSMENT, CANCELLED, FOLLOWUP
++
++# Prices from 1 April 2027 (local date). Appointments before that keep the old prices.
++PRICE_CHANGE_DAY = datetime.date(2027, 4, 1)
++PRICES_BEFORE_CENTS = {
+     ASSESSMENT: 9500,
+     FOLLOWUP: 7000,
+ }
++PRICES_FROM_CENTS = {
++    ASSESSMENT: 10500,
++    FOLLOWUP: 7800,
++}
++
++# Community Services Card holders get this much off follow-ups, not assessments.
++CSC_FOLLOWUP_DISCOUNT_PERCENT = 20
+ 
+ 
+-def session_price(kind):
+-    """The full price of a session of `kind`, in cents. CSC discounts are not applied here."""
++def session_price(kind, day):
++    """The full price in cents of a session of `kind` on the local (Auckland) date `day`."""
++    prices = PRICES_FROM_CENTS if day >= PRICE_CHANGE_DAY else PRICES_BEFORE_CENTS
+     try:
+-        return PRICES_CENTS[kind]
++        return prices[kind]
+     except KeyError:
+         raise ValueError(f"unknown kind {kind!r}") from None
++
++
++def appointment_price(appointment, patient):
++    """What `patient` pays for `appointment`, in cents.
++
++    The price depends on the appointment's local date, and CSC holders get the
++    follow-up discount. Cancelled appointments are not priced: their fee policy
++    is not built yet.
++    """
++    if appointment.patient_id != patient.id:
++        raise ValueError(f"appointment is for {appointment.patient_id}, not {patient.id}")
++    if appointment.status == CANCELLED:
++        raise ValueError(f"appointment {appointment.id} is cancelled; cancellation fees are not priced yet")
++    day = appointment.start.astimezone(LOCAL_TZ).date()
++    price = session_price(appointment.kind, day)
++    if patient.csc and appointment.kind == FOLLOWUP:
++        price = price * (100 - CSC_FOLLOWUP_DISCOUNT_PERCENT) // 100
++    return price
+diff --git a/tests/test_pricing.py b/tests/test_pricing.py
+index a306c5e..4cb0ba2 100644
+--- a/tests/test_pricing.py
++++ b/tests/test_pricing.py
+@@ -1,19 +1,66 @@
++import datetime
+ import unittest
+ 
+-from kestrel.models import ASSESSMENT, FOLLOWUP
+-from kestrel.pricing import session_price
++from helpers import appt, utc
++from kestrel.models import ASSESSMENT, ATTENDED, CANCELLED, FOLLOWUP, NO_SHOW, Patient
++from kestrel.pricing import appointment_price, session_price
++
++BEFORE = datetime.date(2027, 3, 31)
++AFTER = datetime.date(2027, 4, 1)
++PLAIN = Patient("KP-000001", "Ana Silva", "+64211234567")
++CSC = Patient("KP-000001", "Ana Silva", "+64211234567", csc=True)
+ 
+ 
+ class SessionPriceTest(unittest.TestCase):
+-    def test_initial_assessment(self):
+-        self.assertEqual(session_price(ASSESSMENT), 9500)
++    def test_before_change(self):
++        self.assertEqual(session_price(ASSESSMENT, BEFORE), 9500)
++        self.assertEqual(session_price(FOLLOWUP, BEFORE), 7000)
+ 
+-    def test_followup(self):
+-        self.assertEqual(session_price(FOLLOWUP), 7000)
++    def test_from_change_day(self):
++        self.assertEqual(session_price(ASSESSMENT, AFTER), 10500)
++        self.assertEqual(session_price(FOLLOWUP, AFTER), 7800)
+ 
+     def test_rejects_unknown_kind(self):
+         with self.assertRaises(ValueError):
+-            session_price("massage")
++            session_price("massage", AFTER)
++
++
++class AppointmentPriceTest(unittest.TestCase):
++    def test_plain_patient_pays_full_price(self):
++        self.assertEqual(appointment_price(appt("a1", utc(2027, 2, 1, 1), kind=ASSESSMENT), PLAIN), 9500)
++        self.assertEqual(appointment_price(appt("a2", utc(2027, 2, 1, 1), kind=FOLLOWUP), PLAIN), 7000)
++
++    def test_price_depends_on_appointment_date(self):
++        before = appt("a1", utc(2027, 3, 31, 1), kind=FOLLOWUP)  # 14:00 on 31 Mar, Auckland
++        after = appt("a2", utc(2027, 4, 2, 1), kind=FOLLOWUP)  # 14:00 on 2 Apr, Auckland
++        self.assertEqual(appointment_price(before, PLAIN), 7000)
++        self.assertEqual(appointment_price(after, PLAIN), 7800)
++
++    def test_change_uses_local_date_not_utc(self):
++        # 31 Mar 12:30 UTC is 01:30 on 1 Apr in Auckland (still NZDT, +13), so it gets the new price.
++        a = appt("a1", utc(2027, 3, 31, 12, 30), kind=FOLLOWUP)
++        self.assertEqual(appointment_price(a, PLAIN), 7800)
++
++    def test_csc_follow_up_gets_twenty_percent_off(self):
++        self.assertEqual(appointment_price(appt("a1", utc(2027, 2, 1, 1), kind=FOLLOWUP), CSC), 5600)
++        self.assertEqual(appointment_price(appt("a2", utc(2027, 4, 2, 1), kind=FOLLOWUP), CSC), 6240)
++
++    def test_csc_assessment_gets_no_discount(self):
++        self.assertEqual(appointment_price(appt("a1", utc(2027, 2, 1, 1), kind=ASSESSMENT), CSC), 9500)
++        self.assertEqual(appointment_price(appt("a2", utc(2027, 4, 2, 1), kind=ASSESSMENT), CSC), 10500)
++
++    def test_no_show_and_attended_pay_full_price(self):
++        self.assertEqual(appointment_price(appt("a1", utc(2027, 2, 1, 1), kind=FOLLOWUP, status=NO_SHOW), PLAIN), 7000)
++        self.assertEqual(appointment_price(appt("a2", utc(2027, 2, 1, 1), kind=FOLLOWUP, status=ATTENDED), CSC), 5600)
++
++    def test_cancelled_is_not_priced(self):
++        with self.assertRaises(ValueError):
++            appointment_price(appt("a1", utc(2027, 2, 1, 1), status=CANCELLED), PLAIN)
++
++    def test_rejects_other_patients_appointment(self):
++        other = Patient("KP-000002", "Ben Ruru", "+64211234568")
++        with self.assertRaises(ValueError):
++            appointment_price(appt("a1", utc(2027, 2, 1, 1), patient="KP-000001"), other)
+ 
+ 
+ if __name__ == "__main__":

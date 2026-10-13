@@ -1,0 +1,98 @@
+diff --git a/src/kestrel/invoices.py b/src/kestrel/invoices.py
+index 092b7e4..72fecd2 100644
+--- a/src/kestrel/invoices.py
++++ b/src/kestrel/invoices.py
+@@ -5,7 +5,7 @@ import datetime
+ 
+ from .calendar import LOCAL_TZ
+ from .ids import normalize_patient_id
+-from .models import ASSESSMENT, FOLLOWUP
++from .models import ASSESSMENT, CLINICS, FOLLOWUP
+ 
+ # Descriptions carry no treatment details: invoices leave the system.
+ DESCRIPTIONS = {
+@@ -40,3 +40,25 @@ def make_invoice(appointment, patient, number, amount_cents):
+         amount_cents=amount_cents,
+         appointment_id=appointment.id,
+     )
++
++
++def next_invoice_number(clinic, year, existing):
++    """Next number in INV-<clinic>-<year>-<five digits>, counted per clinic and year.
++
++    `existing` is every invoice number issued so far, for any clinic and year;
++    only those for this clinic and year affect the result.
++    """
++    if clinic not in CLINICS:
++        raise ValueError(f"unknown clinic: {clinic!r}")
++    prefix = f"INV-{clinic}-{year}-"
++    last = 0
++    for number in existing:
++        if not number.startswith(prefix):
++            continue
++        digits = number[len(prefix):]
++        if not (digits.isdigit() and len(digits) == 5):
++            raise ValueError(f"malformed invoice number: {number!r}")
++        last = max(last, int(digits))
++    if last >= 99999:
++        raise ValueError(f"no invoice numbers left for {clinic} in {year}")
++    return f"{prefix}{last + 1:05d}"
+diff --git a/tests/test_invoices.py b/tests/test_invoices.py
+index 2e8268b..799a186 100644
+--- a/tests/test_invoices.py
++++ b/tests/test_invoices.py
+@@ -1,7 +1,7 @@
+ import datetime
+ import unittest
+ 
+-from kestrel.invoices import make_invoice
++from kestrel.invoices import make_invoice, next_invoice_number
+ from kestrel.models import ASSESSMENT, FOLLOWUP, Appointment, Patient
+ 
+ 
+@@ -69,3 +69,45 @@ class MakeInvoiceTest(unittest.TestCase):
+     def test_zero_amount_is_allowed(self):
+         invoice = make_invoice(appointment(utc(2026, 10, 12, 9, 0)), PATIENT, "N", 0)
+         self.assertEqual(invoice.amount_cents, 0)
++
++
++class NextInvoiceNumberTest(unittest.TestCase):
++    def test_first_invoice_of_the_year_is_sequence_one(self):
++        self.assertEqual(next_invoice_number("HB", 2026, []), "INV-HB-2026-00001")
++
++    def test_follows_the_highest_sequence_for_the_clinic_and_year(self):
++        existing = ["INV-HB-2026-00001", "INV-HB-2026-00007", "INV-HB-2026-00003"]
++        self.assertEqual(next_invoice_number("HB", 2026, existing), "INV-HB-2026-00008")
++
++    def test_other_clinics_do_not_count(self):
++        existing = ["INV-NG-2026-00005", "INV-WK-2026-00009"]
++        self.assertEqual(next_invoice_number("HB", 2026, existing), "INV-HB-2026-00001")
++
++    def test_other_years_do_not_count(self):
++        existing = ["INV-HB-2025-00042"]
++        self.assertEqual(next_invoice_number("HB", 2026, existing), "INV-HB-2026-00001")
++
++    def test_sequence_restarts_each_year(self):
++        existing = ["INV-HB-2025-00042"]
++        self.assertEqual(next_invoice_number("HB", 2025, existing), "INV-HB-2025-00043")
++
++    def test_accepts_any_iterable(self):
++        numbers = (n for n in ["INV-NG-2026-00002"])
++        self.assertEqual(next_invoice_number("NG", 2026, numbers), "INV-NG-2026-00003")
++
++    def test_unknown_clinic_is_rejected(self):
++        with self.assertRaises(ValueError):
++            next_invoice_number("XX", 2026, [])
++
++    def test_malformed_number_for_this_clinic_and_year_is_rejected(self):
++        with self.assertRaises(ValueError):
++            next_invoice_number("HB", 2026, ["INV-HB-2026-7"])
++
++    def test_last_number_of_the_year_is_refused_once_used(self):
++        with self.assertRaises(ValueError):
++            next_invoice_number("HB", 2026, ["INV-HB-2026-99999"])
++        self.assertEqual(next_invoice_number("HB", 2026, ["INV-HB-2026-99998"]), "INV-HB-2026-99999")
++
++
++if __name__ == "__main__":
++    unittest.main()

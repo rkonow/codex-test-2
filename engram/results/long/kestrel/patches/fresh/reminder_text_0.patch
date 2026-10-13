@@ -1,0 +1,73 @@
+diff --git a/src/kestrel/reminders.py b/src/kestrel/reminders.py
+new file mode 100644
+index 0000000..8bd867b
+--- /dev/null
++++ b/src/kestrel/reminders.py
+@@ -0,0 +1,18 @@
++"""Text of the SMS reminder sent two days before an appointment."""
++
++from kestrel.calendar import CLINIC_TZ
++from kestrel.models import CLINICS
++
++
++def reminder_text(appointment):
++    """Return the reminder text for an appointment, with its local (Auckland) date and time.
++
++    Privacy rule: the text gives only the date, the time and the clinic's name.
++    It never says what the appointment is for, and it does not name the patient.
++    """
++    local = appointment.start.astimezone(CLINIC_TZ)
++    hour = local.hour % 12 or 12
++    meridiem = "am" if local.hour < 12 else "pm"
++    when = f"{local.strftime('%A')} {local.day} {local.strftime('%B')} at {hour}:{local.minute:02d}{meridiem}"
++    clinic = CLINICS[appointment.clinic].name
++    return f"Hi, this is a reminder of your appointment at {clinic} on {when}. We look forward to seeing you!"
+diff --git a/tests/test_reminders.py b/tests/test_reminders.py
+new file mode 100644
+index 0000000..f140e00
+--- /dev/null
++++ b/tests/test_reminders.py
+@@ -0,0 +1,43 @@
++import datetime
++import unittest
++
++from kestrel.models import Appointment, ASSESSMENT
++from kestrel.reminders import reminder_text
++
++UTC = datetime.timezone.utc
++
++
++def appointment(start_utc, clinic="NG", treatment="lower back pain"):
++    return Appointment("A1", "KP-004211", "T1", clinic, start_utc, ASSESSMENT, treatment=treatment)
++
++
++class ReminderTextTest(unittest.TestCase):
++    def test_gives_local_date_time_and_clinic(self):
++        # 2026-10-14 09:30 in Auckland (NZDT, +13) is 20:30 UTC on 13 Oct
++        start = datetime.datetime(2026, 10, 13, 20, 30, tzinfo=UTC)
++        self.assertEqual(
++            reminder_text(appointment(start)),
++            "Hi, this is a reminder of your appointment at Kestrel Physio Northgate on Wednesday 14 October at 9:30am. We look forward to seeing you!",
++        )
++
++    def test_afternoon_uses_pm_and_12_hour_clock(self):
++        # 14:05 Auckland is 01:05 UTC the same day
++        start = datetime.datetime(2026, 10, 14, 1, 5, tzinfo=UTC)
++        text = reminder_text(appointment(start, clinic="HB"))
++        self.assertIn("Kestrel Physio Harbour on Wednesday 14 October at 2:05pm.", text)
++
++    def test_midnight_and_noon_read_as_12(self):
++        midnight = datetime.datetime(2026, 10, 13, 11, 0, tzinfo=UTC)  # 00:00 NZDT, 14 Oct
++        noon = datetime.datetime(2026, 10, 13, 23, 0, tzinfo=UTC)  # 12:00 NZDT, 14 Oct
++        self.assertIn("at 12:00am.", reminder_text(appointment(midnight)))
++        self.assertIn("at 12:00pm.", reminder_text(appointment(noon)))
++
++    def test_never_mentions_treatment_or_patient(self):
++        start = datetime.datetime(2026, 10, 13, 20, 30, tzinfo=UTC)
++        text = reminder_text(appointment(start, treatment="lower back pain"))
++        self.assertNotIn("back", text.lower())
++        self.assertNotIn("KP-", text)
++
++
++if __name__ == "__main__":
++    unittest.main()
