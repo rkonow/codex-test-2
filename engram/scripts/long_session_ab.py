@@ -58,6 +58,13 @@ SCRUB = ("CLAUDE_CODE_AUTO_COMPACT_WINDOW", "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE", "
 def claude(prompt, cwd, env, model, session=None, resume=None, fork=False, timeout=1200):
     cmd = ["claude", "-p", prompt, "--model", model, "--output-format", "json", "--allowedTools", ab.TOOLS,
            "--disallowedTools", "WebFetch,WebSearch", "--max-budget-usd", "3"]
+    # Only the repository's own settings and MCP servers: the user's plugins,
+    # hooks and MCP servers (another memory system among them) would add the
+    # same outside context to every lane. Engram installs into
+    # .claude/settings.local.json and .mcp.json, so it still loads.
+    cmd += ["--setting-sources", "project,local", "--strict-mcp-config"]
+    if os.path.exists(os.path.join(cwd, ".mcp.json")):
+        cmd += ["--mcp-config", os.path.join(cwd, ".mcp.json")]
     if session:
         cmd += ["--session-id", session]
     if resume:
