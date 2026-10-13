@@ -228,7 +228,7 @@ class Lane:
     def save_patch(self, task, rep):
         """What the run changed in the repository, for regrading and reading later."""
         os.makedirs(self.patches, exist_ok=True)
-        p = subprocess.run(["git", "diff", "--no-index", "--", self.repo + ".snap", self.repo], capture_output=True, text=True)
+        p = subprocess.run(["git", "diff", "--no-index", "--", self.repo + ".snap", self.repo], capture_output=True, text=True, errors="replace")
         keep = []
         for block in re.split(r"(?m)^(?=diff --git )", p.stdout):
             if "/.git/" in block.split("\n", 1)[0] or "__pycache__" in block.split("\n", 1)[0]:
