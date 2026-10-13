@@ -7,6 +7,7 @@
 //!   engram remember <kind> "text"
 //!   engram ingest-transcript <file.jsonl>        back-fill from a Claude Code transcript
 //!   engram fetch-model [static|bert]             download the embedding model
+//!   engram rpc '{"op": ...}'                     send one raw request to the daemon
 //!   engram serve --dir D --project P             (the daemon; started on demand)
 
 use std::path::PathBuf;
@@ -68,6 +69,13 @@ enum Cmd {
     Distill,
     /// Stop the daemon.
     Stop,
+    /// Send one raw JSON request to the daemon and print its JSON response
+    /// (the demo inspector's transport).
+    Rpc {
+        request: String,
+        #[arg(long, default_value_t = 60)]
+        timeout: u64,
+    },
     /// Back-fill records from a Claude Code transcript.
     IngestTranscript { path: PathBuf },
     /// Download an embedding model (static: potion-retrieval-32M; bert: bge-small-en-v1.5).
@@ -128,6 +136,20 @@ fn main() {
         Cmd::Stats => println!("{}", serde_json::to_string_pretty(&send(&project, json!({"op": "stats"}), 30)).unwrap()),
         Cmd::Briefing => text(&send(&project, json!({"op": "briefing", "session": ""}), 30)),
         Cmd::Distill => println!("{}", send(&project, json!({"op": "distill_backfill"}), 6 * 3600)),
+        Cmd::Rpc { request, timeout } => {
+            let req: Json = serde_json::from_str(&request).unwrap_or_else(|e| {
+                eprintln!("engram: request is not JSON: {e}");
+                std::process::exit(2)
+            });
+            let dir = paths::store_dir(&project);
+            match daemon::request(&dir, &project.to_string_lossy(), &req, Duration::from_secs(timeout)) {
+                Ok(r) => println!("{r}"),
+                Err(e) => {
+                    println!("{}", json!({"error": e.to_string()}));
+                    std::process::exit(1);
+                }
+            }
+        }
         Cmd::Stop => {
             send(&project, json!({"op": "shutdown"}), 10);
         }

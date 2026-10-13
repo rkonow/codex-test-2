@@ -173,6 +173,10 @@ impl Daemon {
             "forget" => self.op_forget(req).map(|r| (r, None)),
             "append" => self.op_append(req).map(|r| (r, None)),
             "stats" => self.op_stats().map(|r| (r, None)),
+            // Read-only views for the demo inspector (demo/server.py).
+            "inspect_query" => crate::inspect::query(&self.store, req).map(|r| (r, None)),
+            "inspect_layout" => crate::inspect::layout(&self.store).map(|r| (r, None)),
+            "inspect_embed" => crate::inspect::embed(&self.store, req).map(|r| (r, None)),
             "distill_backfill" => self.distill_backfill().map(|(t, n)| (json!({"turns": t, "items": n}), None)),
             "briefing" => {
                 let sid = req.get("session").and_then(|v| v.as_str()).unwrap_or("");
